@@ -568,6 +568,11 @@ function LoginPage({ onBack, onSwitchToSignup, onSuccessLogin }) {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
 
+
+  const [step, setStep] = useState("login"); // login | otp
+const [otp, setOtp] = useState("");
+const [generatedOtp, setGeneratedOtp] = useState("");
+
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
 
@@ -584,22 +589,25 @@ function LoginPage({ onBack, onSwitchToSignup, onSuccessLogin }) {
   try {
     setLoading(true);
 
-    const userCredential = await signInWithEmailAndPassword(auth, email.trim(), pass);
+    const userCredential = await signInWithEmailAndPassword(
+      auth,
+      email.trim(),
+      pass
+    );
+
     const user = userCredential.user;
 
-    // fetch profile from Firestore and pass it back to the app
-    let profile = null;
-    try {
-      const d = await getDoc(doc(db, "users", user.uid));
-      if (d.exists()) profile = d.data();
-      else profile = { uid: user.uid, email: user.email, role: "student" };
-    } catch (e) {
-      console.warn("Failed to fetch user profile:", e);
-      profile = { uid: user.uid, email: user.email };
-    }
+    // 🔥 Generate OTP
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    setGeneratedOtp(otpCode);
 
+    // ⚠️ TEMP: show OTP in console (replace later with email sending)
+    console.log("OTP:", otpCode);
+
+    // 👉 move to OTP step
+    setStep("otp");
     setLoading(false);
-    onSuccessLogin?.(profile);
+
   } catch (error) {
     setLoading(false);
 
@@ -612,6 +620,32 @@ function LoginPage({ onBack, onSwitchToSignup, onSuccessLogin }) {
     } else {
       setErr(error.message);
     }
+  }
+};
+
+const handleVerifyOtp = async (e) => {
+  e.preventDefault();
+
+  if (otp !== generatedOtp) {
+    return setErr("Invalid OTP.");
+  }
+
+  try {
+    setLoading(true);
+
+    const user = auth.currentUser;
+
+    let profile = null;
+    const d = await getDoc(doc(db, "users", user.uid));
+    if (d.exists()) profile = d.data();
+    else profile = { uid: user.uid, email: user.email };
+
+    setLoading(false);
+    onSuccessLogin?.(profile);
+
+  } catch (error) {
+    setLoading(false);
+    setErr(error.message);
   }
 };
 
@@ -650,39 +684,47 @@ function LoginPage({ onBack, onSwitchToSignup, onSuccessLogin }) {
                 </div>
               )}
 
-              <form onSubmit={handleLogin} className="space-y-4">
-                <InputBlock
-                  label="Email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  type="email"
-                />
-                <InputBlock
-                  label="Password"
-                  value={pass}
-                  onChange={(e) => setPass(e.target.value)}
-                  placeholder="••••••••"
-                  type="password"
-                />
+              {step === "login" ? (
+  <form onSubmit={handleLogin} className="space-y-4">
+    <InputBlock
+      label="Email"
+      value={email}
+      onChange={(e) => setEmail(e.target.value)}
+      placeholder="you@example.com"
+      type="email"
+    />
+    <InputBlock
+      label="Password"
+      value={pass}
+      onChange={(e) => setPass(e.target.value)}
+      placeholder="••••••••"
+      type="password"
+    />
 
-                <button
-                  disabled={loading}
-                  className="w-full mt-2 px-6 py-3.5 rounded-2xl bg-[#5F9598] text-[#061E29] font-bold hover:bg-[#4b7f82] transition shadow-xl shadow-[#5F9598]/10 disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {loading ? "Logging in..." : "Login"}
-                </button>
+    <button
+      disabled={loading}
+      className="w-full mt-2 px-6 py-3.5 rounded-2xl bg-[#5F9598] text-[#061E29] font-bold"
+    >
+      {loading ? "Checking..." : "Continue"}
+    </button>
+  </form>
+) : (
+  <form onSubmit={handleVerifyOtp} className="space-y-4">
+    <InputBlock
+      label="Enter OTP"
+      value={otp}
+      onChange={(e) => setOtp(e.target.value)}
+      placeholder="6-digit code"
+    />
 
-                <div className="text-xs text-[#F3F4F4]/55 text-center">
-                  No account yet?{" "}
-                  <span
-                    className="text-[#5F9598] cursor-pointer hover:underline"
-                    onClick={onSwitchToSignup}
-                  >
-                    Sign up
-                  </span>
-                </div>
-              </form>
+    <button
+      disabled={loading}
+      className="w-full mt-2 px-6 py-3.5 rounded-2xl bg-[#5F9598] text-[#061E29] font-bold"
+    >
+      {loading ? "Verifying..." : "Verify OTP"}
+    </button>
+  </form>
+)}
             </div>
           </div>
         </div>
