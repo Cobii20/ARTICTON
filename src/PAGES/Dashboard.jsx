@@ -122,24 +122,25 @@ useEffect(() => {
         lessonsCompleted: 1,
         lessonsTotal: 7,
         lastOpenedAt: Date.now() - 1000 * 60 * 60 * 36,
+        selectionTitle: "Disassembly",
+        selectionModuleNo: "Module 3",
+        selectionProgressText: "Module Progress 1/7 Lessons",
+        selectionCta: "Start",
+        selectionImage: "/PNG/module3.png",
       },
       {
         id: "module-4",
         title: "Module 4",
-        subtitle: "Basic networking",
+        subtitle: "Configuring Software (Windows / BIOS)",
         progress: 0,
         lessonsCompleted: 0,
         lessonsTotal: 6,
-        lastOpenedAt: 0,
-      },
-      {
-        id: "module-5",
-        title: "Module 5",
-        subtitle: "Troubleshooting basics",
-        progress: 100,
-        lessonsCompleted: 6,
-        lessonsTotal: 6,
-        lastOpenedAt: Date.now() - 1000 * 60 * 60 * 72,
+        lastOpenedAt: Date.now() - 1000 * 60 * 60 * 12,
+        selectionTitle: "Configuring Software",
+        selectionModuleNo: "Module 4",
+        selectionProgressText: "Module Progress 0/6 Lessons",
+        selectionCta: "Start",
+        selectionImage: "/PNG/module4.png", 
       },
     ];
 
@@ -237,9 +238,9 @@ useEffect(() => {
                     <SideItem label="Dashboard" active={section} onClick={() => setSection("Dashboard")} icon="home" />
                     <SideItem label="Modules" active={section} onClick={() => setSection("Modules")} icon="modules" />
                     <SideItem
-                      label="Practical Tests"
+                      label="Practice Tests"
                       active={section}
-                      onClick={() => setSection("Practical Tests")}
+                      onClick={() => setSection("Practice Tests")}
                       icon="tests"
                     />
                     <SideItem label="Profile" active={section} onClick={() => setSection("Profile")} icon="profile" />
@@ -248,26 +249,30 @@ useEffect(() => {
                   <div className="flex-1" />
 
                   <div className="pt-5 mt-5 border-t border-white/10 space-y-3">
-                    <button
+                     <button
                       type="button"
-                      className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-white/5 transition text-white/70 focus:outline-none focus:ring-2 focus:ring-[#5F9598]/35"
-                      aria-label="Open settings"
-                      onClick={() => go("/settings")}
-                    >
-                      <span className="h-10 w-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center">
-                        <Icon kind="settings" />
-                      </span>
-                      <span className="text-sm font-semibold">Settings</span>
-                    </button>
-                  </div>
+                     className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-white/5 transition text-white/70 focus:outline-none focus:ring-2 focus:ring-[#5F9598]/35"
+                          aria-label="Open FAQs"
+                      onClick={() => go("/faqs")}
+                      >
+                         <span className="h-10 w-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center">
+                          <Icon kind="help" />
+                            </span>
+                     <span className="text-sm font-semibold">FAQs</span>
+                           </button>
 
-                  <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4 flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-[#5F9598]/25 border border-[#5F9598]/25" aria-hidden="true" />
-                    <div className="leading-tight">
-                      <div className="text-sm font-semibold">{user.name}</div>
-                      <div className="text-[11px] text-white/45">{user.email}</div>
-                    </div>
-                  </div>
+                        <button
+                          type="button"
+                          className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-white/5 transition text-white/70 focus:outline-none focus:ring-2 focus:ring-[#5F9598]/35"
+                          aria-label="Contact Customer Service"
+                          onClick={() => go("/support")}
+                        >
+                          <span className="h-10 w-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center">
+                            <Icon kind="support" />
+                          </span>
+                          <span className="text-sm font-semibold">Customer Service</span>
+                        </button>
+                      </div>                 
                 </div>
               </aside>
 
@@ -288,16 +293,36 @@ useEffect(() => {
                       </div>
                     </div>
 
-                    <div className="hidden md:flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition">
-                      <div className="h-9 w-9 rounded-full bg-[#5F9598]/25 border border-[#5F9598]/25" aria-hidden="true" />
-                      <div className="leading-tight">
-                        <div className="text-sm font-semibold">{user.name}</div>
-                        <div className="text-[11px] text-white/45">{user.email}</div>
+                    <div className="relative z-50">
+                    <details className="group">
+                      <summary className="flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition cursor-pointer list-none">
+                        <div className="h-9 w-9 rounded-full bg-[#5F9598]/25 border border-[#5F9598]/25" aria-hidden="true" />
+                        <div className="leading-tight">
+                          <div className="text-sm font-semibold">{user.name}</div>
+                          <div className="text-[11px] text-white/45">{user.email}</div>
+                        </div>
+                        <div className="text-white/55 text-sm group-open:rotate-180 transform transition" aria-hidden="true">
+                          ▾
+                        </div>
+                      </summary>
+
+                      <div className="absolute right-0 mt-2 w-48 rounded-2xl bg-black/80 backdrop-blur-lg border border-white/10 p-2">
+                        <button
+                          onClick={() => go("/settings")}
+                          className="w-full text-left px-4 py-2 text-sm text-white/80 hover:bg-white/10 rounded-xl"
+                        >
+                          Settings
+                        </button>
+                        <button
+                          onClick={onLogout}
+                          className="w-full text-left px-4 py-2 text-sm text-white/80 hover:bg-white/10 rounded-xl"
+                        >
+                          Logout
+                        </button>
                       </div>
-                      <div className="text-white/55 text-sm" aria-hidden="true">
-                        ▾
-                      </div>
-                    </div>
+                    </details>
+                  </div>
+
                   </div>
 
                   {/* ✅ ONLY this content area scrolls, scrollbar is hidden via CSS class */}
@@ -378,7 +403,7 @@ useEffect(() => {
                           </motion.div>
                         ) : null}
 
-                        {section === "Practical Tests" ? (
+                        {section === "Practice Tests" ? (
                           <motion.div
                             key="tests"
                             initial={{ opacity: 0, y: 8 }}
@@ -407,12 +432,8 @@ useEffect(() => {
 
                   {/* Footer */}
                   <div className="flex justify-end">
-                    <button
-                      onClick={onLogout}
-                      className="px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#5F9598]/35"
-                    >
-                      Logout
-                    </button>
+                    
+                    
                   </div>
                 </div>
               </main>
@@ -432,7 +453,7 @@ useEffect(() => {
 function HomeOverview({ openModule, openTest, setSection, overall, modules, nextUp, user, stats, achievements, activity }) {
   return (
     <div className="h-full min-h-0 overflow-hidden grid grid-rows-[auto_auto_1fr] gap-6">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6">
         <TopCardHero
           title="Continue Module"
           headline={nextUp ? nextUp.subtitle : "Start learning"}
@@ -447,15 +468,7 @@ function HomeOverview({ openModule, openTest, setSection, overall, modules, next
           onClick={() => (nextUp ? openModule(nextUp.id) : setSection("Modules"))}
         />
 
-        <TopCardHero
-          title="Practical Test"
-          headline="Test Your Knowledge"
-          sub="30-min PC Assembly Test"
-          meta="Ready when you are"
-          button="Start Test"
-          imageSrc="/PNG/PCpng2.png"
-          onClick={() => openTest?.("pc-assembly")}
-        />
+    
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
