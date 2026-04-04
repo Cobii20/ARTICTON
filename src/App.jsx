@@ -42,7 +42,9 @@ export default function App() {
     return <Module1Page onBack={() => setPage("dashboard")} />;
   }
   if (page === "module-2") {
-  return <Module2Page onBack={() => setPage("dashboard")} />;
+  return <Module2Page onBack={() => setPage("dashboard")} 
+  onFinish={() => setPage("dashboard")}
+  />;
 }
 if (page === "module-3") {
   return <Module3Page onBack={() => setPage("dashboard")} />;

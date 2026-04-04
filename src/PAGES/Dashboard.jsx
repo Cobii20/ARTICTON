@@ -157,10 +157,13 @@ useEffect(() => {
       { id: "hands-on", icon: "badge", title: "Hands-On", subtitle: "Pass 1 Practical Test" },
     ];
 
-    const tests = [
-      { id: "pc-assembly", title: "PC Assembly Test", desc: "30 minutes • Beginner", status: "Ready" },
-      { id: "networking-basics", title: "Networking Basics", desc: "20 minutes • Intermediate", status: "Locked" },
-    ];
+const tests = [
+  { id: "intro-3d-identification", title: "Hardware Identification", desc: "Introduction • 3D model naming quiz", status: "Ready" },
+  { id: "pc-assembly", title: "PC Assembly Test", desc: "20 minutes timer", status: "Ready" },
+  { id: "pc-disassembly", title: "PC Disassembly Test", desc: "15 minutes timer", status: "Locked" },
+  { id: "software-config", title: "Software Configuration Quiz(Windows & BIOS)", desc: "20 minutes", status: "Locked" },
+];
+
     
 
     return { user, modules, activity, achievements, tests };
@@ -227,11 +230,18 @@ useEffect(() => {
               {/* SIDEBAR */}
               <aside className="border-r border-white/10 bg-black/20 backdrop-blur-xl h-full overflow-hidden">
                 <div className="h-full flex flex-col p-6 overflow-hidden">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="h-10 w-10 rounded-2xl bg-[#5F9598]/16 border border-[#5F9598]/25 flex items-center justify-center shadow-sm">
-                      <div className="h-3 w-3 rounded-full bg-[#5F9598]" />
-                    </div>
-                    <div className="text-lg font-bold tracking-wide">Articton</div>
+                  <div className="flex items-center gap-3 mb-6 ml-7">
+                    <button
+                      onClick={() => setSection("Dashboard")}
+                      className="cursor-pointer flex items-center gap-3"
+                    >
+                      <img
+                        src="/PNG/Articton.png"
+                        alt="Articton Logo"
+                        className="h-10 w-10 object-contain scale-500 hover:opacity-90 transition"
+                      />
+                      <span className="text-lg font-bold tracking-wide">Articton</span>
+                    </button>
                   </div>
 
                   <div className="space-y-2">
@@ -568,40 +578,42 @@ function ModulesSelection({ modules, onBack, onOpenModule }) {
 function PracticalTestsPage({ tests, onOpen }) {
   const motionPreset = useCardMotion();
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {tests.map((t) => (
-        <motion.button
-          key={t.id}
-          type="button"
-          {...motionPreset}
-          onClick={() => onOpen?.(t.id)}
-          className="text-left w-full rounded-[28px] border border-white/10 bg-black/18 backdrop-blur-xl shadow-[0_30px_90px_rgba(0,0,0,0.42)] p-7 focus:outline-none focus:ring-2 focus:ring-[#5F9598]/35"
-          aria-label={`Open test ${t.title}`}
+   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 overflow-hidden">
+  {tests.map((t) => (
+    <motion.div
+      key={t.id}
+      {...motionPreset}
+      className="text-left w-full rounded-[28px] border border-white/10 bg-black/18 backdrop-blur-xl shadow-[0_30px_90px_rgba(0,0,0,0.42)] p-10 flex flex-col items-start justify-between"
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="text-lg font-bold tracking-tight">{t.title}</div>
+          <div className="mt-1 text-sm text-white/55">{t.desc}</div>
+        </div>
+
+        <span
+          className={[
+            "text-[11px] px-3 py-1.5 rounded-full border",
+            t.status === "Ready"
+              ? "bg-[#5F9598]/18 border-[#5F9598]/28 text-white/80"
+              : "bg-white/5 border-white/10 text-white/55",
+          ].join(" ")}
         >
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="text-lg font-bold tracking-tight">{t.title}</div>
-              <div className="mt-1 text-sm text-white/55">{t.desc}</div>
-            </div>
+          {t.status}
+        </span>
+      </div>
 
-            <span
-              className={[
-                "text-[11px] px-3 py-1.5 rounded-full border",
-                t.status === "Ready"
-                  ? "bg-[#5F9598]/18 border-[#5F9598]/28 text-white/80"
-                  : "bg-white/5 border-white/10 text-white/55",
-              ].join(" ")}
-            >
-              {t.status}
-            </span>
-          </div>
+      <button
+        type="button"
+        onClick={() => onOpen?.(t.id)}
+        className="mt-5 inline-flex items-center gap-2 rounded-2xl font-semibold bg-white/5 border border-white/10 hover:bg-white/10 transition px-5 py-3 text-[13px]"
+      >
+        Open test <span className="text-white/70">→</span>
+      </button>
+    </motion.div>
+  ))}
+</div>
 
-          <div className="mt-5 inline-flex items-center gap-2 rounded-2xl font-semibold bg-white/5 border border-white/10 hover:bg-white/10 transition px-5 py-3 text-[13px]">
-            Open test <span className="text-white/70">→</span>
-          </div>
-        </motion.button>
-      ))}
-    </div>
   );
 }
 

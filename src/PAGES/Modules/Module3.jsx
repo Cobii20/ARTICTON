@@ -1,7 +1,7 @@
 export default function Module3Page({ onBack }) {
   return (
     <div className="min-h-screen bg-[#061E29] text-white flex flex-col items-center justify-center">
-      <h1 className="text-3xl font-bold mb-6">Module 2: Assembly</h1>
+      <h1 className="text-3xl font-bold mb-6">Module 3: Disassembly</h1>
 
       <button
         onClick={onBack}

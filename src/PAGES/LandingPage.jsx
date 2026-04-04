@@ -96,11 +96,14 @@ function Navbar({ onHome, onOpenLogin, onSignup,  }) {
       className="fixed top-0 z-50 w-full flex items-center justify-between px-6 md:px-10 lg:px-16 py-5 bg-[#061E29]/75 backdrop-blur-xl border-b border-[#5F9598]/20"
     >
       <div className="flex items-center gap-3 cursor-pointer" onClick={onHome}>
-        <div className="h-9 w-9 rounded-2xl bg-[#5F9598]/15 border border-[#5F9598]/25 flex items-center justify-center shadow-sm">
-          <div className="h-3 w-3 rounded-full bg-[#5F9598]" />
-        </div>
-        <h1 className="text-2xl font-bold tracking-wide">Articton</h1>
-      </div>
+  <img
+    src="/PNG/Articton.png"
+    alt="Articton Logo"
+    className="h-10 w-10 scale-500 object-contain"
+  />
+  <h1 className="text-2xl font-bold tracking-wide">Articton</h1>
+</div>
+
 
       <div className="flex gap-6 md:gap-8 text-sm text-[#F3F4F4]/80 items-center">
   <span onClick={onHome} className="cursor-pointer hover:text-white">
