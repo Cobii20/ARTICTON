@@ -12,14 +12,16 @@ const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
     user: "projectarticton@gmail.com",
-    pass: "gskiddlavlwoftys", 
+    pass: process.env.GMAIL_APP_PASSWORD, 
   },
 });
 
 /* ===========================
    SEND OTP
    =========================== */
-exports.sendEmailOtp = onCall(async (request) => {
+exports.sendEmailOtp = onCall(
+  { secrets: ["GMAIL_APP_PASSWORD"] },
+  async (request) => {
   const { email } = request.data;
 
   console.log("📩 Incoming email:", email);
