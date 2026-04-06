@@ -8,6 +8,12 @@ import {
   signInWithEmailAndPassword
 } from "firebase/auth";
 import { doc, setDoc, getDoc } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
+import { functions } from "../firebase.js";
+
+
+
+
 
 
 /* ===========================
@@ -588,6 +594,9 @@ const [generatedOtp, setGeneratedOtp] = useState("");
   if (!email.trim() || !pass.trim()) {
     return setErr("Please enter your email and password.");
   }
+  console.log("📧 RAW EMAIL:", email);
+  console.log("📧 TRIMMED EMAIL:", email.trim());
+  console.log("📧 TYPE:", typeof email);
 
   try {
     setLoading(true);
@@ -600,19 +609,25 @@ const [generatedOtp, setGeneratedOtp] = useState("");
 
     const user = userCredential.user;
 
-    // 🔥 Generate OTP
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-    setGeneratedOtp(otpCode);
+    const sendEmailOtp = httpsCallable(functions, "sendEmailOtp");
 
-    // ⚠️ TEMP: show OTP in console (replace later with email sending)
-    console.log("OTP:", otpCode);
+const cleanEmail = email.trim();
 
-    // 👉 move to OTP step
-    setStep("otp");
+if (!cleanEmail) {
+  setErr("Email is empty before sending OTP");
+  return;
+}
+
+await sendEmailOtp({
+  email: cleanEmail,
+});
+
+setStep("otp");
     setLoading(false);
 
   } catch (error) {
-    setLoading(false);
+  console.error("LOGIN ERROR:", error); // 👈 ADD THIS
+  setLoading(false);
 
     if (
       error.code === "auth/invalid-credential" ||
@@ -629,9 +644,14 @@ const [generatedOtp, setGeneratedOtp] = useState("");
 const handleVerifyOtp = async (e) => {
   e.preventDefault();
 
-  if (otp !== generatedOtp) {
-    return setErr("Invalid OTP.");
-  }
+ const verifyEmailOtp = httpsCallable(functions, "verifyEmailOtp");
+try {
+  await verifyEmailOtp({ email: email.trim(), otp });
+} catch (error) {
+  console.error("OTP ERROR:", error); 
+  return setErr(error.message || "Invalid OTP");
+}
+
 
   try {
     setLoading(true);
@@ -740,33 +760,187 @@ const handleVerifyOtp = async (e) => {
    INPUTS (base)
 =========================== */
 function InputLite({ value, onChange, placeholder, type = "text" }) {
+  const [show, setShow] = useState(false);
+  const isPassword = type === "password";
+
   return (
-    <input
-      value={value}
-      onChange={onChange}
-      placeholder={placeholder}
-      type={type}
-      className="w-full px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-[#F3F4F4] placeholder:text-[#F3F4F4]/35 outline-none focus:ring-2 focus:ring-[#5F9598]/50 focus:border-[#5F9598]/30 transition text-sm"
-    />
+    <div className="relative">
+      <input
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        type={isPassword && show ? "text" : type}
+        className="w-full px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-[#F3F4F4] 
+                   placeholder:text-[#F3F4F4]/35 outline-none focus:ring-2 focus:ring-[#5F9598]/50 
+                   focus:border-[#5F9598]/30 transition text-sm pr-10"
+      />
+
+      {isPassword && (
+        <button
+          type="button"
+          onClick={() => setShow((v) => !v)}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-white/70 hover:text-white focus:outline-none 
+                     flex items-center justify-center h-6 w-6"
+        >
+          {show ? (
+            // 👁 Visible eye
+            <svg
+             xmlns="[w3.org](http://www.w3.org/2000/svg)"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              className="h-5 w-5"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M2.458 12C3.732 7.943 7.523 5 
+                   12 5c4.478 0 8.268 2.943 9.542 7
+                   -1.274 4.057-5.064 7-9.542 7
+                   -4.477 0-8.268-2.943-9.542-7z"
+              />
+            </svg>
+          ) : (
+            // 🙈 Crossed Out eye
+            <svg
+              xmlns="[w3.org](http://www.w3.org/2000/svg)"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              className="h-5 w-5"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M3.98 8.223A10.477 10.477 0 001.934 12
+                  C3.226 16.114 7.244 19 12 19
+                  c1.474 0 2.87-.254 4.138-.717M21.166 15.803
+                  A10.45 10.45 0 0022.066 12
+                  C20.774 7.886 16.756 5 12 5
+                  a9.967 9.967 0 00-2.652.353"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M15 12a3 3 0 11-6 0"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M3 3l18 18"
+              />
+            </svg>
+
+          )}
+        </button>
+      )}
+    </div>
   );
 }
 
+
+
 function InputBlock({ label, value, onChange, placeholder, type = "text" }) {
+  const [show, setShow] = useState(false);
+  const isPassword = type === "password";
+
   return (
     <label className="block">
       <span className="text-[11px] tracking-widest text-[#F3F4F4]/55">
         {label}
       </span>
-      <input
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        type={type}
-        className="mt-2 w-full px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-[#F3F4F4] placeholder:text-[#F3F4F4]/35 outline-none focus:ring-2 focus:ring-[#5F9598]/50 focus:border-[#5F9598]/30 transition text-sm"
-      />
+
+      {/* wrap input and button together */}
+      <div className="relative mt-2">
+        <input
+          value={value}
+          onChange={onChange}
+          placeholder={placeholder}
+          type={isPassword && show ? "text" : type}
+          className="w-full px-4 py-3 pr-10 rounded-2xl bg-white/5 border border-white/10
+                     text-[#F3F4F4] placeholder:text-[#F3F4F4]/35 outline-none
+                     focus:ring-2 focus:ring-[#5F9598]/50 focus:border-[#5F9598]/30
+                     transition text-sm"
+        />
+
+        {isPassword && (
+          <button
+            type="button"
+            onClick={() => setShow(!show)}
+            className="absolute right-3 top-1/2 -translate-y-1/2
+                       flex items-center justify-center
+                       text-white/70 hover:text-white focus:outline-none
+                       h-6 w-6"
+            aria-label={show ? "Hide password" : "Show password"}
+          >
+            {show ? (
+              // 👁 visible eye
+              <svg
+                xmlns="[w3.org](http://www.w3.org/2000/svg)"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                className="h-5 w-5"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M2.458 12C3.732 7.943 7.523 5
+                     12 5c4.478 0 8.268 2.943 9.542 7
+                     -1.274 4.057-5.064 7-9.542 7
+                     -4.477 0-8.268-2.943-9.542-7z"
+                />
+              </svg>
+            ) : (
+              // 🙈 crossed eye
+              <svg
+                xmlns="[w3.org](http://www.w3.org/2000/svg)"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                className="h-5 w-5"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M3.98 8.223A10.477 10.477 0 001.934 12
+                    C3.226 16.114 7.244 19 12 19
+                    c1.474 0 2.87-.254 4.138-.717M21.166 15.803
+                    A10.45 10.45 0 0022.066 12
+                    C20.774 7.886 16.756 5 12 5
+                    a9.967 9.967 0 00-2.652.353"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M15 12a3 3 0 11-6 0"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M3 3l18 18"
+                />
+              </svg>
+
+            )}
+          </button>
+        )}
+      </div>
     </label>
   );
 }
+
+
 
 /* ===========================
    ✅ DATE PICKER (No future dates)
