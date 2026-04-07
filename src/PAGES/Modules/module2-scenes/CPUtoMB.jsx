@@ -15,7 +15,7 @@ const MB_ROTATION = new THREE.Euler(0, -Math.PI / 2, 0);
  * SOCKET / MAGNET POSITION
  * Tweak this until the red marker sits exactly at the center of the socket.
  */
-const SOCKET_WORLD_POSITION = new THREE.Vector3(5.09, 0.12, 4.03);
+const SOCKET_WORLD_POSITION = new THREE.Vector3(5.15, 0.20, 4.35);
 
 /**
  * Final seated offset.
@@ -37,7 +37,7 @@ const SNAP_DISTANCE = 0.12;
 const MAGNET_DISTANCE = 1.0;
 
 /** Magnetic pull strength */
-const MAGNET_STRENGTH = 0.12;
+const MAGNET_STRENGTH = 0.20;
 
 /** Start rotation only */
 const START_ROTATION = new THREE.Euler(0, 0, 0);
