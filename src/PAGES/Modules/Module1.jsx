@@ -5,8 +5,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import * as THREE from "three";
 import { auth, db } from "../../firebase.js";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { useThree, useFrame } from "@react-three/fiber";
+
 const THEME = {
   bg: "#0a0e17",
   surface: "#0d1220",
@@ -42,7 +43,9 @@ function IntroDeck({ slides, onDone }) {
             <div className="flex items-center justify-between gap-4 border-b border-[#1a2438] bg-[#111d33] px-10 py-7">
               <div className="min-w-0">
                 <div className="text-[14px] text-[#00ffb4]">Introduction</div>
-                <div className="truncate text-[26px] font-extrabold text-[#e8ecf4]">{slide.title}</div>
+                <div className="truncate text-[26px] font-extrabold text-[#e8ecf4]">
+                  {slide.title}
+                </div>
               </div>
 
               <div className="text-[14px] font-medium text-[#7a8ba8]">
@@ -51,7 +54,9 @@ function IntroDeck({ slides, onDone }) {
             </div>
 
             <div className="px-10 py-8">
-              <div className="whitespace-pre-line text-[18px] leading-relaxed text-[#dbe6f5]">{slide.body}</div>
+              <div className="whitespace-pre-line text-[18px] leading-relaxed text-[#dbe6f5]">
+                {slide.body}
+              </div>
 
               {slide.points?.length ? (
                 <ul className="mt-6 space-y-3 text-[#c8d4e6]">
@@ -138,10 +143,9 @@ function HotspotPin({
       .transformDirection(groupRef.current.matrixWorld);
 
     const toCamera = camera.position.clone().sub(worldPos).normalize();
-
     const facing = normal.dot(toCamera);
-
     const nextOpacity = facing > 0.15 ? 1 : facing > -0.15 ? 0.18 : 0;
+
     setPinOpacity(nextOpacity);
   });
 
@@ -190,12 +194,26 @@ function HotspotPin({
   );
 }
 
-function ModelScene({ url, hotspots, activeId, setActiveId, debug, setLastCoords, modelScale = 1, modelRotation = [0, 0, 0], modelPosition = [0, 0, 0], pinStyle, normalize }) {
+function ModelScene({
+  url,
+  hotspots,
+  activeId,
+  setActiveId,
+  debug,
+  setLastCoords,
+  modelScale = 1,
+  modelRotation = [0, 0, 0],
+  modelPosition = [0, 0, 0],
+  pinStyle,
+  normalize,
+}) {
   const { scene } = useGLTF(url);
   const groupRef = useRef();
 
   const normalized = useMemo(() => {
-    if (!normalize?.enabled) return { scale: 1, offset: new THREE.Vector3(0, 0, 0) };
+    if (!normalize?.enabled) {
+      return { scale: 1, offset: new THREE.Vector3(0, 0, 0) };
+    }
 
     const box = new THREE.Box3();
     const tmp = new THREE.Box3();
@@ -233,13 +251,23 @@ function ModelScene({ url, hotspots, activeId, setActiveId, debug, setLastCoords
     e.stopPropagation();
     const local = e.point.clone();
     if (groupRef.current) groupRef.current.worldToLocal(local);
-    const coords = [Number(local.x.toFixed(3)), Number(local.y.toFixed(3)), Number(local.z.toFixed(3))];
+    const coords = [
+      Number(local.x.toFixed(3)),
+      Number(local.y.toFixed(3)),
+      Number(local.z.toFixed(3)),
+    ];
     setLastCoords(coords);
     console.log(`[HOTSPOT COORD] ${url} clicked: [${coords.join(", ")}]`);
   };
 
   return (
-    <group ref={groupRef} onPointerDown={onPointerDown} rotation={modelRotation} position={modelPosition} scale={modelScale}>
+    <group
+      ref={groupRef}
+      onPointerDown={onPointerDown}
+      rotation={modelRotation}
+      position={modelPosition}
+      scale={modelScale}
+    >
       <group position={normalized.offset.toArray()} scale={normalized.scale}>
         <primitive object={scene} />
       </group>
@@ -267,13 +295,17 @@ function HotspotInfoCard({ hotspot, onClose }) {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 10 }}
           transition={{ duration: 0.18 }}
-          className="absolute bottom-8 left-8 z-40"
+          className="absolute bottom-8 right-8 z-40"
         >
           <div className="w-[380px] max-w-[calc(100vw-64px)] overflow-hidden rounded-2xl border border-[#1a2438] bg-[#0d1220]/90 shadow-[0_22px_80px_rgba(0,0,0,0.65)] backdrop-blur-xl">
             <div className="flex items-center justify-between gap-3 border-b border-[#1a2438] bg-white/[0.03] px-4 py-3">
               <div className="min-w-0">
-                <div className="truncate text-[13px] font-extrabold text-white">{hotspot.title}</div>
-                <div className="text-[11px] text-[#7a8ba8]">Hotspot {hotspot.number}</div>
+                <div className="truncate text-[13px] font-extrabold text-white">
+                  {hotspot.title}
+                </div>
+                <div className="text-[11px] text-[#7a8ba8]">
+                  Hotspot {hotspot.number}
+                </div>
               </div>
 
               <button
@@ -287,7 +319,9 @@ function HotspotInfoCard({ hotspot, onClose }) {
             </div>
 
             <div className="p-4">
-              <div className="text-[12px] leading-relaxed text-white/85">{hotspot.en}</div>
+              <div className="text-[12px] leading-relaxed text-white/85">
+                {hotspot.en}
+              </div>
             </div>
           </div>
         </motion.div>
@@ -296,7 +330,7 @@ function HotspotInfoCard({ hotspot, onClose }) {
   );
 }
 
-function HeaderDropdown({ userName = "John Doe", onBack, onLogout }) {
+function HeaderDropdown({ userName, onBack, onLogout }) {
   const handleBack = () => {
     if (typeof onBack === "function") onBack("Modules");
   };
@@ -321,7 +355,9 @@ function HeaderDropdown({ userName = "John Doe", onBack, onLogout }) {
               <div className="text-sm font-semibold text-white">{userName}</div>
               <div className="text-[11px] text-[#7a8ba8]">Student</div>
             </div>
-            <div className="text-sm text-[#7a8ba8] transition group-open:rotate-180">▾</div>
+            <div className="text-sm text-[#7a8ba8] transition group-open:rotate-180">
+              ▾
+            </div>
           </div>
         </summary>
 
@@ -334,7 +370,7 @@ function HeaderDropdown({ userName = "John Doe", onBack, onLogout }) {
           </button>
           <button
             onClick={onLogout}
-            className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 rounded-xl"
+            className="w-full rounded-xl px-4 py-2 text-left text-sm text-red-400 transition hover:bg-red-500/10"
           >
             Logout
           </button>
@@ -351,34 +387,49 @@ export default function Module1Page({ onBack, onLogout }) {
   const [debug, setDebug] = useState(false);
   const [lastCoords, setLastCoords] = useState(null);
   const [firebaseUser, setFirebaseUser] = useState(null);
- const [profile, setProfile] = useState(null);
+  const [profile, setProfile] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+const [localCompletedParts, setLocalCompletedParts] = useState({});
 
- useEffect(() => {
-  const unsubscribe = onAuthStateChanged(auth, async (user) => {
-    if (!user) {
-      setFirebaseUser(null);
-      setProfile(null);
-      return;
-    }
+useEffect(() => {
+  const saved = profile?.moduleProgress?.module1?.completedParts || {};
 
-    setFirebaseUser(user);
-
-    try {
-      const userRef = doc(db, "users", user.uid);
-      const userSnap = await getDoc(userRef);
-
-      if (userSnap.exists()) {
-        setProfile(userSnap.data());
-      } else {
-        setProfile(null);
-      }
-    } catch (err) {
-      console.error("Error reading profile:", err);
-    }
+  setLocalCompletedParts({
+    cpu: !!saved.cpu,
+    motherboard: !!saved.motherboard,
+    ram: !!saved.ram,
+    hdd: !!saved.hdd,
+    psu: !!saved.psu,
+    case: !!saved.case,
   });
+}, [profile]);
 
-  return () => unsubscribe();
-}, []);
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        setFirebaseUser(null);
+        setProfile(null);
+        return;
+      }
+
+      setFirebaseUser(user);
+
+      try {
+        const userRef = doc(db, "users", user.uid);
+        const userSnap = await getDoc(userRef);
+
+        if (userSnap.exists()) {
+          setProfile(userSnap.data());
+        } else {
+          setProfile(null);
+        }
+      } catch (err) {
+        console.error("Error reading profile:", err);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (e) => {
@@ -420,9 +471,30 @@ export default function Module1Page({ onBack, onLogout }) {
           },
         ],
         hotspots: [
-          { id: "cpu-hs-1", number: 1, title: "Heat Spreader (Top Cap)", position: [3.05, 0.28, 0.02], frontAxis: [0, 1, 0], en: "The top metal cover spreads heat from the chip to the cooler for better cooling." },
-          { id: "cpu-hs-2", number: 2, title: "Substrate / Package Base", position: [1.82, -0.35, -0.84], frontAxis: [0, -1, 0], en: "The base that supports the CPU package and routes signals between internal layers." },
-          { id: "cpu-hs-3", number: 3, title: "Contact / Pin Area", position: [0.58, -0.47, 0.28], frontAxis: [0, -1, 0], en: "The contact area connects the CPU to the motherboard socket to deliver power and data." },
+          {
+            id: "cpu-hs-1",
+            number: 1,
+            title: "Heat Spreader (Top Cap)",
+            position: [3.05, 0.28, 0.02],
+            frontAxis: [0, 1, 0],
+            en: "The top metal cover spreads heat from the chip to the cooler for better cooling.",
+          },
+          {
+            id: "cpu-hs-2",
+            number: 2,
+            title: "Substrate / Package Base",
+            position: [1.82, -0.35, -0.84],
+            frontAxis: [0, -1, 0],
+            en: "The base that supports the CPU package and routes signals between internal layers.",
+          },
+          {
+            id: "cpu-hs-3",
+            number: 3,
+            title: "Contact / Pin Area",
+            position: [0.58, -0.47, 0.28],
+            frontAxis: [0, -1, 0],
+            en: "The contact area connects the CPU to the motherboard socket to deliver power and data.",
+          },
         ],
       },
       {
@@ -447,41 +519,64 @@ export default function Module1Page({ onBack, onLogout }) {
             body:
               "This module helps you identify major motherboard zones.\n" +
               "Focus on where power comes in, where the CPU/RAM sit, and how storage connects.",
-            points: ["Learn main connectors and slots.", "Understand how parts communicate on the board.", "Use pins to identify components quickly."],
+            points: [
+              "Learn main connectors and slots.",
+              "Understand how parts communicate on the board.",
+              "Use pins to identify components quickly.",
+            ],
           },
         ],
         hotspots: [
-          { id: "mb-hs-1", number: 1, title: "CPU Socket Area", position: [0.2, 0.3, -0.8], en: "The CPU socket holds and connects the processor to the motherboard." },
-          { id: "mb-hs-2", number: 2, title: "RAM Slots", position: [1.4, 0.32, -1], en: "DIMM slots where memory modules are installed." },
-          { id: "mb-hs-3", number: 3, title: "24-pin ATX Power Connector", position: [2, 0.20, -0.55], en: "Main power input from the PSU to the motherboard." },
+          {
+            id: "mb-hs-1",
+            number: 1,
+            title: "CPU Socket Area",
+            position: [0.2, 0.3, -0.8],
+            en: "The CPU socket holds and connects the processor to the motherboard.",
+          },
+          {
+            id: "mb-hs-2",
+            number: 2,
+            title: "RAM Slots",
+            position: [1.4, 0.32, -1],
+            en: "DIMM slots where memory modules are installed.",
+          },
+          {
+            id: "mb-hs-3",
+            number: 3,
+            title: "24-pin ATX Power Connector",
+            position: [2, 0.2, -0.55],
+            en: "Main power input from the PSU to the motherboard.",
+          },
         ],
       },
-     {
-  key: "ram",
-  name: "RAM",
-  url: "/models/ram.glb",
-  view: {
-    cameraPos: [0, 0.55, 2.4],
-    boundsMargin: 1.05,
-    minDistance: 0.9,
-    maxDistance: 6.0,
-    modelScale: 1.5,
-    modelRotation: [0, 0.35, 0],
-    modelPosition: [0, 0, 0],
-    normalize: { enabled: true, targetSize: 2.8 },
-    pinStyle: { buttonPx: 16, glowRadius: 0.006, distanceFactor: 18 },
-  },
-  slides: [
-    {
-      id: "ram-s1",
-      title: "RAM Module Overview",
-      body: "Explore a RAM stick and learn its key parts.\nRAM provides fast temporary storage while programs run.",
-      points: [
-        "Identify the IC chips and connector edge.",
-        "Understand the notch alignment.",
-        "Learn safe handling.",
-      ],
-    },
+      {
+        key: "ram",
+        name: "RAM",
+        url: "/models/ram.glb",
+        view: {
+          cameraPos: [0, 0.55, 2.4],
+          boundsMargin: 1.05,
+          minDistance: 0.9,
+          maxDistance: 6.0,
+          modelScale: 1.5,
+          modelRotation: [0, 0.35, 0],
+          modelPosition: [0, 0, 0],
+          normalize: { enabled: true, targetSize: 2.8 },
+          pinStyle: { buttonPx: 16, glowRadius: 0.006, distanceFactor: 18 },
+        },
+        slides: [
+          {
+            id: "ram-s1",
+            title: "RAM Module Overview",
+            body:
+              "Explore a RAM stick and learn its key parts.\nRAM provides fast temporary storage while programs run.",
+            points: [
+              "Identify the IC chips and connector edge.",
+              "Understand the notch alignment.",
+              "Learn safe handling.",
+            ],
+          },
         ],
         hotspots: [
           {
@@ -526,14 +621,19 @@ export default function Module1Page({ onBack, onLogout }) {
           {
             id: "hdd-s1",
             title: "Hard Disk Drive Overview",
-            body: "This module introduces the HDD exterior and connection points.\nHDDs store data long-term using spinning platters internally.",
-            points: ["Identify SATA data + power ports.", "Recognize the casing and mounting holes.", "Learn handling precautions."],
+            body:
+              "This module introduces the HDD exterior and connection points.\nHDDs store data long-term using spinning platters internally.",
+            points: [
+              "Identify SATA data + power ports.",
+              "Recognize the casing and mounting holes.",
+              "Learn handling precautions.",
+            ],
           },
         ],
         hotspots: [
-          { id: "hdd-hs-1", number: 1, title: "SATA Data Port", position: [2.15, 3, 2.22],frontAxis: [0, 0, -1], en: "Transfers data between the HDD and motherboard via a SATA cable." },
-          { id: "hdd-hs-2", number: 2, title: "SATA Power Port", position: [0.22, -0.03, 0.22],frontAxis: [0, 0, -1], en: "Receives power from the PSU through the SATA power connector." },
-          { id: "hdd-hs-3", number: 3, title: "Drive Casing", position: [0.0, 0.1, 0.0],frontAxis: [0, 0, -1], en: "Protective metal enclosure that houses internal parts." },
+           { id: "hdd-hs-1", number: 1, title: "SATA Data Port", position: [239.735, 0.039, -9.351],frontAxis: [0, 1, 1], en: "Transfers data between the HDD and motherboard via a SATA cable." },
+          { id: "hdd-hs-2", number: 2, title: "SATA Power Port", position: [239.735, -0.045, 80.445],frontAxis: [0, 1, 1], en: "Receives power from the PSU through the SATA power connector." },
+          { id: "hdd-hs-3", number: 3, title: "Drive Casing", position: [-13.835, 16.201, -133.387],frontAxis: [0, 1, 0], en: "Protective metal enclosure that houses internal parts." },
         ],
       },
       {
@@ -549,20 +649,46 @@ export default function Module1Page({ onBack, onLogout }) {
           modelRotation: [0, -0.25, 0],
           modelPosition: [0, 0, 0],
           normalize: { enabled: true, targetSize: 2.6 },
-          pinStyle: { buttonPx: 44, glowRadius: 0.05, distanceFactor: 14 },
+          pinStyle: { buttonPx: 34, glowRadius: 0.05, distanceFactor: 14 },
         },
         slides: [
           {
             id: "psu-s1",
             title: "Power Supply Unit Overview",
-            body: "The PSU converts AC wall power into regulated DC power for the PC.",
-            points: ["Identify the AC input and main output area.", "PSUs must not be opened.", "Use pins to locate key areas."],
+            body:
+              "The PSU converts AC wall power into regulated DC power for the PC.",
+            points: [
+              "Identify the AC input and main output area.",
+              "PSUs must not be opened.",
+              "Use pins to locate key areas.",
+            ],
           },
         ],
         hotspots: [
-          { id: "psu-hs-1", number: 1, title: "PSU Fan / Vent", position: [0, 0, 0], uiOffset: [460, -170], en: "Moves air to cool internal components and maintain stable power delivery." },
-          { id: "psu-hs-2", number: 2, title: "AC Input Socket", position: [0, 0, 0], uiOffset: [460, 0], en: "Where the power cable from the wall plugs into the PSU." },
-          { id: "psu-hs-3", number: 3, title: "DC Output / Cable Interface", position: [0, 0, 0], uiOffset: [460, 170], en: "Where PSU cables connect to supply power to the motherboard, GPU, and storage." },
+          {
+            id: "psu-hs-1",
+            number: 1,
+            title: "PSU Fan / Vent",
+            position: [-0.294, -5.234, -0.641],
+            frontAxis: [0, 1, 0],
+            en: "Moves air to cool internal components and maintain stable power delivery.",
+          },
+          {
+            id: "psu-hs-2",
+            number: 2,
+            title: "AC Input Socket",
+            position: [-0.717, -5.778, -1.699],
+            frontAxis: [0, 1, -1],
+            en: "Where the power cable from the wall plugs into the PSU.",
+          },
+          {
+            id: "psu-hs-3",
+            number: 3,
+            title: "DC Output / Cable Interface",
+            position: [0.019, -5.759, 0.795],
+            frontAxis: [0, 0, 1],
+            en: "Where PSU cables connect to supply power to the motherboard, GPU, and storage.",
+          },
         ],
       },
       {
@@ -584,14 +710,37 @@ export default function Module1Page({ onBack, onLogout }) {
           {
             id: "case-s1",
             title: "PC Case Overview",
-            body: "The case provides structure, airflow, and mounting points for components.",
-            points: ["Identify motherboard tray and PSU bay.", "Find storage mounting areas.", "Understand airflow direction."],
+            body:
+              "The case provides structure, airflow, and mounting points for components.",
+            points: [
+              "Identify motherboard tray and PSU bay.",
+              "Find storage mounting areas.",
+              "Understand airflow direction.",
+            ],
           },
         ],
         hotspots: [
-          { id: "case-hs-1", number: 1, title: "Motherboard Tray Area", position: [0.0, 0.2, 0.0], en: "Where the motherboard mounts using standoffs and screws." },
-          { id: "case-hs-2", number: 2, title: "PSU Bay", position: [-0.25, -0.15, 0.15], en: "The compartment where the power supply is installed." },
-          { id: "case-hs-3", number: 3, title: "Drive Bay / Storage Mount", position: [0.28, -0.05, 0.2], en: "Where HDD/SSD mounts are located in many case designs." },
+          {
+            id: "case-hs-1",
+            number: 1,
+            title: "Motherboard Tray Area",
+            position: [0.0, 0.2, 0.0],
+            en: "Where the motherboard mounts using standoffs and screws.",
+          },
+          {
+            id: "case-hs-2",
+            number: 2,
+            title: "PSU Bay",
+            position: [-0.25, -0.15, 0.15],
+            en: "The compartment where the power supply is installed.",
+          },
+          {
+            id: "case-hs-3",
+            number: 3,
+            title: "Drive Bay / Storage Mount",
+            position: [0.28, -0.05, 0.2],
+            en: "Where HDD/SSD mounts are located in many case designs.",
+          },
         ],
       },
     ],
@@ -600,34 +749,171 @@ export default function Module1Page({ onBack, onLogout }) {
 
   const current = modules[moduleIndex];
 
+ const completedParts = localCompletedParts;
+
+const moduleFinished = useMemo(() => {
+  return modules.every((m) => completedParts[m.key]);
+}, [modules, completedParts]);
+
+  useEffect(() => {
+    if (!current) return;
+    const isFinished = completedParts[current.key];
+    setShowIntro(!isFinished);
+  }, [current, completedParts]);
+
   useEffect(() => {
     modules.forEach((m) => useGLTF.preload(m.url));
   }, [modules]);
 
-  const activeHotspot = useMemo(() => current.hotspots.find((h) => h.id === activeId) || null, [current, activeId]);
- const user = useMemo(
-  () => ({
-    name: profile
-      ? `${profile.firstName || ""} ${profile.lastName || ""}`.trim()
-      : "Loading...",
-    email: firebaseUser?.email || "No email",
-  }),
-  [profile, firebaseUser]
-);
+  const activeHotspot = useMemo(
+    () => current.hotspots.find((h) => h.id === activeId) || null,
+    [current, activeId]
+  );
 
-  const goNextModule = () => {
-    setActiveId(null);
-    setLastCoords(null);
-    setModuleIndex((i) => (i + 1) % modules.length);
-    setShowIntro(true);
+  const user = useMemo(
+    () => ({
+      name: profile
+        ? `${profile.firstName || ""} ${profile.lastName || ""}`.trim()
+        : "Loading...",
+      email: firebaseUser?.email || "No email",
+    }),
+    [profile, firebaseUser]
+  );
+
+  const saveModule1Progress = async ({
+  page = moduleIndex + 1,
+  introDone = !showIntro,
+  moduleKey = current?.key,
+  completedParts: partsPatch = {},
+} = {}) => {
+  if (!firebaseUser) return;
+
+  const totalPages = modules.length;
+  const prevParts = profile?.moduleProgress?.module1?.completedParts || {};
+
+  const mergedParts = {
+    ...prevParts,
+    ...partsPatch,
   };
 
-  const goPrevModule = () => {
-    setActiveId(null);
-    setLastCoords(null);
-    setModuleIndex((i) => (i - 1 + modules.length) % modules.length);
-    setShowIntro(true);
-  };
+  const completedCount = modules.filter((m) => mergedParts[m.key]).length;
+  const allCompleted = completedCount === totalPages;
+
+  const completed = allCompleted;
+  const percent = Math.round((completedCount / totalPages) * 100);
+  
+setLocalCompletedParts(mergedParts);
+  try {
+    const userRef = doc(db, "users", firebaseUser.uid);
+
+    await setDoc(
+      userRef,
+      {
+        moduleProgress: {
+          module1: {
+            currentPage: page,
+            totalPages,
+            introDone,
+            completed,
+            percent,
+            lastVisitedModuleKey: moduleKey,
+            completedParts: mergedParts,
+            updatedAt: serverTimestamp(),
+          },
+        },
+      },
+      { merge: true }
+    );
+  } catch (err) {
+    console.error("Error saving module 1 progress:", err);
+  }
+};
+
+const goNextModule = async () => {
+  const nextIndex = (moduleIndex + 1) % modules.length;
+  const nextPage = nextIndex + 1;
+
+  setActiveId(null);
+  setLastCoords(null);
+  setModuleIndex(nextIndex);
+  setShowIntro(true);
+
+  await saveModule1Progress({
+    page: nextPage,
+    introDone: false,
+    moduleKey: modules[nextIndex].key,
+    completedParts: {
+      [current.key]: true,
+    },
+  });
+};
+
+  const goPrevModule = async () => {
+  const prevIndex = (moduleIndex - 1 + modules.length) % modules.length;
+  const prevPage = prevIndex + 1;
+
+  setActiveId(null);
+  setLastCoords(null);
+  setModuleIndex(prevIndex);
+  setShowIntro(true);
+
+  await saveModule1Progress({
+    page: prevPage,
+    introDone: false,
+    moduleKey: modules[prevIndex].key,
+    completedParts: {
+      [current.key]: true,
+    },
+  });
+};
+const handleFinishModule = async () => {
+  await saveModule1Progress({
+    page: modules.length,
+    introDone: true,
+    moduleKey: "case",
+    completedParts: {
+      case: true,
+    },
+  });
+
+  if (typeof onBack === "function") onBack("Modules");
+};
+  useEffect(() => {
+    if (!profile?.moduleProgress?.module1) return;
+
+    const saved = profile.moduleProgress.module1;
+
+    if (
+      typeof saved.currentPage === "number" &&
+      saved.currentPage >= 1 &&
+      saved.currentPage <= modules.length
+    ) {
+      setModuleIndex(saved.currentPage - 1);
+    }
+
+    if (typeof saved.introDone === "boolean") {
+      setShowIntro(!saved.introDone);
+    }
+  }, [profile, modules.length]);
+
+ const handleSelectModule = async (index) => {
+  const key = modules[index].key;
+  const isFinished = completedParts[key];
+
+  setActiveId(null);
+  setLastCoords(null);
+  setModuleIndex(index);
+  setShowIntro(!isFinished);
+
+  await saveModule1Progress({
+    page: index + 1,
+    introDone: isFinished,
+    moduleKey: key,
+    completedParts: {
+      [current.key]: true,
+    },
+  });
+};
 
   return (
     <div className="min-h-screen w-full overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased">
@@ -644,7 +930,8 @@ export default function Module1Page({ onBack, onLogout }) {
             <div className="relative flex h-full w-full flex-col overflow-hidden">
               <div className="flex items-center justify-between px-6 pt-6 text-[12px] text-[#7a8ba8] md:px-10">
                 <div>
-                  Module 1 (Page {moduleIndex + 1}) — <span className="text-[#dbe6f5]">{current.name}</span>
+                  Module 1 (Page {moduleIndex + 1}) —{" "}
+                  <span className="text-[#dbe6f5]">{current.name}</span>
                 </div>
 
                 <div className="flex items-center gap-2 text-[11px]">
@@ -672,11 +959,15 @@ export default function Module1Page({ onBack, onLogout }) {
                     <img
                       src="/PNG/Articton.png"
                       alt="Articton Logo"
-                      className="h-10 w-10 scale-300 object-contain ml-4"
+                      className="ml-4 h-10 w-10 scale-300 object-contain"
                     />
                     <div>
-                      <div className="text-base font-bold tracking-wide text-white">Articton</div>
-                      <div className="text-[11px] uppercase tracking-[0.24em] text-[#00ffb4]">3D Learning View</div>
+                      <div className="text-base font-bold tracking-wide text-white">
+                        Articton
+                      </div>
+                      <div className="text-[11px] uppercase tracking-[0.24em] text-[#00ffb4]">
+                        3D Learning View
+                      </div>
                     </div>
                   </div>
 
@@ -690,18 +981,44 @@ export default function Module1Page({ onBack, onLogout }) {
 
               <div className="min-h-0 flex-1 px-6 py-6 md:px-10">
                 <div className="relative h-full overflow-hidden rounded-[24px] border border-[#1a2438] bg-[#0d1220]/78 shadow-[0_28px_90px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+                  <PartsSidebar
+                    open={sidebarOpen}
+                    onToggle={() => setSidebarOpen((v) => !v)}
+                    modules={modules}
+                    currentKey={current.key}
+                    completedParts={completedParts}
+                    onSelect={handleSelectModule}
+                    onFinishModule={handleFinishModule}
+                     moduleFinished={moduleFinished}
+                  />
+
                   <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_22%_0%,rgba(255,255,255,0.08),transparent_40%)]" />
                   <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_120px_rgba(0,0,0,0.55)]" />
 
-                  <div className="absolute inset-6 overflow-hidden rounded-[18px] border border-[#1a2438] bg-black/10">
+                  <div
+                    className="absolute inset-y-6 right-6 overflow-hidden rounded-[18px] border border-[#1a2438] bg-black/10 transition-all duration-300"
+                    style={{
+                      left: sidebarOpen ? 320 : 32,
+                    }}
+                  >
                     <div className="pointer-events-none absolute inset-0 rounded-[18px] ring-1 ring-[#00ffb4]/15 shadow-[0_0_0_1px_rgba(0,255,180,0.08)]" />
                     <div className="pointer-events-none absolute -left-24 -top-24 h-56 w-56 rounded-full bg-[#00ffb4]/10 blur-3xl" />
                     <div className="pointer-events-none absolute left-[10%] top-[8%] h-[58%] w-[2px] animate-pulse bg-[linear-gradient(180deg,transparent,#00ffb4,transparent)] opacity-25" />
                   </div>
 
-                  {!showIntro ? <HotspotInfoCard hotspot={activeHotspot} onClose={() => setActiveId(null)} /> : null}
+                  {!showIntro ? (
+                    <HotspotInfoCard
+                      hotspot={activeHotspot}
+                      onClose={() => setActiveId(null)}
+                    />
+                  ) : null}
 
-                  <div className="absolute inset-6 overflow-hidden rounded-[18px]">
+                  <div
+                    className="absolute inset-y-6 right-6 overflow-hidden rounded-[18px] transition-all duration-300"
+                    style={{
+                      left: sidebarOpen ? 296 : 24,
+                    }}
+                  >
                     <AnimatePresence mode="wait">
                       {showIntro ? (
                         <motion.div
@@ -714,9 +1031,18 @@ export default function Module1Page({ onBack, onLogout }) {
                         >
                           <IntroDeck
                             slides={current.slides}
-                            onDone={() => {
+                            onDone={async () => {
                               setShowIntro(false);
                               setActiveId(null);
+
+                              await saveModule1Progress({
+                                page: moduleIndex + 1,
+                                introDone: true,
+                                moduleKey: current.key,
+                                completedParts: {
+                                  [current.key]: true,
+                                },
+                              });
                             }}
                           />
                         </motion.div>
@@ -729,7 +1055,11 @@ export default function Module1Page({ onBack, onLogout }) {
                           exit={{ opacity: 0 }}
                           transition={{ duration: 0.28 }}
                         >
-                          <Canvas key={current.url} camera={{ position: current.view.cameraPos, fov: 45 }} dpr={[1, 1.8]}>
+                          <Canvas
+                            key={current.url}
+                            camera={{ position: current.view.cameraPos, fov: 45 }}
+                            dpr={[1, 1.8]}
+                          >
                             <color attach="background" args={["#071520"]} />
                             <ambientLight intensity={0.75} />
                             <directionalLight position={[6, 8, 6]} intensity={1.25} />
@@ -771,15 +1101,20 @@ export default function Module1Page({ onBack, onLogout }) {
                     </AnimatePresence>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={goPrevModule}
-                    aria-label="Previous module"
-                    className="absolute left-7 top-1/2 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-[#1a2438] bg-[#0d1220]/85 shadow-[0_18px_60px_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:bg-white/[0.06]"
-                  >
-                    <span className="text-lg text-white/80">←</span>
-                  </button>
-
+                 {current.key !== "cpu" && (
+                    <button
+                type="button"
+                onClick={goPrevModule}
+                aria-label="Previous module"
+                className="absolute top-1/2 z-[200] flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-[#1a2438] bg-[#0d1220]/85 shadow-[0_18px_60px_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:bg-white/[0.06]"
+                style={{
+                  left: sidebarOpen ? 320 : 80, // 👈 push it OUTSIDE the sidebar
+                }}
+              >
+                ←
+              </button>
+                  )}
+                  {current.key !== "case" && (
                   <button
                     type="button"
                     onClick={goNextModule}
@@ -788,9 +1123,11 @@ export default function Module1Page({ onBack, onLogout }) {
                   >
                     <span className="text-lg text-white/80">→</span>
                   </button>
-
-                  <div className="absolute bottom-8 left-9 text-[12px] text-[#7a8ba8]">
-                    {showIntro ? "Read the intro slides, then start the 3D" : "Click pins to learn parts"}
+                )}
+                  <div className="absolute top-8 right-9 text-[12px] text-[#7a8ba8]">
+                    {showIntro
+                      ? "Read the intro slides, then start the 3D"
+                      : "Click pins to learn parts"}
                   </div>
                 </div>
               </div>
@@ -798,6 +1135,114 @@ export default function Module1Page({ onBack, onLogout }) {
               <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_120px_rgba(0,0,0,0.45)]" />
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PartsSidebar({
+  open,
+  onToggle,
+  modules,
+  currentKey,
+  completedParts,
+  onSelect,
+  onFinishModule,
+   moduleFinished,
+}) {
+  return (
+    <div
+      className={[
+        "absolute left-0 top-0 z-[80] h-full transition-all duration-300",
+        open ? "w-[280px]" : "w-[64px]",
+      ].join(" ")}
+    >
+      <div className="h-full border-r border-[#1a2438] bg-[#0b1220]/92 backdrop-blur-xl shadow-[0_18px_60px_rgba(0,0,0,0.28)]">
+        <div className="flex items-center justify-between border-b border-[#1a2438] px-4 py-4">
+          {open ? (
+            <div>
+              <div className="text-sm font-bold text-white">Parts List</div>
+              <div className="text-[11px] text-[#7a8ba8]">Module navigation</div>
+            </div>
+          ) : null}
+
+          <button
+            type="button"
+            onClick={onToggle}
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#1a2438] bg-white/[0.03] text-[#dbe6f5] transition hover:bg-white/[0.06]"
+          >
+            {open ? "←" : "→"}
+          </button>
+        </div>
+
+        <div className="space-y-2 p-3">
+          {modules.map((m, index) => {
+            const done = !!completedParts[m.key];
+            const active = currentKey === m.key;
+
+            return (
+              <button
+                key={m.key}
+                type="button"
+                onClick={() => onSelect(index)}
+                className={[
+                  "flex w-full items-center gap-3 rounded-2xl border px-3 py-3 text-left transition",
+                  active
+                    ? "border-[#00ffb4]/25 bg-[#00ffb4]/10"
+                    : "border-[#1a2438] bg-white/[0.03] hover:bg-white/[0.06]",
+                ].join(" ")}
+              >
+                <span
+                  className={[
+                    "flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold transition",
+                    open
+                      ? done
+                        ? "bg-[#00ffb4] text-[#0a0e17]"
+                        : "border border-[#1a2438] bg-[#0d1220] text-[#7a8ba8]"
+                      : done
+                      ? "text-[#00ffb4]"   // minimized + finished = green number
+                      : active
+                      ? "text-[#00ffb4]"   // minimized + active = green number
+                      : "text-[#7a8ba8]",
+                  ].join(" ")}
+                >
+                  {index + 1}
+                </span>
+
+                {open ? (
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold text-white">
+                      {m.name === "Motherboard" ? "MB" : m.name}
+                    </div>
+                    <div className="text-[11px] text-[#7a8ba8]">
+                      {done ? "Finished" : "Not finished"}
+                    </div>
+                  </div>
+                ) : null}
+              </button>
+            );
+          })}
+
+         {(currentKey === "case" || moduleFinished) &&
+  (open ? (
+    <button
+      type="button"
+      onClick={onFinishModule}
+      className="mt-3 w-full rounded-2xl bg-[#00ffb4] px-4 py-3 text-sm font-semibold text-[#0a0e17] shadow-[0_12px_40px_rgba(0,255,180,0.22)] transition hover:scale-[1.01]"
+    >
+      ✓ Finish Module
+    </button>
+  ) : (
+    <button
+      type="button"
+      onClick={onFinishModule}
+      className="mt-3 flex h-12 w-full items-center justify-center rounded-2xl bg-[#00ffb4] text-[#0a0e17] shadow-[0_12px_40px_rgba(0,255,180,0.22)] transition hover:scale-[1.01]"
+      aria-label="Finish module"
+    >
+      ✓
+    </button>
+  ))}
         </div>
       </div>
     </div>

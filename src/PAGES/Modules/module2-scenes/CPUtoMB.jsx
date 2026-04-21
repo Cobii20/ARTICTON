@@ -46,7 +46,7 @@ const START_ROTATION = new THREE.Euler(0, 0, 0);
 const CPU_SCALE = 1;
 const MB_SCALE = 1;
 
-function Scene() {
+function Scene({ onCpuPlaced }) {
   const { camera } = useThree();
 
   useEffect(() => {
@@ -72,7 +72,7 @@ function Scene() {
 
       <Motherboard />
       <SocketWorldMarker visible={true} />
-      <CpuDraggable />
+      <CpuDraggable onCpuPlaced={onCpuPlaced} />
 
       <ContactShadows position={[0, -0.02, 0]} opacity={0.35} scale={8} blur={2.8} far={4} />
 
@@ -131,7 +131,7 @@ function SocketWorldMarker({ visible = true }) {
   );
 }
 
-function CpuDraggable() {
+function CpuDraggable({ onCpuPlaced }) {
   const { scene } = useGLTF(CPU_URL);
   const cpuRef = useRef();
   const { camera, gl } = useThree();
@@ -342,6 +342,13 @@ function CpuDraggable() {
   }
 });
   
+useEffect(() => {
+  if (snapped) {
+    onCpuPlaced?.(true);
+  } else {
+    onCpuPlaced?.(false);
+  }
+}, [snapped, onCpuPlaced]);
   
 
   return (
@@ -465,14 +472,14 @@ function ResetCpuButton({ cpuRef, startPos, startQuat, onReset }) {
   );
 }
 
-export default function CPUtoMB() {
+export default function ({ onCpuPlaced }) {
   return (
   
     <Canvas
       style={{ width: "100%", height: "100%" }}
       camera={{ position: [0, 6, 2], fov: 50 }}
     >
-      <Scene />
+      <Scene onCpuPlaced={onCpuPlaced} />
     </Canvas>
 
   );

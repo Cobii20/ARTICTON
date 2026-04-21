@@ -85,15 +85,10 @@ export default function ArtictonLandingPage({ onLogin }) {
 
 function Navbar({ isHome, onHome, onAbout, onOpenLogin, onSignup }) {
   return (
-    <motion.nav
+   <motion.nav
       initial={{ y: -18, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
-      className={[
-        "fixed top-0 z-50 w-full flex items-center justify-between px-6 md:px-10 lg:px-16 py-5 border-b backdrop-blur-xl",
-        isHome
-          ? "bg-[#0a0e17]/80 border-white/10 shadow-[0_16px_40px_rgba(0,0,0,0.28)]"
-          : "bg-[#071E29]/92 border-white/10 shadow-[0_10px_30px_rgba(7,30,41,0.22)]",
-      ].join(" ")}
+      className="fixed top-0 z-50 w-full flex items-center justify-between px-6 md:px-10 lg:px-16 py-5 border-b border-white/10 backdrop-blur-xl bg-[#0a0e17]/80 shadow-[0_16px_40px_rgba(0,0,0,0.28)]"
     >
       <button className="flex items-center gap-3" onClick={onHome}>
         <img

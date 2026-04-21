@@ -4,13 +4,33 @@ import { auth, db } from "../firebase.js";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 
-export default function Dashboard({ onLogout, onOpenModule, onOpenTest,  initialSection = "Dashboard"}) {
+function getCurrentWeekKey(date = new Date()) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
+}
+
+export default function Dashboard({
+  onLogout,
+  onOpenModule,
+  onOpenTest,
+  initialSection = "Dashboard",
+}) {
   const [section, setSection] = useState(initialSection);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [firebaseUser, setFirebaseUser] = useState(null);
+  const [profile, setProfile] = useState(null);
+
   useEffect(() => {
-  setSection(initialSection);
-}, [initialSection]);
+    setSection(initialSection);
+  }, [initialSection]);
 
   const navigate = useOptionalNavigate();
+
   const go = (path) => {
     if (navigate) navigate(path);
     else console.log("Route to:", path);
@@ -26,16 +46,12 @@ export default function Dashboard({ onLogout, onOpenModule, onOpenTest,  initial
     else go(`/tests/${id}`);
   };
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [firebaseUser, setFirebaseUser] = useState(null);
-  const [profile, setProfile] = useState(null);
-
   useEffect(() => {
     const prevHtml = document.documentElement.style.overflow;
     const prevBody = document.body.style.overflow;
     document.documentElement.style.overflow = "hidden";
     document.body.style.overflow = "hidden";
+
     return () => {
       document.documentElement.style.overflow = prevHtml;
       document.body.style.overflow = prevBody;
@@ -55,8 +71,12 @@ export default function Dashboard({ onLogout, onOpenModule, onOpenTest,  initial
       try {
         const userRef = doc(db, "users", user.uid);
         const userSnap = await getDoc(userRef);
-        if (userSnap.exists()) setProfile(userSnap.data());
-        else setProfile(null);
+
+        if (userSnap.exists()) {
+          setProfile(userSnap.data());
+        } else {
+          setProfile(null);
+        }
       } catch (err) {
         console.error("Error reading profile:", err);
       }
@@ -66,28 +86,49 @@ export default function Dashboard({ onLogout, onOpenModule, onOpenTest,  initial
   }, []);
 
   const data = useMemo(() => {
+    const currentWeekKey = getCurrentWeekKey();
+
     const user = {
       name: profile
         ? `${profile.firstName || ""} ${profile.lastName || ""}`.trim()
         : "Loading...",
       email: firebaseUser?.email || "No email",
       avatarUrl: "",
-      streakDays: 6,
-      minutesThisWeek: 142,
+      streakDays: profile?.streakDays || 0,
+      minutesThisWeek: profile?.weeklyMinutes?.[currentWeekKey] || 0,
+    };
+
+    const module1Progress = profile?.moduleProgress?.module1;
+    const module1CompletedParts = module1Progress?.completedParts || {};
+    const module1CompletedCount = Object.values(module1CompletedParts).filter(Boolean).length;
+
+    const moduleNames = {
+      cpu: "CPU",
+      motherboard: "Motherboard",
+      ram: "RAM",
+      hdd: "HDD",
+      psu: "PSU",
+      case: "Case",
     };
 
     const modules = [
       {
         id: "module-1",
         title: "Module 1",
-        subtitle: "Name of the parts and what use",
-        progress: 72,
-        lessonsCompleted: 5,
-        lessonsTotal: 8,
-        lastOpenedAt: Date.now() - 1000 * 60 * 12,
+        subtitle: module1Progress
+          ? `Page ${module1Progress.currentPage} • ${
+              moduleNames[module1Progress.lastVisitedModuleKey] || "Unknown"
+            }`
+          : "Name of the parts and what use",
+        progress: module1Progress?.percent || 0,
+        lessonsCompleted: module1CompletedCount,
+        lessonsTotal: module1Progress?.totalPages || 6,
+        lastOpenedAt: Date.now(),
         selectionTitle: "Introduction To Hardware",
         selectionModuleNo: "Module 1",
-        selectionProgressText: "Module Progress 1/7 Lessons",
+       selectionProgressText: module1Progress
+        ? `${module1CompletedCount} of ${module1Progress.totalPages} parts completed`
+        : "Start Module",
         selectionCta: "Start",
         selectionImage: "/PNG/module1.png",
       },
@@ -231,11 +272,13 @@ export default function Dashboard({ onLogout, onOpenModule, onOpenTest,  initial
                       <img
                         src="/PNG/Articton.png"
                         alt="Articton Logo"
-                       className="h-10 w-10 scale-300 object-contain"
+                        className="h-10 w-10 scale-300 object-contain"
                       />
                       <div>
                         <div className="text-lg font-bold tracking-wide text-white">Articton</div>
-                        <div className="text-[11px] uppercase tracking-[0.24em] text-[#00ffb4]">Control Panel</div>
+                        <div className="text-[11px] uppercase tracking-[0.24em] text-[#00ffb4]">
+                          Control Panel
+                        </div>
                       </div>
                     </button>
                   </div>
@@ -499,7 +542,7 @@ function HomeOverview({ openModule, openTest, setSection, overall, modules, next
 
       <div className="grid min-h-0 grid-cols-1 gap-6 xl:grid-cols-[1.6fr_0.9fr]">
         <ProgressCardFillHeight overall={overall} modules={modules} onModuleClick={(id) => openModule(id)} />
-        <RightColumnFill achievements={achievements} activity={activity} openTest={openTest} setSection={setSection} />
+        <RightColumnFill achievements={achievements} activity={activity} />
       </div>
     </div>
   );
@@ -584,6 +627,7 @@ function ModulesSelection({ modules, onBack, onOpenModule }) {
 
 function PracticalTestsPage({ tests, onOpen }) {
   const motionPreset = useCardMotion();
+
   return (
     <div className="grid grid-cols-1 gap-6 overflow-hidden lg:grid-cols-2">
       {tests.map((t) => (
@@ -592,7 +636,7 @@ function PracticalTestsPage({ tests, onOpen }) {
           {...motionPreset}
           className="flex w-full flex-col items-start justify-between rounded-[28px] border border-[#1a2438] bg-[#0d1220] p-10 text-left shadow-[0_30px_90px_rgba(0,0,0,0.42)]"
         >
-          <div className="flex items-start justify-between gap-4 w-full">
+          <div className="flex w-full items-start justify-between gap-4">
             <div>
               <div className="text-lg font-bold tracking-tight text-[#e8ecf4]">{t.title}</div>
               <div className="mt-1 text-sm text-[#7a8ba8]">{t.desc}</div>
@@ -699,6 +743,7 @@ function RightColumnFill({ achievements, activity }) {
 
 function SideItem({ label, active, onClick, icon }) {
   const isActive = active === label;
+
   return (
     <button
       onClick={onClick}
@@ -719,7 +764,9 @@ function SideItem({ label, active, onClick, icon }) {
         >
           <Icon kind={icon} active={isActive} />
         </span>
-        <span className={isActive ? "text-sm font-semibold text-white" : "text-sm font-semibold text-[#c8d4e6]"}>{label}</span>
+        <span className={isActive ? "text-sm font-semibold text-white" : "text-sm font-semibold text-[#c8d4e6]"}>
+          {label}
+        </span>
       </div>
     </button>
   );
@@ -727,8 +774,10 @@ function SideItem({ label, active, onClick, icon }) {
 
 function useCardMotion() {
   const reduce = useReducedMotion();
+
   return useMemo(() => {
     if (reduce) return { whileHover: {}, whileTap: {}, transition: { duration: 0.15 } };
+
     return {
       whileHover: { y: -6, scale: 1.01 },
       whileTap: { scale: 0.99 },
@@ -739,6 +788,7 @@ function useCardMotion() {
 
 function TopCardHero({ title, headline, sub, meta, button, imageSrc, onClick }) {
   const motionPreset = useCardMotion();
+
   return (
     <motion.button
       type="button"
@@ -781,13 +831,13 @@ function ProgressCardFillHeight({ overall, modules, onModuleClick }) {
       <div className="flex h-full min-h-0 flex-col p-8">
         <div className="text-lg font-bold tracking-tight text-[#e8ecf4]">My Progress</div>
 
-        <div className="mt-6 grid grid-cols-1 items-center gap-6 md:grid-cols-[220px_1fr]">
-          <DonutAnimated value={overall} label="Overall Progress" />
+        <div className="mt-6 grid grid-cols-1 items-start gap-6 md:grid-cols-[220px_1fr]">
+          <DonutAnimated value={overall} />
 
           <div className="relative overflow-hidden rounded-2xl border border-[#1a2438] bg-white/[0.03] p-6">
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_80%_40%,rgba(0,255,180,0.10),transparent_55%)]" />
             <div className="relative">
-              <div className="flex items-center gap-2 text-sm text-[#9fb0c9]">
+              <div className="mt-2 flex items-center gap-2 text-sm text-[#9fb0c9]">
                 <span className="h-2 w-2 rounded-full bg-[#00ffb4]" />
                 Overall Progress
               </div>
@@ -802,7 +852,7 @@ function ProgressCardFillHeight({ overall, modules, onModuleClick }) {
           </div>
         </div>
 
-        <div className="scrollArea mt-6 min-h-0 overflow-auto pr-1 space-y-4">
+        <div className="scrollArea mt-6 min-h-0 space-y-4 overflow-auto pr-1">
           <StaggerList>
             {modules.map((m) => (
               <ModuleProgressRow
@@ -870,10 +920,12 @@ function ModuleProgressRow({ title, subtitle, progress, lessonsCompleted, lesson
 
 function AnimatedBar({ percent = 0 }) {
   const [ready, setReady] = useState(false);
+
   useEffect(() => {
     const t = setTimeout(() => setReady(true), 60);
     return () => clearTimeout(t);
   }, []);
+
   return (
     <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10" aria-label={`Progress bar ${percent}%`}>
       <div
@@ -912,6 +964,7 @@ function AchievementsCardCompact({ achievements, onClick }) {
 
 function AchievementRow({ icon, title, subtitle, onClick }) {
   const motionPreset = useCardMotion();
+
   return (
     <motion.button
       type="button"
@@ -934,7 +987,7 @@ function AchievementRow({ icon, title, subtitle, onClick }) {
 
 function RecentActivityFill({ items, onClick }) {
   return (
-    <div className="overflow-hidden rounded-[28px] border border-[#1a2438] bg-[#0d1220] shadow-[0_30px_90px_rgba(0,0,0,0.42)] h-full min-h-0">
+    <div className="h-full min-h-0 overflow-hidden rounded-[28px] border border-[#1a2438] bg-[#0d1220] shadow-[0_30px_90px_rgba(0,0,0,0.42)]">
       <div className="flex h-full min-h-0 flex-col p-7">
         <div className="text-lg font-bold tracking-tight text-[#e8ecf4]">Recent Activity</div>
         <div className="scrollArea mt-5 min-h-0 overflow-auto pr-1 space-y-3">
@@ -956,6 +1009,7 @@ function RecentActivityFill({ items, onClick }) {
 
 function ActivityRow({ title, desc, onClick }) {
   const motionPreset = useCardMotion();
+
   return (
     <motion.button
       type="button"
@@ -974,11 +1028,9 @@ function DonutAnimated({ value = 72, label = "Overall Progress" }) {
   const size = 156;
   const stroke = 14;
   const r = (size - stroke) / 2;
-  const c = 2 * Math.PI * r;
-  const dash = (value / 100) * c;
-
   const reduce = useReducedMotion();
   const [ready, setReady] = useState(false);
+  const safeValue = Math.max(0, Math.min(100, value));
 
   useEffect(() => {
     const t = setTimeout(() => setReady(true), 60);
@@ -988,40 +1040,65 @@ function DonutAnimated({ value = 72, label = "Overall Progress" }) {
   return (
     <div className="relative mx-auto h-[156px] w-[156px]">
       <div className="absolute inset-0 rounded-full border border-[#1a2438] bg-white/[0.03]" />
-      <svg width={size} height={size} className="absolute inset-0" viewBox={`0 0 ${size} ${size}`} aria-label={`${label}: ${value}%`}>
-        <circle cx={size / 2} cy={size / 2} r={r} fill="transparent" stroke="rgba(255,255,255,0.08)" strokeWidth={stroke} />
+
+      <svg
+        width={size}
+        height={size}
+        className="absolute inset-0"
+        viewBox={`0 0 ${size} ${size}`}
+        aria-label={`${label}: ${safeValue}%`}
+      >
+        <defs>
+          <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#00ffb4" />
+            <stop offset="100%" stopColor="#00b4ff" />
+          </linearGradient>
+        </defs>
+
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          fill="transparent"
+          stroke="rgba(255,255,255,0.08)"
+          strokeWidth={stroke}
+        />
+
         <motion.circle
           cx={size / 2}
           cy={size / 2}
           r={r}
           fill="transparent"
-          stroke="rgba(0,255,180,1)"
+          stroke="url(#grad)"
           strokeWidth={stroke}
           strokeLinecap="round"
-          strokeDasharray={`${dash} ${c - dash}`}
-          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+          pathLength={1}
           initial={{ pathLength: 0 }}
-          animate={{ pathLength: ready ? 1 : 0 }}
-          transition={reduce ? { duration: 0 } : { duration: 0.9, ease: "easeOut" }}
+          animate={{ pathLength: ready ? safeValue / 100 : 0 }}
+          transition={reduce ? { duration: 0 } : { duration: 1, ease: "easeOut" }}
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+          style={{
+            filter: "drop-shadow(0 0 6px rgba(0,255,180,0.6))",
+          }}
         />
       </svg>
 
       <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-        <div className="text-4xl font-extrabold text-white">{value}%</div>
+        <div className="text-4xl font-extrabold text-white">{safeValue}%</div>
         <div className="mt-1 text-[11px] text-[#7a8ba8]">PC Building Course</div>
       </div>
-
-      <div className="absolute -bottom-7 left-1/2 -translate-x-1/2 text-[12px] text-[#7a8ba8]">{label}</div>
     </div>
   );
 }
 
 function StaggerList({ children }) {
   const reduce = useReducedMotion();
+
   const variants = {
     hidden: {},
     show: { transition: reduce ? {} : { staggerChildren: 0.06, delayChildren: 0.02 } },
   };
+
   const item = {
     hidden: reduce ? { opacity: 1 } : { opacity: 0, y: 8 },
     show: reduce ? { opacity: 1 } : { opacity: 1, y: 0, transition: { duration: 0.18 } },
@@ -1090,12 +1167,14 @@ function Icon({ kind, active = false }) {
         <div className={`absolute left-[6px] top-[7px] h-[7px] w-[9px] rounded ${fill}`} />
       </div>
     );
+
   if (kind === "modules")
     return (
       <div className={`relative h-4 w-5 overflow-hidden rounded ${soft}`}>
         <div className={`absolute left-0 top-0 h-full w-[3px] ${fill}`} />
       </div>
     );
+
   if (kind === "tests")
     return (
       <div className={`relative h-4 w-5 rounded ${soft}`}>
@@ -1104,6 +1183,7 @@ function Icon({ kind, active = false }) {
         <div className={`absolute left-1 top-4 h-[2px] w-2 rounded ${fill}`} />
       </div>
     );
+
   if (kind === "profile")
     return (
       <div className={`relative h-5 w-5 rounded-full ${soft}`}>
@@ -1111,6 +1191,7 @@ function Icon({ kind, active = false }) {
         <div className={`absolute bottom-[5px] left-1/2 h-2 w-4 -translate-x-1/2 rounded-full ${soft}`} />
       </div>
     );
+
   if (kind === "help") return <div className={`h-5 w-5 rounded-full ${soft}`} />;
   if (kind === "support") return <div className={`h-5 w-5 rounded ${soft}`} />;
   if (kind === "trophy") return <div className={`h-5 w-5 rounded ${fill}`} />;
