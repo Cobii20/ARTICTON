@@ -1,133 +1,127 @@
 import React, { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { OrbitControls, useGLTF, Bounds } from "@react-three/drei";
-import { auth, db } from "../firebase.js";
+import { OrbitControls, useGLTF, Bounds, Grid } from "@react-three/drei";
+import { Cpu, GraduationCap, MousePointerClick, Rotate3d } from "lucide-react";
+import { auth, db, functions } from "../firebase.js";
 import {
   createUserWithEmailAndPassword,
-  signInWithEmailAndPassword
+  signInWithEmailAndPassword,
 } from "firebase/auth";
 import { doc, setDoc, getDoc } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
 
-
-/* ===========================
-   ROOT PAGE (UPDATED)
-   - Auto-rotate toggle fixed
-   - Signup + Login are FULL PAGES (no modal)
-   - Signup/Login are NOT scrollable (locks body scroll)
-   - ✅ Custom dropdown (palette-matched)
-   - ✅ Date picker (no future dates)
-=========================== */
 export default function ArtictonLandingPage({ onLogin }) {
-  
-  const [activeSection, setActiveSection] = useState("home"); // "home" | "signup" | "login"
+  const [activeSection, setActiveSection] = useState("home");
 
-  const goHome = () => setActiveSection("home");
-  const goSignup = () => setActiveSection("signup");
-  const goLogin = () => setActiveSection("login");
+  const isLightPage = false;
 
-  // ✅ Lock scroll on signup/login pages
   useEffect(() => {
-    if (activeSection === "home") {
-      document.body.style.overflow = "";
-      return;
-    }
-    document.body.style.overflow = "hidden";
+    const shouldLockScroll =
+      activeSection === "signup" || activeSection === "login";
+
+    document.body.style.overflow = shouldLockScroll ? "hidden" : "";
     return () => {
       document.body.style.overflow = "";
     };
   }, [activeSection]);
 
   const handleSuccessLogin = (profile) => {
-    // propagate the fetched profile from LoginPage up to App
     onLogin?.(profile);
   };
 
   return (
-    <div className="min-h-screen bg-[#061E29] text-[#F3F4F4] font-sans antialiased">
+    <div
+      className={[
+        "min-h-screen font-[Outfit] antialiased",
+        isLightPage ? "bg-[#f8fafb] text-[#0f1a22]" : "bg-[#0a0e17] text-[#e8ecf4]",
+      ].join(" ")}
+    >
       <Navbar
-  onHome={goHome}
-  onOpenLogin={goLogin}
-  onSignup={goSignup}
-/>
+        isHome={activeSection === "home"}
+        onHome={() => setActiveSection("home")}
+        onAbout={() => setActiveSection("about")}
+        onOpenLogin={() => setActiveSection("login")}
+        onSignup={() => setActiveSection("signup")}
+      />
 
       {activeSection === "home" ? (
         <>
-          <HeroShowcaseFull onLogin={goLogin} onSignup={goSignup} />
-          <TrustSection />
-          <FeaturesSection />
-          <ShowcaseSection />
-          <HowItWorksSection />
-          <SecondaryFeaturesSection />
-          <CTASection onJoin={goSignup} />
-          <Footer />
+          <HeroShowcaseFull
+            onLogin={() => setActiveSection("login")}
+            onSignup={() => setActiveSection("signup")}
+            
+          />
+         
+          <Footer dark />
+        </>
+      ) : activeSection === "about" ? (
+        <>
+          <AboutPage onJoin={() => setActiveSection("signup")} />
+          <Footer dark />
         </>
       ) : activeSection === "signup" ? (
         <>
           <SignupPage
-            onBack={goHome}
-            onSwitchToLogin={goLogin}
-            onAfterSignup={() => goLogin()}
+            onBack={() => setActiveSection("home")}
+            onSwitchToLogin={() => setActiveSection("login")}
+            onAfterSignup={() => setActiveSection("login")}
           />
-          <Footer />
+          <Footer dark />
         </>
       ) : (
         <>
           <LoginPage
-            onBack={goHome}
-            onSwitchToSignup={goSignup}
+            onBack={() => setActiveSection("home")}
+            onSwitchToSignup={() => setActiveSection("signup")}
             onSuccessLogin={handleSuccessLogin}
           />
-          <Footer />
+          <Footer dark />
         </>
       )}
     </div>
   );
 }
 
-/* ===========================
-   NAVBAR
-=========================== */
-function Navbar({ onHome, onOpenLogin, onSignup,  }) {
+function Navbar({ isHome, onHome, onAbout, onOpenLogin, onSignup }) {
   return (
     <motion.nav
       initial={{ y: -18, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
-      className="fixed top-0 z-50 w-full flex items-center justify-between px-6 md:px-10 lg:px-16 py-5 bg-[#061E29]/75 backdrop-blur-xl border-b border-[#5F9598]/20"
+      className={[
+        "fixed top-0 z-50 w-full flex items-center justify-between px-6 md:px-10 lg:px-16 py-5 border-b backdrop-blur-xl",
+        isHome
+          ? "bg-[#0a0e17]/80 border-white/10 shadow-[0_16px_40px_rgba(0,0,0,0.28)]"
+          : "bg-[#071E29]/92 border-white/10 shadow-[0_10px_30px_rgba(7,30,41,0.22)]",
+      ].join(" ")}
     >
-      <div className="flex items-center gap-3 cursor-pointer" onClick={onHome}>
-  <img
-    src="/PNG/Articton.png"
-    alt="Articton Logo"
-    className="h-10 w-10 scale-500 object-contain"
-  />
-  <h1 className="text-2xl font-bold tracking-wide">Articton</h1>
-</div>
+      <button className="flex items-center gap-3" onClick={onHome}>
+        <img
+          src="/PNG/Articton.png"
+          alt="Articton Logo"
+          className="h-10 w-10 scale-500 object-contain"
+        />
+        <h1 className="text-2xl font-bold tracking-wide text-white">Articton</h1>
+      </button>
 
-
-      <div className="flex gap-6 md:gap-8 text-sm text-[#F3F4F4]/80 items-center">
-  <span onClick={onHome} className="cursor-pointer hover:text-white">
-    Home
-  </span>
-  <span className="cursor-pointer hover:text-white">About</span>
-  <span onClick={onOpenLogin} className="cursor-pointer hover:text-white">
-    Login
-  </span>
-  <span onClick={onSignup} className="cursor-pointer hover:text-white">
-    Signup
-  </span>
-
-</div>
+      <div className="flex gap-6 md:gap-8 text-sm text-white/80 items-center">
+        <button onClick={onHome} className="hover:text-white transition">Home</button>
+        <button onClick={onAbout} className="hover:text-white transition">About</button>
+        <button onClick={onOpenLogin} className="hover:text-white transition">Login</button>
+        <button
+          onClick={onSignup}
+          className="rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/8 px-4 py-2 text-[#00ffb4] hover:bg-[#00ffb4]/14 transition"
+        >
+          Signup
+        </button>
+      </div>
     </motion.nav>
   );
 }
 
-/* ===========================
-   HERO SHOWCASE (UPDATED ROTATION)
-=========================== */
 function HeroShowcaseFull({ onLogin, onSignup }) {
   const controlsRef = useRef(null);
-  const [autoRotate, setAutoRotate] = useState(true);
+  const [mouse, setMouse] = useState({ x: 0, y: 0 });
 
   const defaultCamera = useMemo(
     () => ({
@@ -137,136 +131,239 @@ function HeroShowcaseFull({ onLogin, onSignup }) {
     []
   );
 
-  const handleResetView = () => {
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      const x = (e.clientX / window.innerWidth) * 2 - 1;
+      const y = (e.clientY / window.innerHeight) * 2 - 1;
+      setMouse({ x, y });
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    return () => window.removeEventListener("mousemove", handleMouseMove);
+  }, []);
+
+  useEffect(() => {
     if (!controlsRef.current) return;
     controlsRef.current.object.position.set(...defaultCamera.position);
     controlsRef.current.target.set(0, 0, 0);
     controlsRef.current.update();
-  };
+    controlsRef.current.saveState();
+  }, [defaultCamera]);
 
-  useEffect(() => {
-    if (!controlsRef.current) return;
-    controlsRef.current.target.set(0, 0, 0);
-    controlsRef.current.update();
-  }, []);
 
+  
   return (
-    <section className="relative min-h-screen pt-28 overflow-hidden flex items-center">
-      <div className="absolute inset-0 bg-gradient-to-b from-[#061E29] via-[#061E29] to-[#0B2A3A]" />
-      <div className="absolute -top-56 -left-56 h-[760px] w-[760px] rounded-full bg-[#5F9598]/12 blur-3xl" />
-      <div className="absolute -bottom-80 -right-56 h-[800px] w-[800px] rounded-full bg-[#1D546D]/22 blur-3xl" />
+  <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-[#0a0e17] px-6 pt-28 pb-16">
+    <style>{`
+      @keyframes greenWaveFlow {
+        0% {
+          transform: translateY(-160%);
+          opacity: 0;
+        }
+        15% {
+          opacity: 0.12;
+        }
+        45% {
+          opacity: 0.22;
+        }
+        85% {
+          opacity: 0.12;
+        }
+        100% {
+          transform: translateY(110vh);
+          opacity: 0;
+        }
+      }
+    `}</style>
 
-      <div className="relative w-full px-6 md:px-10 lg:px-16">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-12 items-center">
+    <AnimatedGridBackground />
+    <AmbientGlowLines />
+
+    <div className="absolute inset-0 pointer-events-none overflow-hidden">
+      {[0].map((delay, i) => (
+        <div
+          key={i}
+          className="absolute left-0 w-full"
+          style={{
+            top: "-80px",
+            height: "200px",
+            background:
+              "linear-gradient(180deg, transparent 0%, rgba(0,255,180,0.10) 45%, rgba(0,255,180,0.16) 50%, rgba(0,255,180,0.10) 55%, transparent 100%)",
+            animation: "greenWaveFlow 5.5s linear infinite",
+            animationDelay: `${delay}s`,
+            filter: "blur(10px)",
+          }}
+        />
+      ))}
+    </div>
+      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_60%_50%_at_50%_50%,rgba(0,255,180,0.08),transparent)]" />
+      <div className="relative z-10 mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-2 lg:gap-20">
+        <div className="text-center lg:text-left">
           <motion.div
-            initial={{ opacity: 0, y: 26 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.75 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/6 px-4 py-1.5"
           >
-            <span className="inline-flex items-center gap-2 mb-6 px-5 py-2.5 rounded-full bg-[#5F9598]/10 text-[#5F9598] text-xs tracking-widest border border-[#5F9598]/20">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#5F9598]" />
-              3D HARDWARE LEARNING
+            <span className="h-2 w-2 rounded-full bg-[#00ffb4]" />
+            <span className="text-xs font-medium uppercase tracking-[0.25em] text-[#00ffb4]">
+              Interactive 3D Experience
             </span>
-
-            <h2 className="text-5xl sm:text-6xl xl:text-7xl font-extrabold leading-[1.05] mb-6">
-              Learn PC Hardware Like It’s{" "}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#5F9598] to-[#8ad1d4]">
-                In Your Hands
-              </span>
-            </h2>
-
-            <p className="text-[#F3F4F4]/70 text-base sm:text-lg xl:text-xl max-w-2xl mb-10 leading-relaxed">
-              Rotate, zoom, and inspect a realistic system in 3D — then follow
-              guided steps that build confidence.
-            </p>
-
-            <div className="flex flex-wrap gap-4 sm:gap-5 items-center">
-              <button
-                onClick={onLogin}
-                className="px-10 sm:px-12 py-4 rounded-2xl bg-[#5F9598] text-[#061E29] font-semibold hover:bg-[#4b7f82] transition shadow-xl shadow-[#5F9598]/10"
-              >
-                Start Learning
-              </button>
-              <button
-                onClick={onSignup}
-                className="px-10 sm:px-12 py-4 rounded-2xl border border-[#5F9598]/60 text-[#5F9598] hover:bg-[#5F9598]/10 transition"
-              >
-                Create Account
-              </button>
-            </div>
           </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
+          <motion.h2
+            initial={{ opacity: 0, y: 28 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.75, delay: 0.06 }}
-            className="relative"
+            transition={{ duration: 0.8 }}
+            className="text-5xl font-black leading-[1.02] tracking-tight text-[#e8ecf4] sm:text-6xl lg:text-7xl"
           >
-            <div className="relative w-full h-[520px] sm:h-[640px] lg:h-[760px] rounded-[44px] border border-[#5F9598]/25 overflow-hidden shadow-[0_70px_180px_rgba(0,0,0,0.70)]">
-              <div className="absolute inset-0 pointer-events-none bg-gradient-to-br from-[#061E29] via-[#0B2A3A] to-[#1D546D]/42" />
-              <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_65%_45%,rgba(95,149,152,0.26),transparent_58%)]" />
-              <div className="absolute inset-0 pointer-events-none rounded-[44px] ring-1 ring-white/5" />
+            Learn PC Hardware.
+            <br />
+            <span className="text-[#00ffb4]">Build Confidence in 3D.</span>
+          </motion.h2>
 
+          <motion.p
+            initial={{ opacity: 0, y: 28 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.12 }}
+            className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-[#7a8ba8] lg:mx-0 sm:text-xl"
+          >
+            Rotate, inspect, and understand each PC component in an immersive 3D
+            workspace designed for guided learning and hands-on exploration.
+          </motion.p>
+
+          <motion.div
+            initial={{ opacity: 0, y: 28 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.24 }}
+            className="mt-10 flex flex-col justify-center gap-4 sm:flex-row lg:justify-start"
+          >
+            <button
+              onClick={onLogin}
+              className="group relative overflow-hidden rounded-xl bg-[#00ffb4] px-8 py-4 text-lg font-semibold tracking-wide text-[#0a0e17] transition hover:scale-[1.02]"
+            >
+              <span className="absolute inset-0 -translate-x-full bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.18),transparent)] transition duration-500 group-hover:translate-x-full" />
+              <span className="relative">Start Learning →</span>
+            </button>
+            <button
+              onClick={onSignup}
+              className="rounded-xl border border-white/12 px-8 py-4 text-lg font-semibold text-[#7a8ba8] transition hover:bg-white/5 hover:text-white"
+            >
+              Create Account
+            </button>
+          </motion.div>
+
+        
+        </div>
+
+       <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.18 }}
+            className="relative flex justify-center lg:justify-end lg:pl-10 xl:pl-28"
+          >
+          <div className="absolute right-[-90px] top-1/2 h-[700px] w-[620px] -translate-y-1/2 rounded-[120px] bg-[radial-gradient(circle_at_center,rgba(0,255,180,0.18),transparent_70%)] blur-3xl" />
+          <div className="relative h-[460px] w-full max-w-[760px] sm:h-[540px] lg:h-[640px] xl:h-[700px]">
+            
+            <div className="absolute inset-0 z-10">
               <Canvas
                 dpr={[1, 2]}
                 gl={{ antialias: true, alpha: true }}
-                camera={{
-                  position: defaultCamera.position,
-                  fov: defaultCamera.fov,
-                  near: 0.01,
-                  far: 2000,
-                }}
+                camera={{ position: [0.95, 0.72, 1.2] }}
                 style={{ background: "transparent" }}
               >
                 <Suspense fallback={<CanvasFallback />}>
-                  <ModelOnlyScene autoRotate={autoRotate} />
+                  <ModelOnlyScene mouse={mouse} />
                 </Suspense>
-
                 <OrbitControls
                   ref={controlsRef}
                   makeDefault
                   enableDamping
                   dampingFactor={0.08}
                   rotateSpeed={0.75}
-                  zoomSpeed={0.95}
+                enableZoom={false}
+                  enableRotate={false}
                   enablePan={false}
                   minDistance={0.2}
                   maxDistance={20}
                 />
               </Canvas>
-
-              <div className="absolute top-6 left-6 flex items-center gap-2">
-                <button
-                  onClick={() => setAutoRotate((v) => !v)}
-                  className="text-xs px-3 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition"
-                >
-                  Auto-rotate: {autoRotate ? "On" : "Off"}
-                </button>
-
-                <button
-                  onClick={handleResetView}
-                  className="text-xs px-3 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition"
-                >
-                  Reset view
-                </button>
-              </div>
-
-              <div className="pointer-events-none absolute bottom-6 left-1/2 -translate-x-1/2 text-xs text-[#F3F4F4]/60">
-                Drag to rotate • Scroll to zoom
-              </div>
             </div>
-          </motion.div>
-        </div>
+            
+          </div>
+        </motion.div>
       </div>
     </section>
   );
 }
 
-/* ===========================
-   SIGNUP PAGE (UPDATED)
-   ✅ Custom dropdown (palette matched)
-   ✅ Date picker (max=today, no future)
-=========================== */
+function AmbientGlowLines() {
+  return (
+    <>
+      <div className="absolute left-[15%] top-[10%] h-[60%] w-[2px] animate-pulse bg-[linear-gradient(180deg,transparent,#00ffb4,transparent)] opacity-40" />
+      <div className="absolute right-[20%] top-[5%] h-[60%] w-[2px] animate-pulse bg-[linear-gradient(180deg,transparent,#00b4ff,transparent)] opacity-30" />
+      <div className="absolute left-[60%] top-[15%] h-[60%] w-[2px] animate-pulse bg-[linear-gradient(180deg,transparent,#00ffb4,transparent)] opacity-30" />
+    </>
+  );
+}
+
+function AnimatedGridBackground() {
+  return (
+    <div className="absolute inset-0 opacity-100">
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(0,255,180,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,180,0.03)_1px,transparent_1px)] bg-[size:60px_60px]" />
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(10,14,23,0)_0%,rgba(10,14,23,0.15)_70%,rgba(10,14,23,0.8)_100%)]" />
+    </div>
+  );
+}
+
+function StatItem({ value, label }) {
+  return (
+    <div>
+      <div className="font-mono text-3xl font-bold text-[#e8ecf4]">{value}</div>
+      <div className="mt-1 text-sm text-[#4a5b78]">{label}</div>
+    </div>
+  );
+}
+
+
+
+function AboutPage({ onJoin }) {
+  return (
+    <section className="relative min-h-screen overflow-hidden bg-[#0a0e17] pt-28">
+      <AnimatedGridBackground />
+      <AmbientGlowLines />
+      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_60%_50%_at_50%_20%,rgba(0,255,180,0.08),transparent)]" />
+
+      <div className="relative z-10 px-6 py-12 text-center md:px-10 lg:px-16">
+        <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/6 px-4 py-1.5">
+          <span className="h-2 w-2 rounded-full bg-[#00ffb4]" />
+          <span className="text-xs font-medium uppercase tracking-[0.25em] text-[#00ffb4]">
+            About Articton
+          </span>
+        </div>
+
+        <h2 className="mb-4 text-4xl font-bold text-[#e8ecf4] md:text-5xl">
+          Learn Hardware the
+          <span className="block text-[#00ffb4]">Immersive Way</span>
+        </h2>
+
+        <p className="mx-auto max-w-3xl text-base text-[#7a8ba8] md:text-lg">
+          Articton helps students understand computer hardware through immersive
+          3D interaction, guided procedures, and hands-on exploration.
+        </p>
+      </div>
+
+      <div className="relative z-10">
+        <TrustSectionDark />
+        <FeaturesSectionDark />
+        <ShowcaseSectionDark />
+        <HowItWorksSectionDark />
+        <SecondaryFeaturesSectionDark />
+        <CTASectionDark onJoin={onJoin} />
+      </div>
+    </section>
+  );
+}
+
 function SignupPage({ onBack, onSwitchToLogin, onAfterSignup }) {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
@@ -274,289 +371,276 @@ function SignupPage({ onBack, onSwitchToLogin, onAfterSignup }) {
   const [lastName, setLastName] = useState("");
   const [firstName, setFirstName] = useState("");
   const [middleName, setMiddleName] = useState("");
-
   const [gender, setGender] = useState("");
-  const [birthday, setBirthday] = useState(""); // ✅ YYYY-MM-DD
-
-
+  const [birthday, setBirthday] = useState("");
   const [program, setProgram] = useState("");
-
   const [contactNumber, setContactNumber] = useState("");
   const [email, setEmail] = useState("");
-  const validateEmail = (val) => /\S+@\S+\.\S+/.test(val);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-
   const [agree, setAgree] = useState(false);
 
- 
-
-  
-
-
-
+  const validateEmail = (val) => /\S+@\S+\.\S+/.test(val);
   const genderOptions = ["Male", "Female", "Prefer not to say"];
-  const programOptions = [
-    "BS Computer Science",
-    "BS IT-MWA ",
-    
-  ];
+  const programOptions = ["BS Computer Science", "BS IT-MWA"];
 
   const todayStr = useMemo(() => {
     const d = new Date();
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-    return `${yyyy}-${mm}-${dd}`;
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+      d.getDate()
+    ).padStart(2, "0")}`;
   }, []);
 
   const handleSignup = async (e) => {
-  e.preventDefault();
-  setErr("");
+    e.preventDefault();
+    setErr("");
 
-  if (!lastName.trim() || !firstName.trim()) {
-    return setErr("Please enter your first and last name.");
-  }
-  if (!gender) return setErr("Please select your gender.");
-  if (!birthday) return setErr("Please select your birthday.");
-  if (birthday > todayStr) return setErr("Birthday cannot be in the future.");
-  
-  if (!program) return setErr("Please select a program.");
-  if (!contactNumber.trim()) {
-    return setErr("Please enter your contact number.");
-  }
-  if (!validateEmail(email)) return setErr("Please enter a valid email.");
-  if (!password || password.length < 6) {
-    return setErr("Password must be at least 6 characters.");
-  }
-  if (password !== confirmPassword) {
-    return setErr("Passwords do not match.");
-  }
-  if (!agree) {
-    return setErr("You must agree to the terms and conditions.");
-  }
-
-  try {
-    setLoading(true);
-
-    const userCredential = await createUserWithEmailAndPassword(
-      auth,
-      email.trim(),
-      password
-    );
-
-    const user = userCredential.user;
-
-    await setDoc(doc(db, "users", user.uid), {
-      uid: user.uid,
-      email: user.email,
-      role: "student",
-      firstName: firstName.trim(),
-      lastName: lastName.trim(),
-      middleName: middleName.trim(),
-      gender,
-      birthday,
-      program,
-      contactNumber: contactNumber.trim(),
-      createdAt: new Date().toISOString(),
-    });
-
-    setLoading(false);
-    onAfterSignup?.();
-  } catch (error) {
-    setLoading(false);
-
-    if (error.code === "auth/email-already-in-use") {
-      setErr("That email is already registered.");
-    } else if (error.code === "auth/invalid-email") {
-      setErr("Invalid email address.");
-    } else if (error.code === "auth/weak-password") {
-      setErr("Password should be at least 6 characters.");
-    } else {
-      setErr(error.message);
+    if (!lastName.trim() || !firstName.trim()) {
+      return setErr("Please enter your first and last name.");
     }
-  }
-};
+    if (!gender) return setErr("Please select your gender.");
+    if (!birthday) return setErr("Please select your birthday.");
+    if (birthday > todayStr) return setErr("Birthday cannot be in the future.");
+    if (!program) return setErr("Please select a program.");
+    if (!contactNumber.trim()) {
+      return setErr("Please enter your contact number.");
+    }
+    if (!validateEmail(email)) return setErr("Please enter a valid email.");
+    if (!password || password.length < 6) {
+      return setErr("Password must be at least 6 characters.");
+    }
+    if (password !== confirmPassword) {
+      return setErr("Passwords do not match.");
+    }
+    if (!agree) {
+      return setErr("You must agree to the terms and conditions.");
+    }
+
+    try {
+      setLoading(true);
+
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email.trim(),
+        password
+      );
+
+      const user = userCredential.user;
+
+      await setDoc(doc(db, "users", user.uid), {
+        uid: user.uid,
+        email: user.email,
+        role: "student",
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        middleName: middleName.trim(),
+        gender,
+        birthday,
+        program,
+        contactNumber: contactNumber.trim(),
+        createdAt: new Date().toISOString(),
+      });
+
+      setLoading(false);
+      onAfterSignup?.();
+    } catch (error) {
+      setLoading(false);
+
+      if (error.code === "auth/email-already-in-use") {
+        setErr("That email is already registered.");
+      } else if (error.code === "auth/invalid-email") {
+        setErr("Invalid email address.");
+      } else if (error.code === "auth/weak-password") {
+        setErr("Password should be at least 6 characters.");
+      } else {
+        setErr(error.message);
+      }
+    }
+  };
 
   return (
-    <section className="pt-28 px-6 md:px-10 lg:px-16">
-      <div className="h-[calc(100vh-7rem)] flex items-center justify-center overflow-hidden">
-        <div className="w-full max-w-6xl">
-          <div className="flex items-center justify-between gap-4 mb-5">
-            <button
-              onClick={onBack}
-              className="px-5 py-3 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition text-sm text-[#F3F4F4]/85"
-            >
-              ← Back
-            </button>
+    <section className="relative min-h-screen overflow-hidden bg-[#0a0e17] pt-32 pb-12">
+      <AnimatedGridBackground />
+      <AmbientGlowLines />
+      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_55%_45%_at_50%_18%,rgba(0,255,180,0.08),transparent)]" />
 
-            <button
-              onClick={onSwitchToLogin}
-              className="px-5 py-3 rounded-2xl bg-[#5F9598] text-[#061E29] font-semibold hover:bg-[#4b7f82] transition text-sm"
-            >
-              Login
-            </button>
-          </div>
+      <div className="relative z-10 mx-auto w-full max-w-5xl px-6 md:px-10 lg:px-16">
+        <div className="mb-10 flex items-center justify-between gap-4">
+          <button
+            onClick={onBack}
+            className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-[#7a8ba8] transition hover:bg-white/10 hover:text-white"
+          >
+            ← Back
+          </button>
 
-          <div className="relative h-[calc(100vh-12rem)] overflow-hidden rounded-[36px] border border-[#5F9598]/25 bg-[#0B2A3A]/55 backdrop-blur-xl shadow-[0_60px_160px_rgba(0,0,0,0.65)]">
-            <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_35%_35%,rgba(95,149,152,0.22),transparent_55%)]" />
-            <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_75%_65%,rgba(29,84,109,0.28),transparent_60%)]" />
+          <button
+            onClick={onSwitchToLogin}
+            className="rounded-lg border border-[#00ffb4]/25 bg-[#00ffb4]/8 px-4 py-2 text-sm text-[#00ffb4] transition hover:bg-[#00ffb4]/14"
+          >
+            Login
+          </button>
+        </div>
 
-            <div className="relative px-6 md:px-12 py-8 h-full flex flex-col justify-center">
-              <h2 className="text-center text-3xl md:text-5xl font-extrabold mb-6">
-                Create Account as Student
-              </h2>
-
-              {err && (
-                <div className="mb-4 rounded-2xl border border-red-500/35 bg-red-500/10 px-4 py-3 text-sm text-[#F3F4F4] max-w-3xl mx-auto">
-                  {err}
-                </div>
-              )}
-
-              <form onSubmit={handleSignup} className="max-w-5xl mx-auto">
-                {/* Name */}
-                <div className="mb-5">
-                  <p className="text-xs tracking-widest text-[#F3F4F4]/65 mb-2">
-                    Student&apos;s Name
-                  </p>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <InputLite
-                      placeholder="Last Name"
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                    />
-                    <InputLite
-                      placeholder="First Name"
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                    />
-                    <InputLite
-                      placeholder="Middle Name"
-                      value={middleName}
-                      onChange={(e) => setMiddleName(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                {/* Gender | Birthday (Date Picker) */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-5">
-                  <div>
-                    <p className="text-xs tracking-widest text-[#F3F4F4]/65 mb-2">
-                      Gender
-                    </p>
-                    <Dropdown
-                      value={gender}
-                      placeholder="Select Gender"
-                      options={genderOptions}
-                      onChange={setGender}
-                    />
-                  </div>
-
-                  <div className="hidden md:block" />
-
-                  <div>
-                    <p className="text-xs tracking-widest text-[#F3F4F4]/65 mb-2">
-                      Birthday
-                    </p>
-                    <DatePickerLite
-                      value={birthday}
-                      onChange={(e) => setBirthday(e.target.value)}
-                      max={todayStr} // ✅ blocks future dates
-                    />
-                  </div>
-                </div>
-
-                {/* Dept | program | Contact | Email */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-5">
-                 
-
-                  <div>
-                    <p className="text-xs tracking-widest text-[#F3F4F4]/65 mb-2">
-                      program
-                    </p>
-                    <Dropdown
-                      value={program}
-                      placeholder="Select program"
-                      options={programOptions}
-                      onChange={setProgram}
-                    />
-                  </div>
-
-                  <div>
-                    <p className="text-xs tracking-widest text-[#F3F4F4]/65 mb-2">
-                      Contact Number
-                    </p>
-                    <InputLite
-                      placeholder="Enter Contact No."
-                      value={contactNumber}
-                      onChange={(e) => setContactNumber(e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <p className="text-xs tracking-widest text-[#F3F4F4]/65 mb-2">
-                      Email
-                    </p>
-                    <InputLite
-                      placeholder="Email Address"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      type="email"
-                    />
-                  </div>
-                </div>
-
-                {/* Password | Confirm | Terms + Button */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
-                  <div>
-                    <p className="text-xs tracking-widest text-[#F3F4F4]/65 mb-2">
-                      Password
-                    </p>
-                    <InputLite
-                      placeholder="Input Password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      type="password"
-                    />
-                  </div>
-
-                  <div>
-                    <p className="text-xs tracking-widest text-[#F3F4F4]/65 mb-2">
-                      Confirm Password
-                    </p>
-                    <InputLite
-                      placeholder="Confirm Password"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      type="password"
-                    />
-                  </div>
-
-                  <div className="md:col-span-2 flex flex-col md:flex-row items-center justify-between gap-4">
-                    <label className="flex items-center gap-3 text-sm text-[#F3F4F4]/80">
-                      <input
-                        type="checkbox"
-                        checked={agree}
-                        onChange={(e) => setAgree(e.target.checked)}
-                        className="h-4 w-4 accent-[#5F9598]"
-                      />
-                      I agree to the terms and conditions
-                    </label>
-
-                    <button
-                      disabled={loading}
-                      className="px-12 py-3 rounded-2xl bg-[#5F9598] text-[#061E29] font-extrabold hover:bg-[#4b7f82] transition shadow-xl shadow-[#5F9598]/10 disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                      {loading ? "Signing up..." : "Sign Up"}
-                    </button>
-                  </div>
-                </div>
-              </form>
-
-              <div className="mt-4 text-xs text-[#F3F4F4]/55 text-center">
-                Mock signup stores your data locally in this browser only.
+        <div className="relative overflow-hidden rounded-[28px] border border-[#1a2438] bg-[#0d1220]/95 p-8 shadow-[0_24px_80px_rgba(0,0,0,0.45)] md:p-10">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(0,255,180,0.06),transparent_40%)]" />
+          <div className="relative">
+            <div className="mb-8 text-center">
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/6 px-4 py-1.5">
+                <span className="h-2 w-2 rounded-full bg-[#00ffb4]" />
+                <span className="text-xs font-medium uppercase tracking-[0.25em] text-[#00ffb4]">
+                  Student Access
+                </span>
               </div>
+
+              <h2 className="mb-2 text-3xl font-bold text-[#e8ecf4] md:text-4xl">
+                Create Your Account
+              </h2>
+              <p className="text-[#7a8ba8]">
+                Start learning PC hardware with guided 3D interaction.
+              </p>
             </div>
+
+            {err && (
+              <div className="mb-6 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                {err}
+              </div>
+            )}
+
+            <form onSubmit={handleSignup} className="space-y-6">
+              <div>
+                <label className="mb-3 block text-sm font-medium text-[#9fb0c9]">
+                  Student&apos;s Name
+                </label>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                  <InputBlockLight
+                    placeholder="Last Name"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                  />
+                  <InputBlockLight
+                    placeholder="First Name"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                  />
+                  <InputBlockLight
+                    placeholder="Middle Name"
+                    value={middleName}
+                    onChange={(e) => setMiddleName(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-[#9fb0c9]">
+                    Gender
+                  </label>
+                  <Dropdown
+                    value={gender}
+                    placeholder="Select Gender"
+                    options={genderOptions}
+                    onChange={setGender}
+                  />
+                </div>
+
+                <div className="hidden md:block" />
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-[#9fb0c9]">
+                    Birthday
+                  </label>
+                  <DatePickerLite
+                    value={birthday}
+                    onChange={(e) => setBirthday(e.target.value)}
+                    max={todayStr}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-[#9fb0c9]">
+                    Program
+                  </label>
+                  <Dropdown
+                    value={program}
+                    placeholder="Select Program"
+                    options={programOptions}
+                    onChange={setProgram}
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-[#9fb0c9]">
+                    Contact Number
+                  </label>
+                  <InputBlockLight
+                    placeholder="Enter Contact No."
+                    value={contactNumber}
+                    onChange={(e) => setContactNumber(e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-[#9fb0c9]">
+                    Email
+                  </label>
+                  <InputBlockLight
+                    placeholder="Email Address"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    type="email"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-[#9fb0c9]">
+                    Password
+                  </label>
+                  <InputBlockLight
+                    placeholder="Input Password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    type="password"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-[#9fb0c9]">
+                    Confirm Password
+                  </label>
+                  <InputBlockLight
+                    placeholder="Confirm Password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    type="password"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col items-center justify-between gap-4 pt-4 md:flex-row">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={agree}
+                    onChange={(e) => setAgree(e.target.checked)}
+                    className="h-4 w-4 accent-[#00ffb4]"
+                  />
+                  <span className="text-sm text-[#7a8ba8]">
+                    I agree to the terms and conditions
+                  </span>
+                </label>
+
+                <button
+                  disabled={loading}
+                  className="rounded-xl bg-[#00ffb4] px-8 py-3 font-semibold text-[#0a0e17] transition hover:scale-[1.02] disabled:opacity-60"
+                >
+                  {loading ? "Signing up..." : "Sign Up"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       </div>
@@ -564,171 +648,219 @@ function SignupPage({ onBack, onSwitchToLogin, onAfterSignup }) {
   );
 }
 
-/* ===========================
-   LOGIN PAGE (FULL PAGE)
-=========================== */
 function LoginPage({ onBack, onSwitchToSignup, onSuccessLogin }) {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
+  const DEV_BYPASS_LOGIN = import.meta.env.VITE_DEV_BYPASS_LOGIN === "true";
 
-
-  const [step, setStep] = useState("login"); // login | otp
-const [otp, setOtp] = useState("");
-const [generatedOtp, setGeneratedOtp] = useState("");
-
+  const [step, setStep] = useState("login");
+  const [otp, setOtp] = useState("");
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
 
- 
+  const handleDevBypass = async () => {
+    try {
+      setLoading(true);
+      setErr("");
 
-   const handleLogin = async (e) => {
-  e.preventDefault();
-  setErr("");
+      const profile = {
+        uid: "dev-user",
+        email: "dev@example.com",
+        firstName: "Dev",
+        lastName: "User",
+        role: "student",
+      };
 
-  if (!email.trim() || !pass.trim()) {
-    return setErr("Please enter your email and password.");
-  }
-
-  try {
-    setLoading(true);
-
-    const userCredential = await signInWithEmailAndPassword(
-      auth,
-      email.trim(),
-      pass
-    );
-
-    const user = userCredential.user;
-
-    // 🔥 Generate OTP
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-    setGeneratedOtp(otpCode);
-
-    // ⚠️ TEMP: show OTP in console (replace later with email sending)
-    console.log("OTP:", otpCode);
-
-    // 👉 move to OTP step
-    setStep("otp");
-    setLoading(false);
-
-  } catch (error) {
-    setLoading(false);
-
-    if (
-      error.code === "auth/invalid-credential" ||
-      error.code === "auth/wrong-password" ||
-      error.code === "auth/user-not-found"
-    ) {
-      setErr("Invalid email or password.");
-    } else {
+      setLoading(false);
+      onSuccessLogin?.(profile);
+    } catch (error) {
+      setLoading(false);
       setErr(error.message);
     }
-  }
-};
+  };
 
-const handleVerifyOtp = async (e) => {
-  e.preventDefault();
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setErr("");
 
-  if (otp !== generatedOtp) {
-    return setErr("Invalid OTP.");
-  }
+    if (!email.trim() || !pass.trim()) {
+      return setErr("Please enter your email and password.");
+    }
 
-  try {
-    setLoading(true);
+    try {
+      setLoading(true);
 
-    const user = auth.currentUser;
+      await signInWithEmailAndPassword(auth, email.trim(), pass);
 
-    let profile = null;
-    const d = await getDoc(doc(db, "users", user.uid));
-    if (d.exists()) profile = d.data();
-    else profile = { uid: user.uid, email: user.email };
+      const sendEmailOtp = httpsCallable(functions, "sendEmailOtp");
+      const cleanEmail = email.trim();
 
-    setLoading(false);
-    onSuccessLogin?.(profile);
+      if (!cleanEmail) {
+        setLoading(false);
+        return setErr("Email is empty before sending OTP");
+      }
 
-  } catch (error) {
-    setLoading(false);
-    setErr(error.message);
-  }
-};
+      await sendEmailOtp({ email: cleanEmail });
+
+      setStep("otp");
+      setLoading(false);
+    } catch (error) {
+      setLoading(false);
+
+      if (
+        error.code === "auth/invalid-credential" ||
+        error.code === "auth/wrong-password" ||
+        error.code === "auth/user-not-found"
+      ) {
+        setErr("Invalid email or password.");
+      } else {
+        setErr(error.message);
+      }
+    }
+  };
+
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault();
+
+    const verifyEmailOtp = httpsCallable(functions, "verifyEmailOtp");
+
+    try {
+      await verifyEmailOtp({ email: email.trim(), otp });
+    } catch (error) {
+      return setErr(error.message || "Invalid OTP");
+    }
+
+    try {
+      setLoading(true);
+
+      const user = auth.currentUser;
+      const d = await getDoc(doc(db, "users", user.uid));
+
+      let profile = null;
+      if (d.exists()) profile = d.data();
+      else profile = { uid: user.uid, email: user.email };
+
+      setLoading(false);
+      onSuccessLogin?.(profile);
+    } catch (error) {
+      setLoading(false);
+      setErr(error.message);
+    }
+  };
 
   return (
-    <section className="pt-28 px-6 md:px-10 lg:px-16">
-      <div className="h-[calc(100vh-7rem)] flex items-center justify-center overflow-hidden">
-        <div className="w-full max-w-md">
-          <div className="flex items-center justify-between gap-4 mb-5">
-            <button
-              onClick={onBack}
-              className="px-5 py-3 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition text-sm text-[#F3F4F4]/85"
-            >
-              ← Back
-            </button>
+    <section className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0a0e17] px-4 pt-24 pb-12 md:px-6">
+      <AnimatedGridBackground />
+      <AmbientGlowLines />
+      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_55%_45%_at_50%_18%,rgba(0,255,180,0.08),transparent)]" />
 
-            <button
-              onClick={onSwitchToSignup}
-              className="px-5 py-3 rounded-2xl border border-[#5F9598]/60 text-[#5F9598] hover:bg-[#5F9598]/10 transition text-sm"
-            >
-              Signup
-            </button>
-          </div>
+      <div className="relative z-10 w-full max-w-md">
+        <div className="mb-6 flex items-center justify-between gap-4">
+          <button
+            onClick={onBack}
+            className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-[#7a8ba8] transition hover:bg-white/10 hover:text-white"
+          >
+            ← Back
+          </button>
 
-          <div className="relative overflow-hidden rounded-[28px] border border-[#5F9598]/25 bg-[#0B2A3A]/75 backdrop-blur-xl shadow-2xl">
-            <div className="p-7 border-b border-white/10">
-              <h3 className="text-2xl font-bold">Welcome back</h3>
-              <p className="text-sm text-[#F3F4F4]/60 mt-1">
+          <button
+            onClick={onSwitchToSignup}
+            className="rounded-lg border border-[#00ffb4]/25 bg-[#00ffb4]/8 px-4 py-2 text-sm text-[#00ffb4] transition hover:bg-[#00ffb4]/14"
+          >
+            Signup
+          </button>
+        </div>
+
+        <div className="relative overflow-hidden rounded-[28px] border border-[#1a2438] bg-[#0d1220]/95 shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(0,255,180,0.06),transparent_40%)]" />
+
+          <div className="relative px-6 py-10 md:px-8">
+            <div className="mb-6">
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/6 px-4 py-1.5">
+                <span className="h-2 w-2 rounded-full bg-[#00ffb4]" />
+                <span className="text-xs font-medium uppercase tracking-[0.25em] text-[#00ffb4]">
+                  Login
+                </span>
+              </div>
+
+              <h2 className="mb-1 text-2xl font-bold text-[#e8ecf4]">
+                Welcome back
+              </h2>
+              <p className="text-sm text-[#7a8ba8]">
                 Log in to continue learning in 3D.
               </p>
             </div>
 
-            <div className="p-7">
-              {err && (
-                <div className="mb-4 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-[#F3F4F4]/90">
-                  {err}
+            {err && (
+              <div className="mb-5 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                {err}
+              </div>
+            )}
+
+            {step === "login" ? (
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-[#9fb0c9]">
+                    Email
+                  </label>
+                  <InputBlockLight
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    type="email"
+                  />
                 </div>
-              )}
 
-              {step === "login" ? (
-  <form onSubmit={handleLogin} className="space-y-4">
-    <InputBlock
-      label="Email"
-      value={email}
-      onChange={(e) => setEmail(e.target.value)}
-      placeholder="you@example.com"
-      type="email"
-    />
-    <InputBlock
-      label="Password"
-      value={pass}
-      onChange={(e) => setPass(e.target.value)}
-      placeholder="••••••••"
-      type="password"
-    />
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-[#9fb0c9]">
+                    Password
+                  </label>
+                  <InputBlockLight
+                    value={pass}
+                    onChange={(e) => setPass(e.target.value)}
+                    placeholder="••••••••"
+                    type="password"
+                  />
+                </div>
 
-    <button
-      disabled={loading}
-      className="w-full mt-2 px-6 py-3.5 rounded-2xl bg-[#5F9598] text-[#061E29] font-bold"
-    >
-      {loading ? "Checking..." : "Continue"}
-    </button>
-  </form>
-) : (
-  <form onSubmit={handleVerifyOtp} className="space-y-4">
-    <InputBlock
-      label="Enter OTP"
-      value={otp}
-      onChange={(e) => setOtp(e.target.value)}
-      placeholder="6-digit code"
-    />
+                <button
+                  disabled={loading}
+                  className="w-full rounded-xl bg-[#00ffb4] px-6 py-3 font-semibold text-[#0a0e17] transition hover:scale-[1.01] disabled:opacity-60"
+                >
+                  {loading ? "Checking..." : "Continue"}
+                </button>
 
-    <button
-      disabled={loading}
-      className="w-full mt-2 px-6 py-3.5 rounded-2xl bg-[#5F9598] text-[#061E29] font-bold"
-    >
-      {loading ? "Verifying..." : "Verify OTP"}
-    </button>
-  </form>
-)}
-            </div>
+                {DEV_BYPASS_LOGIN && (
+                  <button
+                    type="button"
+                    onClick={handleDevBypass}
+                    className="w-full rounded-xl border border-[#00ffb4]/25 bg-[#00ffb4]/8 px-6 py-3 font-semibold text-[#00ffb4] transition hover:bg-[#00ffb4]/14"
+                  >
+                    Continue as Dev
+                  </button>
+                )}
+              </form>
+            ) : (
+              <form onSubmit={handleVerifyOtp} className="space-y-4">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-[#9fb0c9]">
+                    Enter OTP
+                  </label>
+                  <InputBlockLight
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value)}
+                    placeholder="6-digit code"
+                  />
+                </div>
+
+                <button
+                  disabled={loading}
+                  className="w-full rounded-xl bg-[#00ffb4] px-6 py-3 font-semibold text-[#0a0e17] transition hover:scale-[1.01] disabled:opacity-60"
+                >
+                  {loading ? "Verifying..." : "Verify OTP"}
+                </button>
+              </form>
+            )}
           </div>
         </div>
       </div>
@@ -736,43 +868,42 @@ const handleVerifyOtp = async (e) => {
   );
 }
 
-/* ===========================
-   INPUTS (base)
-=========================== */
-function InputLite({ value, onChange, placeholder, type = "text" }) {
-  return (
-    <input
-      value={value}
-      onChange={onChange}
-      placeholder={placeholder}
-      type={type}
-      className="w-full px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-[#F3F4F4] placeholder:text-[#F3F4F4]/35 outline-none focus:ring-2 focus:ring-[#5F9598]/50 focus:border-[#5F9598]/30 transition text-sm"
-    />
-  );
-}
+function InputBlockLight({ label, value, onChange, placeholder, type = "text" }) {
+  const [show, setShow] = useState(false);
+  const isPassword = type === "password";
 
-function InputBlock({ label, value, onChange, placeholder, type = "text" }) {
   return (
     <label className="block">
-      <span className="text-[11px] tracking-widest text-[#F3F4F4]/55">
-        {label}
-      </span>
-      <input
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        type={type}
-        className="mt-2 w-full px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-[#F3F4F4] placeholder:text-[#F3F4F4]/35 outline-none focus:ring-2 focus:ring-[#5F9598]/50 focus:border-[#5F9598]/30 transition text-sm"
-      />
+      {label ? (
+        <span className="text-[11px] tracking-widest text-[#7a8ba8]/75">
+          {label}
+        </span>
+      ) : null}
+
+      <div className="relative mt-2">
+        <input
+          value={value}
+          onChange={onChange}
+          placeholder={placeholder}
+          type={isPassword && show ? "text" : type}
+          className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 pr-10 text-sm text-[#e8ecf4] outline-none transition placeholder:text-[#7a8ba8]/45 focus:border-[#00ffb4]/30 focus:ring-2 focus:ring-[#00ffb4]/30"
+        />
+
+        {isPassword && (
+          <button
+            type="button"
+            onClick={() => setShow(!show)}
+            className="absolute right-3 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center text-[#7a8ba8] hover:text-[#e8ecf4]"
+            aria-label={show ? "Hide password" : "Show password"}
+          >
+            {show ? "◉" : "◎"}
+          </button>
+        )}
+      </div>
     </label>
   );
 }
 
-/* ===========================
-   ✅ DATE PICKER (No future dates)
-   - Uses native input[type=date]
-   - max={today} blocks future selection
-=========================== */
 function DatePickerLite({ value, onChange, max }) {
   return (
     <input
@@ -780,16 +911,11 @@ function DatePickerLite({ value, onChange, max }) {
       value={value}
       onChange={onChange}
       max={max}
-      className="w-full px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-[#F3F4F4] outline-none focus:ring-2 focus:ring-[#5F9598]/50 focus:border-[#5F9598]/30 transition text-sm"
+      className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-[#e8ecf4] outline-none transition focus:border-[#00ffb4]/30 focus:ring-2 focus:ring-[#00ffb4]/30"
     />
   );
 }
 
-/* ===========================
-   ✅ CUSTOM DROPDOWN (Palette-matched)
-   - Avoids ugly native <select> white dropdown
-   - Fully styled with your theme
-=========================== */
 function Dropdown({ value, onChange, options, placeholder = "Select" }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -808,17 +934,17 @@ function Dropdown({ value, onChange, options, placeholder = "Select" }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-[#F3F4F4] outline-none hover:bg-white/10 transition text-sm"
+        className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-[#e8ecf4] outline-none transition hover:bg-white/10"
       >
-        <span className={value ? "text-[#F3F4F4]" : "text-[#F3F4F4]/45"}>
+        <span className={value ? "text-[#e8ecf4]" : "text-[#7a8ba8]/45"}>
           {value || placeholder}
         </span>
-        <span className="text-[#F3F4F4]/70">▾</span>
+        <span className="text-[#7a8ba8]/70">▾</span>
       </button>
 
       {open && (
-        <div className="absolute z-[80] mt-2 w-full rounded-2xl border border-[#5F9598]/25 bg-[#061E29]/95 backdrop-blur-xl shadow-2xl overflow-hidden">
-          <div className="py-2 max-h-60 overflow-auto">
+        <div className="absolute z-[80] mt-2 w-full overflow-hidden rounded-2xl border border-[#1a2438] bg-[#0d1220] shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
+          <div className="max-h-60 overflow-auto py-2">
             {options.map((opt) => (
               <button
                 key={opt}
@@ -828,10 +954,10 @@ function Dropdown({ value, onChange, options, placeholder = "Select" }) {
                   setOpen(false);
                 }}
                 className={[
-                  "w-full text-left px-4 py-2.5 text-sm transition",
+                  "w-full px-4 py-2.5 text-left text-sm transition",
                   opt === value
-                    ? "bg-[#5F9598]/20 text-[#F3F4F4]"
-                    : "text-[#F3F4F4]/85 hover:bg-white/5",
+                    ? "bg-[#00ffb4]/10 font-medium text-[#00ffb4]"
+                    : "text-[#e8ecf4] hover:bg-white/5",
                 ].join(" ")}
               >
                 {opt}
@@ -844,188 +970,238 @@ function Dropdown({ value, onChange, options, placeholder = "Select" }) {
   );
 }
 
-/* ===========================
-   3D SCENE
-=========================== */
-function ModelOnlyScene({ autoRotate }) {
+function ModelOnlyScene({ mouse }) {
   return (
     <>
       <ambientLight intensity={0.8} />
       <directionalLight position={[6, 7, 5]} intensity={2.25} />
       <directionalLight position={[-6, 3.5, -4]} intensity={0.9} />
       <directionalLight position={[0, 4, -8]} intensity={0.8} />
-
       <Bounds fit clip margin={1.2}>
-        <AutoRotateGroup enabled={autoRotate} speed={0.35}>
-          <group position={[0, -0.05, 0]} rotation={[0.05, -0.55, 0]}>
-            <HardwareModel />
-          </group>
-        </AutoRotateGroup>
+        <MouseFollowModel mouse={mouse} />
       </Bounds>
     </>
   );
 }
 
-function AutoRotateGroup({ children, enabled, speed = 0.35 }) {
-  const ref = useRef();
-  useFrame((_, delta) => {
-    if (!ref.current || !enabled) return;
-    ref.current.rotation.y += delta * speed;
+function MouseFollowModel({ mouse }) {
+  const groupRef = useRef();
+
+  useFrame(() => {
+    if (!groupRef.current) return;
+    const targetX = mouse.x * 3;
+    const targetY = -mouse.y * 1.5;
+    const targetZ = 2;
+    groupRef.current.lookAt(targetX, targetY, targetZ);
   });
-  return <group ref={ref}>{children}</group>;
-}
 
-/* ===========================
-   SECTIONS (placeholders)
-=========================== */
-function TrustSection() {
   return (
-    <section className="px-6 md:px-10 lg:px-16 pt-12 pb-6">
-      <div className="rounded-[28px] border border-[#5F9598]/20 bg-white/5 backdrop-blur-xl shadow-lg overflow-hidden">
-        <div className="grid grid-cols-1 md:grid-cols-3">
-          <TrustPill label="Learning Mode" value="Guided + Free Explore" />
-          <TrustPill label="Content Style" value="Accurate + Visual" />
-          <TrustPill label="Goal" value="Confidence in Hardware" />
-        </div>
-      </div>
-    </section>
-  );
-}
-function TrustPill({ label, value }) {
-  return (
-    <div className="p-7 md:p-8 border-b md:border-b-0 md:border-r last:md:border-r-0 border-white/10">
-      <p className="text-[11px] tracking-widest text-[#F3F4F4]/55 mb-2">
-        {label}
-      </p>
-      <p className="text-xl font-semibold">{value}</p>
-    </div>
-  );
-}
-function FeaturesSection() {
-  return (
-    <section className="px-6 md:px-10 lg:px-16 py-20">
-      <SectionHeader title="Designed for Deep Hardware Understanding" />
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        <FeatureCard title="Interactive 3D Models" description="Inspect and learn." />
-        <FeatureCard title="Guided Procedures" description="Step-by-step workflows." />
-        <FeatureCard title="Component Explanations" description="Understand every part." />
-      </div>
-    </section>
-  );
-}
-function ShowcaseSection() {
-  return (
-    <section className="px-6 md:px-10 lg:px-16 py-24 bg-gradient-to-b from-[#1D546D]/25 to-transparent">
-      <SectionHeader title="A Learning Experience" />
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <FeatureCard title="Preview → Practice" description="Learn by doing." />
-        <FeatureCard title="See the System Logic" description="Connections make sense." />
-        <FeatureCard title="Learn the Sequence" description="Correct assembly order." />
-      </div>
-    </section>
-  );
-}
-function HowItWorksSection() {
-  return (
-    <section className="px-6 md:px-10 lg:px-16 py-24">
-      <SectionHeader title="How Articton Works" />
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-10">
-        <StepCard step="01" title="Select Hardware" description="Choose a system." />
-        <StepCard step="02" title="Explore in 3D" description="Rotate and zoom." />
-        <StepCard step="03" title="Assemble" description="Follow sequences." />
-        <StepCard step="04" title="Assess" description="Check your knowledge." />
-      </div>
-    </section>
-  );
-}
-function SecondaryFeaturesSection() {
-  return (
-    <section className="px-6 md:px-10 lg:px-16 py-20">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-        <FeatureCard title="Self-Paced Learning" description="Anytime, anywhere." />
-        <FeatureCard title="Quizzes" description="Instant feedback." />
-      </div>
-    </section>
-  );
-}
-function CTASection({ onJoin }) {
-  return (
-    <section className="px-6 md:px-10 lg:px-16 py-24 text-center">
-      <h3 className="text-4xl md:text-5xl font-bold mb-6">
-        Experience Hardware Beyond Textbooks
-      </h3>
-      <p className="text-[#5F9598] mb-10 text-base md:text-lg">
-        Bridge theory and practice with immersive 3D interaction.
-      </p>
-      <button
-        onClick={onJoin}
-        className="px-12 py-4 rounded-2xl bg-[#5F9598] text-[#061E29] font-bold hover:bg-[#4b7f82] transition shadow-xl shadow-[#5F9598]/10"
-      >
-        Join Articton
-      </button>
-    </section>
-  );
-}
-function Footer() {
-  return (
-    <footer className="px-6 md:px-10 lg:px-16 py-10 text-center text-sm text-[#F3F4F4]/60 border-t border-[#5F9598]/20">
-      © 2026 Articton — 3D Computer Hardware Learning Platform
-    </footer>
-  );
-}
-function SectionHeader({ title }) {
-  return (
-    <div className="text-center mb-14">
-      <h3 className="text-3xl md:text-4xl font-bold mb-4">{title}</h3>
-    </div>
-  );
-}
-function StepCard({ step, title, description }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 18 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      className="relative bg-[#061E29]/70 border border-[#5F9598]/20 rounded-3xl p-8 shadow-xl backdrop-blur-xl"
-    >
-      <span className="absolute -top-4 left-6 px-4 py-1 rounded-full bg-[#5F9598] text-[#061E29] text-sm font-bold shadow">
-        {step}
-      </span>
-      <h4 className="text-xl font-semibold mt-4 mb-3">{title}</h4>
-      <p className="text-[#F3F4F4]/70 text-sm">{description}</p>
-    </motion.div>
-  );
-}
-function FeatureCard({ title, description }) {
-  return (
-    <motion.div
-      whileHover={{ y: -6 }}
-      className="bg-[#061E29]/70 border border-[#5F9598]/20 rounded-3xl p-8 shadow-xl backdrop-blur-xl h-full"
-    >
-      <h4 className="text-xl font-semibold mb-3">{title}</h4>
-      <p className="text-[#F3F4F4]/70 text-sm leading-relaxed">
-        {description}
-      </p>
-    </motion.div>
+    <group ref={groupRef} position={[0, -0.05, 0]}>
+      <HardwareModel />
+    </group>
   );
 }
 
-/* ===========================
-   3D MODEL
-=========================== */
 function HardwareModel() {
   const { scene } = useGLTF("/models/pc.glb");
   return <primitive object={scene} />;
 }
 useGLTF.preload("/models/pc.glb");
 
-/* ===========================
-   CANVAS FALLBACK
-=========================== */
 function CanvasFallback() {
   return (
     <mesh>
       <ambientLight intensity={1} />
     </mesh>
+  );
+}
+
+function TrustSectionDark() {
+  return (
+    <section className="px-6 pb-6 pt-12 md:px-10 lg:px-16">
+      <div className="overflow-hidden rounded-[28px] border border-[#1a2438] bg-[#0d1220] shadow-[0_16px_42px_rgba(0,0,0,0.28)]">
+        <div className="grid grid-cols-1 md:grid-cols-3">
+          <TrustPillDark label="Learning Mode" value="Guided + Free Explore" />
+          <TrustPillDark label="Content Style" value="Accurate + Visual" />
+          <TrustPillDark label="Goal" value="Confidence in Hardware" />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function TrustPillDark({ label, value }) {
+  return (
+    <div className="border-[#1a2438] p-7 md:border-r md:p-8 md:last:border-r-0">
+      <p className="mb-2 text-[11px] tracking-widest text-[#00ffb4]">{label}</p>
+      <p className="text-xl font-semibold text-[#e8ecf4]">{value}</p>
+    </div>
+  );
+}
+
+function FeaturesSectionDark() {
+  return (
+    <section className="px-6 py-20 md:px-10 lg:px-16">
+      <SectionHeaderDark title="Designed for Deep Hardware Understanding" />
+      <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
+        <FeatureCardDark title="Interactive 3D Models" description="Inspect and learn." />
+        <FeatureCardDark title="Guided Procedures" description="Step-by-step workflows." />
+        <FeatureCardDark title="Component Explanations" description="Understand every part." />
+      </div>
+    </section>
+  );
+}
+
+function ShowcaseSectionDark() {
+  return (
+    <section className="px-6 py-24 md:px-10 lg:px-16">
+      <SectionHeaderDark title="A Learning Experience" />
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+        <FeatureCardDark title="Preview → Practice" description="Learn by doing." />
+        <FeatureCardDark title="See the System Logic" description="Connections make sense." />
+        <FeatureCardDark title="Learn the Sequence" description="Correct assembly order." />
+      </div>
+    </section>
+  );
+}
+
+function HowItWorksSectionDark() {
+  return (
+    <section className="px-6 py-24 md:px-10 lg:px-16">
+      <SectionHeaderDark title="How Articton Works" />
+      <div className="grid grid-cols-1 gap-10 md:grid-cols-4">
+        <StepCardDark step="01" title="Select Hardware" description="Choose a system." />
+        <StepCardDark step="02" title="Explore in 3D" description="Rotate and zoom." />
+        <StepCardDark step="03" title="Assemble" description="Follow sequences." />
+        <StepCardDark step="04" title="Assess" description="Check your knowledge." />
+      </div>
+    </section>
+  );
+}
+
+function SecondaryFeaturesSectionDark() {
+  return (
+    <section className="px-6 py-20 md:px-10 lg:px-16">
+      <div className="grid grid-cols-1 gap-10 md:grid-cols-2">
+        <FeatureCardDark title="Self-Paced Learning" description="Anytime, anywhere." />
+        <FeatureCardDark title="Quizzes" description="Instant feedback." />
+      </div>
+    </section>
+  );
+}
+
+function CTASectionDark({ onJoin }) {
+  return (
+    <section className="px-6 py-24 text-center md:px-10 lg:px-16">
+      <h3 className="mb-6 text-4xl font-bold text-[#e8ecf4] md:text-5xl">
+        Experience Hardware Beyond Textbooks
+      </h3>
+      <p className="mb-10 text-base text-[#7a8ba8] md:text-lg">
+        Bridge theory and practice with immersive 3D interaction.
+      </p>
+      <button
+        onClick={onJoin}
+        className="rounded-2xl bg-[#00ffb4] px-12 py-4 font-bold text-[#0a0e17] transition hover:scale-[1.02]"
+      >
+        Join Articton
+      </button>
+    </section>
+  );
+}
+
+function SectionHeaderDark({ title }) {
+  return (
+    <div className="mb-14 text-center">
+      <h3 className="text-3xl font-bold text-[#e8ecf4] md:text-4xl">{title}</h3>
+    </div>
+  );
+}
+
+function StepCardDark({ step, title, description }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 18 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      className="relative rounded-3xl border border-[#1a2438] bg-[#0d1220] p-8 shadow-[0_14px_34px_rgba(0,0,0,0.28)]"
+    >
+      <span className="absolute -top-4 left-6 rounded-full bg-[#00ffb4] px-4 py-1 text-sm font-bold text-[#0a0e17] shadow">
+        {step}
+      </span>
+      <h4 className="mb-3 mt-4 text-xl font-semibold text-[#e8ecf4]">{title}</h4>
+      <p className="text-sm text-[#7a8ba8]">{description}</p>
+    </motion.div>
+  );
+}
+
+function FeatureCardDark({ title, description }) {
+  return (
+    <motion.div
+      whileHover={{ y: -6 }}
+      className="h-full rounded-3xl border border-[#1a2438] bg-[#0d1220] p-8 shadow-[0_14px_34px_rgba(0,0,0,0.28)]"
+    >
+      <h4 className="mb-3 text-xl font-semibold text-[#e8ecf4]">{title}</h4>
+      <p className="text-sm leading-relaxed text-[#7a8ba8]">{description}</p>
+    </motion.div>
+  );
+}
+
+function Footer({ dark = false }) {
+  return (
+    <footer
+      className={[
+        "border-t px-6 py-10 md:px-10 lg:px-16",
+        dark
+          ? "border-[#1a2438] bg-[#080c14] text-[#4a5b78]"
+          : "border-[#d7dfe3] bg-white text-[#4d5b64]",
+      ].join(" ")}
+    >
+      <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 text-center sm:flex-row sm:text-left">
+        <div className="flex items-center gap-2">
+          {dark ? <Cpu className="h-5 w-5 text-[#00ffb4]" /> : null}
+          <span className={dark ? "font-bold tracking-tight text-[#e8ecf4]" : ""}>
+            © 2026 Articton — 3D Computer Hardware Learning Platform
+          </span>
+        </div>
+        {dark ? <p className="text-sm text-[#4a5b78]">Built for curious minds. Learn hardware the hands-on way.</p> : null}
+      </div>
+    </footer>
+  );
+}
+
+function SectionHeader({ title }) {
+  return (
+    <div className="mb-14 text-center">
+      <h3 className="text-3xl font-bold text-[#132029] md:text-4xl">{title}</h3>
+    </div>
+  );
+}
+
+function StepCard({ step, title, description }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 18 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      className="relative rounded-3xl border border-[#d5dfe3] bg-white p-8 shadow-[0_14px_34px_rgba(15,26,34,0.10)]"
+    >
+      <span className="absolute -top-4 left-6 rounded-full bg-[#3f83f8] px-4 py-1 text-sm font-bold text-white shadow">
+        {step}
+      </span>
+      <h4 className="mt-4 mb-3 text-xl font-semibold text-[#132029]">{title}</h4>
+      <p className="text-sm text-[#4c5d66]">{description}</p>
+    </motion.div>
+  );
+}
+
+function FeatureCard({ title, description }) {
+  return (
+    <motion.div
+      whileHover={{ y: -6 }}
+      className="h-full rounded-3xl border border-[#d5dfe3] bg-white p-8 shadow-[0_14px_34px_rgba(15,26,34,0.10)]"
+    >
+      <h4 className="mb-3 text-xl font-semibold text-[#132029]">{title}</h4>
+      <p className="text-sm leading-relaxed text-[#4c5d66]">{description}</p>
+    </motion.div>
   );
 }

@@ -3,15 +3,21 @@ import { Canvas } from "@react-three/fiber";
 import { Bounds, Environment, Html, OrbitControls, useGLTF } from "@react-three/drei";
 import { motion, AnimatePresence } from "framer-motion";
 import * as THREE from "three";
-
-const COLORS = {
-  pineBlue: "#50757B",
-  lightBlue: "#B2C9CF",
-  lightBlueHeader: "#A6BEC5",
-  graphite: "#2C2C2E",
+import { auth, db } from "../../firebase.js";
+import { onAuthStateChanged } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import { useThree, useFrame } from "@react-three/fiber";
+const THEME = {
+  bg: "#0a0e17",
+  surface: "#0d1220",
+  surface2: "#111d33",
+  text: "#e8ecf4",
+  muted: "#7a8ba8",
+  accent: "#00ffb4",
+  accentSoft: "rgba(0,255,180,0.12)",
+  border: "#1a2438",
 };
 
-/* ===================== INTRO "POWERPOINT" DECK ===================== */
 function IntroDeck({ slides, onDone }) {
   const [index, setIndex] = useState(0);
   useEffect(() => setIndex(0), [slides]);
@@ -21,9 +27,9 @@ function IntroDeck({ slides, onDone }) {
 
   return (
     <div className="absolute inset-0 z-50">
-      <div className="absolute inset-0 bg-black/55" />
+      <div className="absolute inset-0 bg-black/60" />
 
-      <div className="relative h-full w-full flex items-center justify-center p-6">
+      <div className="relative flex h-full w-full items-center justify-center p-6">
         <AnimatePresence mode="wait">
           <motion.div
             key={slide.id}
@@ -31,45 +37,27 @@ function IntroDeck({ slides, onDone }) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.99 }}
             transition={{ duration: 0.22 }}
-            className={[
-              "w-[1120px] max-w-[calc(100vw-40px)]",
-              "min-h-[520px]",
-              "rounded-[32px] overflow-hidden",
-              "shadow-[0_40px_120px_rgba(0,0,0,0.45)]",
-            ].join(" ")}
-            style={{ backgroundColor: COLORS.lightBlue }}
+            className="w-[1120px] max-w-[calc(100vw-40px)] min-h-[520px] overflow-hidden rounded-[32px] border border-[#1a2438] bg-[#0d1220] shadow-[0_40px_120px_rgba(0,0,0,0.45)]"
           >
-            <div
-              className="px-10 py-7 flex items-center justify-between gap-4"
-              style={{ backgroundColor: COLORS.lightBlueHeader }}
-            >
+            <div className="flex items-center justify-between gap-4 border-b border-[#1a2438] bg-[#111d33] px-10 py-7">
               <div className="min-w-0">
-                <div className="text-[14px]" style={{ color: `${COLORS.graphite}B3` }}>
-                  Introduction
-                </div>
-                <div className="text-[26px] font-extrabold truncate" style={{ color: COLORS.graphite }}>
-                  {slide.title}
-                </div>
+                <div className="text-[14px] text-[#00ffb4]">Introduction</div>
+                <div className="truncate text-[26px] font-extrabold text-[#e8ecf4]">{slide.title}</div>
               </div>
 
-              <div className="text-[14px] font-medium" style={{ color: `${COLORS.graphite}B3` }}>
+              <div className="text-[14px] font-medium text-[#7a8ba8]">
                 {index + 1}/{slides.length}
               </div>
             </div>
 
             <div className="px-10 py-8">
-              <div className="text-[18px] leading-relaxed whitespace-pre-line" style={{ color: COLORS.graphite }}>
-                {slide.body}
-              </div>
+              <div className="whitespace-pre-line text-[18px] leading-relaxed text-[#dbe6f5]">{slide.body}</div>
 
               {slide.points?.length ? (
-                <ul className="mt-6 space-y-3" style={{ color: `${COLORS.graphite}CC` }}>
+                <ul className="mt-6 space-y-3 text-[#c8d4e6]">
                   {slide.points.map((p, i) => (
                     <li key={i} className="flex gap-3 text-[17px] leading-relaxed">
-                      <span
-                        className="mt-[10px] h-2 w-2 rounded-full flex-none"
-                        style={{ backgroundColor: `${COLORS.graphite}99` }}
-                      />
+                      <span className="mt-[10px] h-2 w-2 flex-none rounded-full bg-[#00ffb4]/70" />
                       <span>{p}</span>
                     </li>
                   ))}
@@ -81,12 +69,7 @@ function IntroDeck({ slides, onDone }) {
                   type="button"
                   onClick={() => setIndex((i) => Math.max(0, i - 1))}
                   disabled={index === 0}
-                  className="h-12 px-6 rounded-2xl border transition disabled:opacity-40 text-[16px] font-semibold"
-                  style={{
-                    borderColor: `${COLORS.graphite}1A`,
-                    backgroundColor: "rgba(255,255,255,0.50)",
-                    color: COLORS.graphite,
-                  }}
+                  className="h-12 rounded-2xl border border-[#1a2438] bg-white/[0.03] px-6 text-[16px] font-semibold text-[#dbe6f5] transition hover:bg-white/[0.06] disabled:opacity-40"
                 >
                   ← Back
                 </button>
@@ -95,12 +78,7 @@ function IntroDeck({ slides, onDone }) {
                   <button
                     type="button"
                     onClick={onDone}
-                    className="h-12 px-6 rounded-2xl border transition text-[16px] font-semibold"
-                    style={{
-                      borderColor: `${COLORS.graphite}1A`,
-                      backgroundColor: "rgba(255,255,255,0.50)",
-                      color: COLORS.graphite,
-                    }}
+                    className="h-12 rounded-2xl border border-[#1a2438] bg-white/[0.03] px-6 text-[16px] font-semibold text-[#dbe6f5] transition hover:bg-white/[0.06]"
                     title="Skip introduction"
                   >
                     Skip
@@ -112,15 +90,14 @@ function IntroDeck({ slides, onDone }) {
                       if (isLast) onDone();
                       else setIndex((i) => i + 1);
                     }}
-                    className="h-12 px-7 rounded-2xl font-semibold transition text-[16px]"
-                    style={{ backgroundColor: COLORS.pineBlue, color: "white" }}
+                    className="h-12 rounded-2xl bg-[#00ffb4] px-7 text-[16px] font-semibold text-[#0a0e17] transition hover:scale-[1.02]"
                   >
                     {isLast ? "Start 3D →" : "Next →"}
                   </button>
                 </div>
               </div>
 
-              <div className="mt-6 text-[14px]" style={{ color: `${COLORS.graphite}99` }}>
+              <div className="mt-6 text-[14px] text-[#7a8ba8]">
                 Tip: press <b>D</b> then click the model to log exact hotspot coordinates.
               </div>
             </div>
@@ -131,14 +108,14 @@ function IntroDeck({ slides, onDone }) {
   );
 }
 
-/* ===================== HOTSPOT PIN (with UI offset) ===================== */
 function HotspotPin({
   number,
   position,
   active,
   onClick,
   pin = { buttonPx: 36, glowRadius: 0.05, distanceFactor: 10 },
-  uiOffset, // [xPx, yPx]
+  uiOffset,
+  frontAxis = [0, 1, 0],
 }) {
   const btn = pin.buttonPx ?? 36;
   const glow = pin.glowRadius ?? 0.05;
@@ -146,11 +123,37 @@ function HotspotPin({
   const offX = uiOffset?.[0] ?? 0;
   const offY = uiOffset?.[1] ?? 0;
 
+  const { camera } = useThree();
+  const groupRef = useRef();
+  const [pinOpacity, setPinOpacity] = useState(1);
+
+  useFrame(() => {
+    if (!groupRef.current) return;
+
+    const worldPos = new THREE.Vector3();
+    groupRef.current.getWorldPosition(worldPos);
+
+    const normal = new THREE.Vector3(...frontAxis)
+      .normalize()
+      .transformDirection(groupRef.current.matrixWorld);
+
+    const toCamera = camera.position.clone().sub(worldPos).normalize();
+
+    const facing = normal.dot(toCamera);
+
+    const nextOpacity = facing > 0.15 ? 1 : facing > -0.15 ? 0.18 : 0;
+    setPinOpacity(nextOpacity);
+  });
+
   return (
-    <group position={position}>
-      <mesh>
+    <group ref={groupRef} position={position}>
+      <mesh visible={pinOpacity > 0.02}>
         <sphereGeometry args={[glow, 24, 24]} />
-        <meshBasicMaterial color={active ? "#5F9598" : "white"} transparent opacity={active ? 0.2 : 0.08} />
+        <meshBasicMaterial
+          color={active ? "#00ffb4" : "white"}
+          transparent
+          opacity={active ? 0.22 * pinOpacity : 0.08 * pinOpacity}
+        />
       </mesh>
 
       <Html center distanceFactor={dist} occlude={false}>
@@ -160,73 +163,48 @@ function HotspotPin({
           whileHover={{ scale: 1.07 }}
           whileTap={{ scale: 0.95 }}
           className={[
-            "relative rounded-full flex items-center justify-center",
-            "border backdrop-blur-md",
-            "shadow-[0_16px_45px_rgba(0,0,0,0.55)]",
-            "transition select-none",
+            "relative flex items-center justify-center rounded-full border backdrop-blur-md shadow-[0_16px_45px_rgba(0,0,0,0.55)] transition select-none",
             active
-              ? "bg-white/92 text-black border-white/60"
-              : "bg-white/72 text-black border-white/30 hover:bg-white/90",
+              ? "border-[#00ffb4]/30 bg-[#00ffb4]/95 text-[#0a0e17]"
+              : "border-white/20 bg-white/75 text-black hover:bg-white/90",
           ].join(" ")}
-          aria-label={`Hotspot ${number}`}
           style={{
             width: btn,
             height: btn,
+            opacity: pinOpacity,
+            pointerEvents: pinOpacity < 0.05 ? "none" : "auto",
             transform: `translate(-50%, -50%) translate(${offX}px, ${offY}px)`,
           }}
+          aria-label={`Hotspot ${number}`}
         >
           <span className="absolute inset-[3px] rounded-full border border-black/10" />
-          <span style={{ fontSize: Math.max(11, Math.round(btn * 0.33)) }} className="font-extrabold">
+          <span
+            style={{ fontSize: Math.max(11, Math.round(btn * 0.33)) }}
+            className="font-extrabold"
+          >
             {number}
           </span>
-
-          {!active ? (
-            <motion.span
-              className="absolute inset-0 rounded-full border border-white/45"
-              initial={{ opacity: 0.0, scale: 1 }}
-              animate={{ opacity: [0.0, 0.35, 0.0], scale: [1, 1.35, 1.55] }}
-              transition={{ duration: 2.3, repeat: Infinity, ease: "easeInOut" }}
-            />
-          ) : null}
         </motion.button>
       </Html>
     </group>
   );
 }
 
-/* ===================== 3D SCENE (FIX: normalize center/scale so Bounds doesn't shrink it) ===================== */
-function ModelScene({
-  url,
-  hotspots,
-  activeId,
-  setActiveId,
-  debug,
-  setLastCoords,
-  modelScale = 1,
-  modelRotation = [0, 0, 0],
-  modelPosition = [0, 0, 0],
-  pinStyle,
-  normalize, // { enabled: true, targetSize: 1.6 }  <-- used for RAM/PSU
-}) {
+function ModelScene({ url, hotspots, activeId, setActiveId, debug, setLastCoords, modelScale = 1, modelRotation = [0, 0, 0], modelPosition = [0, 0, 0], pinStyle, normalize }) {
   const { scene } = useGLTF(url);
   const groupRef = useRef();
 
-  // ✅ This fixes "model looks tiny" when the GLB has a huge empty bounding box.
-  // We compute a tight box from meshes only, then recenter + scale to a target size.
   const normalized = useMemo(() => {
     if (!normalize?.enabled) return { scale: 1, offset: new THREE.Vector3(0, 0, 0) };
 
     const box = new THREE.Box3();
     const tmp = new THREE.Box3();
-
     let hasMesh = false;
     scene.updateMatrixWorld(true);
 
     scene.traverse((obj) => {
       if (!obj.isMesh) return;
       hasMesh = true;
-
-      // geometry bounds in local space -> transform to world
       if (!obj.geometry.boundingBox) obj.geometry.computeBoundingBox();
       tmp.copy(obj.geometry.boundingBox);
       tmp.applyMatrix4(obj.matrixWorld);
@@ -243,10 +221,8 @@ function ModelScene({
     box.getCenter(center);
 
     const biggest = Math.max(size.x, size.y, size.z) || 1;
-    const target = normalize.targetSize ?? 1.6; // world units
+    const target = normalize.targetSize ?? 1.6;
     const s = target / biggest;
-
-    // offset to re-center model at origin
     const offset = center.multiplyScalar(-1);
 
     return { scale: s, offset };
@@ -255,30 +231,19 @@ function ModelScene({
   const onPointerDown = (e) => {
     if (!debug) return;
     e.stopPropagation();
-
     const local = e.point.clone();
     if (groupRef.current) groupRef.current.worldToLocal(local);
-
     const coords = [Number(local.x.toFixed(3)), Number(local.y.toFixed(3)), Number(local.z.toFixed(3))];
     setLastCoords(coords);
-    // eslint-disable-next-line no-console
     console.log(`[HOTSPOT COORD] ${url} clicked: [${coords.join(", ")}]`);
   };
 
   return (
-    <group
-      ref={groupRef}
-      onPointerDown={onPointerDown}
-      rotation={modelRotation}
-      position={modelPosition}
-      scale={modelScale}
-    >
-      {/* ✅ normalized wrapper (centered, scaled) */}
+    <group ref={groupRef} onPointerDown={onPointerDown} rotation={modelRotation} position={modelPosition} scale={modelScale}>
       <group position={normalized.offset.toArray()} scale={normalized.scale}>
         <primitive object={scene} />
       </group>
 
-      {/* Pins */}
       {hotspots.map((h) => (
         <HotspotPin
           key={h.id}
@@ -293,7 +258,6 @@ function ModelScene({
   );
 }
 
-/* ===================== INFO CARD (ENGLISH ONLY) ===================== */
 function HotspotInfoCard({ hotspot, onClose }) {
   return (
     <AnimatePresence>
@@ -303,19 +267,19 @@ function HotspotInfoCard({ hotspot, onClose }) {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 10 }}
           transition={{ duration: 0.18 }}
-          className="absolute left-8 bottom-8 z-40"
+          className="absolute bottom-8 left-8 z-40"
         >
-          <div className="w-[380px] max-w-[calc(100vw-64px)] rounded-2xl border border-white/10 bg-black/75 backdrop-blur-xl shadow-[0_22px_80px_rgba(0,0,0,0.65)] overflow-hidden">
-            <div className="px-4 py-3 border-b border-white/10 bg-white/5 flex items-center justify-between gap-3">
+          <div className="w-[380px] max-w-[calc(100vw-64px)] overflow-hidden rounded-2xl border border-[#1a2438] bg-[#0d1220]/90 shadow-[0_22px_80px_rgba(0,0,0,0.65)] backdrop-blur-xl">
+            <div className="flex items-center justify-between gap-3 border-b border-[#1a2438] bg-white/[0.03] px-4 py-3">
               <div className="min-w-0">
-                <div className="text-[13px] font-extrabold text-white truncate">{hotspot.title}</div>
-                <div className="text-[11px] text-white/45">Hotspot {hotspot.number}</div>
+                <div className="truncate text-[13px] font-extrabold text-white">{hotspot.title}</div>
+                <div className="text-[11px] text-[#7a8ba8]">Hotspot {hotspot.number}</div>
               </div>
 
               <button
                 type="button"
                 onClick={onClose}
-                className="h-9 w-9 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition flex items-center justify-center text-white/70"
+                className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#1a2438] bg-white/[0.03] text-white/70 transition hover:bg-white/[0.06]"
                 aria-label="Close hotspot"
               >
                 ✕
@@ -332,13 +296,89 @@ function HotspotInfoCard({ hotspot, onClose }) {
   );
 }
 
-export default function Module1Page({ onBack }) {
+function HeaderDropdown({ userName = "John Doe", onBack, onLogout }) {
+  const handleBack = () => {
+    if (typeof onBack === "function") onBack("Modules");
+  };
+
+  return (
+    <div className="flex items-center gap-4">
+      <button
+        type="button"
+        onClick={handleBack}
+        className="rounded-2xl border border-[#1a2438] bg-white/[0.03] px-4 py-2.5 text-[13px] font-semibold text-[#dbe6f5] transition hover:bg-white/[0.06]"
+      >
+        Go back to Dashboard
+      </button>
+
+      <details className="group relative z-50">
+        <summary className="list-none cursor-pointer rounded-2xl border border-[#1a2438] bg-[#0d1220]/95 px-4 py-2.5 transition hover:bg-[#111b2f]">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/10 text-sm font-bold text-[#00ffb4]">
+              {(userName || "U").charAt(0).toUpperCase()}
+            </div>
+            <div className="leading-tight text-left">
+              <div className="text-sm font-semibold text-white">{userName}</div>
+              <div className="text-[11px] text-[#7a8ba8]">Student</div>
+            </div>
+            <div className="text-sm text-[#7a8ba8] transition group-open:rotate-180">▾</div>
+          </div>
+        </summary>
+
+        <div className="absolute right-0 mt-2 w-52 rounded-2xl border border-[#1a2438] bg-[#0d1220]/98 p-2 shadow-[0_18px_50px_rgba(0,0,0,0.35)] backdrop-blur-xl">
+          <button className="w-full rounded-xl px-4 py-2 text-left text-sm text-[#dbe6f5] transition hover:bg-white/5">
+            Settings
+          </button>
+          <button className="w-full rounded-xl px-4 py-2 text-left text-sm text-[#dbe6f5] transition hover:bg-white/5">
+            Profile
+          </button>
+          <button
+            onClick={onLogout}
+            className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 rounded-xl"
+          >
+            Logout
+          </button>
+        </div>
+      </details>
+    </div>
+  );
+}
+
+export default function Module1Page({ onBack, onLogout }) {
   const [moduleIndex, setModuleIndex] = useState(0);
   const [activeId, setActiveId] = useState(null);
   const [showIntro, setShowIntro] = useState(true);
-
   const [debug, setDebug] = useState(false);
   const [lastCoords, setLastCoords] = useState(null);
+  const [firebaseUser, setFirebaseUser] = useState(null);
+ const [profile, setProfile] = useState(null);
+
+ useEffect(() => {
+  const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    if (!user) {
+      setFirebaseUser(null);
+      setProfile(null);
+      return;
+    }
+
+    setFirebaseUser(user);
+
+    try {
+      const userRef = doc(db, "users", user.uid);
+      const userSnap = await getDoc(userRef);
+
+      if (userSnap.exists()) {
+        setProfile(userSnap.data());
+      } else {
+        setProfile(null);
+      }
+    } catch (err) {
+      console.error("Error reading profile:", err);
+    }
+  });
+
+  return () => unsubscribe();
+}, []);
 
   useEffect(() => {
     const onKeyDown = (e) => {
@@ -348,7 +388,6 @@ export default function Module1Page({ onBack }) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  // ✅ pc.glb intentionally excluded
   const modules = useMemo(
     () => [
       {
@@ -381,12 +420,11 @@ export default function Module1Page({ onBack }) {
           },
         ],
         hotspots: [
-          { id: "cpu-hs-1", number: 1, title: "Heat Spreader (Top Cap)", position: [0.05, 0.18, 0.02], en: "The top metal cover spreads heat from the chip to the cooler for better cooling." },
-          { id: "cpu-hs-2", number: 2, title: "Substrate / Package Base", position: [0.32, 0.05, 0.14], en: "The base that supports the CPU package and routes signals between internal layers." },
-          { id: "cpu-hs-3", number: 3, title: "Contact / Pin Area", position: [0.28, -0.07, 0.28], en: "The contact area connects the CPU to the motherboard socket to deliver power and data." },
+          { id: "cpu-hs-1", number: 1, title: "Heat Spreader (Top Cap)", position: [3.05, 0.28, 0.02], frontAxis: [0, 1, 0], en: "The top metal cover spreads heat from the chip to the cooler for better cooling." },
+          { id: "cpu-hs-2", number: 2, title: "Substrate / Package Base", position: [1.82, -0.35, -0.84], frontAxis: [0, -1, 0], en: "The base that supports the CPU package and routes signals between internal layers." },
+          { id: "cpu-hs-3", number: 3, title: "Contact / Pin Area", position: [0.58, -0.47, 0.28], frontAxis: [0, -1, 0], en: "The contact area connects the CPU to the motherboard socket to deliver power and data." },
         ],
       },
-
       {
         key: "motherboard",
         name: "Motherboard",
@@ -413,69 +451,62 @@ export default function Module1Page({ onBack }) {
           },
         ],
         hotspots: [
-          { id: "mb-hs-1", number: 1, title: "CPU Socket Area", position: [0.0, 0.2, 0.0], en: "The CPU socket holds and connects the processor to the motherboard." },
-          { id: "mb-hs-2", number: 2, title: "RAM Slots", position: [0.35, 0.12, 0.1], en: "DIMM slots where memory modules are installed." },
-          { id: "mb-hs-3", number: 3, title: "24-pin ATX Power Connector", position: [0.45, 0.0, 0.25], en: "Main power input from the PSU to the motherboard." },
+          { id: "mb-hs-1", number: 1, title: "CPU Socket Area", position: [0.2, 0.3, -0.8], en: "The CPU socket holds and connects the processor to the motherboard." },
+          { id: "mb-hs-2", number: 2, title: "RAM Slots", position: [1.4, 0.32, -1], en: "DIMM slots where memory modules are installed." },
+          { id: "mb-hs-3", number: 3, title: "24-pin ATX Power Connector", position: [2, 0.20, -0.55], en: "Main power input from the PSU to the motherboard." },
         ],
       },
-
-      /* ✅ RAM FIX:
-         - normalize enabled (fix tiny model from huge GLB bounds)
-         - rotate/position to make rotation look good
-         - pins moved to LEFT empty space + made SMALLER (no giant circles)
-      */
-      {
-        key: "ram",
-        name: "RAM",
-        url: "/models/ram.glb",
-        view: {
-          cameraPos: [0, 0.65, 3.2],
-          boundsMargin: 1.1,
-          minDistance: 1.0,
-          maxDistance: 7.0,
-          modelScale: 1.25,
-          modelRotation: [0, 0.35, 0], // slight angle for nicer display; change if you want
-          modelPosition: [0, 0, 0],
-          normalize: { enabled: true, targetSize: 2.2 },
-          // SMALL pins (your screenshot shows them huge)
-          pinStyle: { buttonPx: 26, glowRadius: 0.02, distanceFactor: 18 },
-        },
-        slides: [
-          {
-            id: "ram-s1",
-            title: "RAM Module Overview",
-            body: "Explore a RAM stick and learn its key parts.\nRAM provides fast temporary storage while programs run.",
-            points: ["Identify the IC chips and connector edge.", "Understand the notch alignment.", "Learn safe handling."],
-          },
+     {
+  key: "ram",
+  name: "RAM",
+  url: "/models/ram.glb",
+  view: {
+    cameraPos: [0, 0.55, 2.4],
+    boundsMargin: 1.05,
+    minDistance: 0.9,
+    maxDistance: 6.0,
+    modelScale: 1.5,
+    modelRotation: [0, 0.35, 0],
+    modelPosition: [0, 0, 0],
+    normalize: { enabled: true, targetSize: 2.8 },
+    pinStyle: { buttonPx: 16, glowRadius: 0.006, distanceFactor: 18 },
+  },
+  slides: [
+    {
+      id: "ram-s1",
+      title: "RAM Module Overview",
+      body: "Explore a RAM stick and learn its key parts.\nRAM provides fast temporary storage while programs run.",
+      points: [
+        "Identify the IC chips and connector edge.",
+        "Understand the notch alignment.",
+        "Learn safe handling.",
+      ],
+    },
         ],
         hotspots: [
           {
             id: "ram-hs-1",
             number: 1,
             title: "Memory IC Chips",
-            position: [0, 0, 0],
-            uiOffset: [-460, -170],
+            position: [-0.55, 0, 0.03],
             en: "These chips store data temporarily for fast access by the CPU.",
           },
           {
             id: "ram-hs-2",
             number: 2,
             title: "Gold Contacts (Edge Connector)",
-            position: [0, 0, 0],
-            uiOffset: [-460, 0],
+            position: [0.4, 0, 0.3],
             en: "The gold contacts connect the RAM electrically to the motherboard DIMM slot.",
           },
           {
             id: "ram-hs-3",
             number: 3,
             title: "Alignment Notch",
-            position: [0, 0, 0],
-            uiOffset: [-460, 170],
+            position: [-1.28, -0.01, 0.06],
             en: "The notch ensures the RAM is inserted in the correct orientation.",
           },
         ],
       },
-
       {
         key: "hdd",
         name: "HDD",
@@ -500,17 +531,11 @@ export default function Module1Page({ onBack }) {
           },
         ],
         hotspots: [
-          { id: "hdd-hs-1", number: 1, title: "SATA Data Port", position: [0.15, -0.03, 0.22], en: "Transfers data between the HDD and motherboard via a SATA cable." },
-          { id: "hdd-hs-2", number: 2, title: "SATA Power Port", position: [0.22, -0.03, 0.22], en: "Receives power from the PSU through the SATA power connector." },
-          { id: "hdd-hs-3", number: 3, title: "Drive Casing", position: [0.0, 0.1, 0.0], en: "Protective metal enclosure that houses internal parts." },
+          { id: "hdd-hs-1", number: 1, title: "SATA Data Port", position: [2.15, 3, 2.22],frontAxis: [0, 0, -1], en: "Transfers data between the HDD and motherboard via a SATA cable." },
+          { id: "hdd-hs-2", number: 2, title: "SATA Power Port", position: [0.22, -0.03, 0.22],frontAxis: [0, 0, -1], en: "Receives power from the PSU through the SATA power connector." },
+          { id: "hdd-hs-3", number: 3, title: "Drive Casing", position: [0.0, 0.1, 0.0],frontAxis: [0, 0, -1], en: "Protective metal enclosure that houses internal parts." },
         ],
       },
-
-      /* ✅ PSU FIX:
-         - normalize enabled (prevents Bounds from using huge empty bounds)
-         - zoom out a bit (cameraPos farther + minDistance higher)
-         - pins moved to RIGHT empty space + bigger than RAM but NOT absurd
-      */
       {
         key: "psu",
         name: "PSU",
@@ -535,33 +560,11 @@ export default function Module1Page({ onBack }) {
           },
         ],
         hotspots: [
-          {
-            id: "psu-hs-1",
-            number: 1,
-            title: "PSU Fan / Vent",
-            position: [0, 0, 0],
-            uiOffset: [460, -170],
-            en: "Moves air to cool internal components and maintain stable power delivery.",
-          },
-          {
-            id: "psu-hs-2",
-            number: 2,
-            title: "AC Input Socket",
-            position: [0, 0, 0],
-            uiOffset: [460, 0],
-            en: "Where the power cable from the wall plugs into the PSU.",
-          },
-          {
-            id: "psu-hs-3",
-            number: 3,
-            title: "DC Output / Cable Interface",
-            position: [0, 0, 0],
-            uiOffset: [460, 170],
-            en: "Where PSU cables connect to supply power to the motherboard, GPU, and storage.",
-          },
+          { id: "psu-hs-1", number: 1, title: "PSU Fan / Vent", position: [0, 0, 0], uiOffset: [460, -170], en: "Moves air to cool internal components and maintain stable power delivery." },
+          { id: "psu-hs-2", number: 2, title: "AC Input Socket", position: [0, 0, 0], uiOffset: [460, 0], en: "Where the power cable from the wall plugs into the PSU." },
+          { id: "psu-hs-3", number: 3, title: "DC Output / Cable Interface", position: [0, 0, 0], uiOffset: [460, 170], en: "Where PSU cables connect to supply power to the motherboard, GPU, and storage." },
         ],
       },
-
       {
         key: "case",
         name: "Case",
@@ -597,17 +600,20 @@ export default function Module1Page({ onBack }) {
 
   const current = modules[moduleIndex];
 
-  // Preload (excluding pc.glb)
   useEffect(() => {
     modules.forEach((m) => useGLTF.preload(m.url));
   }, [modules]);
 
-  const activeHotspot = useMemo(
-    () => current.hotspots.find((h) => h.id === activeId) || null,
-    [current, activeId]
-  );
-
-  const user = useMemo(() => ({ name: "John Doe" }), []);
+  const activeHotspot = useMemo(() => current.hotspots.find((h) => h.id === activeId) || null, [current, activeId]);
+ const user = useMemo(
+  () => ({
+    name: profile
+      ? `${profile.firstName || ""} ${profile.lastName || ""}`.trim()
+      : "Loading...",
+    email: firebaseUser?.email || "No email",
+  }),
+  [profile, firebaseUser]
+);
 
   const goNextModule = () => {
     setActiveId(null);
@@ -624,80 +630,78 @@ export default function Module1Page({ onBack }) {
   };
 
   return (
-    <div className="min-h-screen w-full bg-[#061E29] text-[#F3F4F4] font-sans antialiased overflow-hidden">
-      <div className="relative w-full h-screen overflow-hidden">
-        <div className="pointer-events-none absolute -top-44 -left-44 h-[720px] w-[720px] rounded-full bg-[#5F9598]/18 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-56 -right-52 h-[820px] w-[820px] rounded-full bg-[#1D546D]/26 blur-3xl" />
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#061E29] via-[#061E29] to-[#0B2A3A]" />
+    <div className="min-h-screen w-full overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased">
+      <div className="relative h-screen w-full overflow-hidden">
+        <ModulePageBackground />
 
-        <div className="relative w-full h-full overflow-hidden">
-          <div className="relative w-full h-full overflow-hidden rounded-none md:rounded-[30px] md:m-3 border border-white/10 shadow-[0_70px_180px_rgba(0,0,0,0.70)]">
-            <div className="absolute inset-0 bg-gradient-to-br from-[#061E29] via-[#0B2A3A] to-[#1D546D]/35" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_35%_12%,rgba(95,149,152,0.16),transparent_55%)]" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_84%_22%,rgba(29,84,109,0.22),transparent_55%)]" />
+        <div className="relative h-full w-full overflow-hidden p-0 md:p-3">
+          <div className="relative h-full w-full overflow-hidden border border-[#1a2438] bg-[linear-gradient(135deg,#0a0e17,#0d1220,#101a2d)] shadow-[0_70px_180px_rgba(0,0,0,0.70)] md:rounded-[30px]">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(0,255,180,0.08),transparent_35%)]" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_88%_20%,rgba(0,255,180,0.05),transparent_30%)]" />
+            <div className="absolute inset-0 bg-[linear-gradient(rgba(0,255,180,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,180,0.025)_1px,transparent_1px)] bg-[size:54px_54px] opacity-55" />
             <div className="absolute inset-0 bg-black/10 ring-1 ring-white/5" />
 
-            <div className="relative h-full w-full overflow-hidden flex flex-col">
-              {/* top label */}
-              <div className="px-6 md:px-10 pt-6 flex items-center justify-between">
-                <div className="text-[12px] text-white/55">
-                  Module {moduleIndex + 1} — {current.name}
+            <div className="relative flex h-full w-full flex-col overflow-hidden">
+              <div className="flex items-center justify-between px-6 pt-6 text-[12px] text-[#7a8ba8] md:px-10">
+                <div>
+                  Module 1 (Page {moduleIndex + 1}) — <span className="text-[#dbe6f5]">{current.name}</span>
                 </div>
 
-                <div className="text-[11px] text-white/45 flex items-center gap-2">
+                <div className="flex items-center gap-2 text-[11px]">
                   {debug ? (
-                    <span className="px-2 py-1 rounded-lg bg-white/10 border border-white/10">
+                    <span className="rounded-lg border border-[#1a2438] bg-white/[0.03] px-2 py-1">
                       Debug ON — click model to log coords (press D)
                     </span>
                   ) : (
-                    <span className="px-2 py-1 rounded-lg bg-white/5 border border-white/10">
+                    <span className="rounded-lg border border-[#1a2438] bg-white/[0.03] px-2 py-1">
                       Press D for hotspot debug
                     </span>
                   )}
 
                   {debug && lastCoords ? (
-                    <span className="hidden sm:inline-flex px-2 py-1 rounded-lg bg-white/5 border border-white/10">
+                    <span className="hidden rounded-lg border border-[#1a2438] bg-white/[0.03] px-2 py-1 sm:inline-flex">
                       Last: [{lastCoords.join(", ")}]
                     </span>
                   ) : null}
                 </div>
               </div>
 
-              {/* top nav */}
-              <div className="px-6 md:px-10 mt-3">
-                <div className="w-full rounded-[18px] border border-white/10 bg-black/20 backdrop-blur-xl shadow-[0_18px_60px_rgba(0,0,0,0.30)] px-6 py-4 flex items-center justify-between gap-4">
+              <div className="relative z-[120] mt-3 px-6 md:px-10">
+                <div className="flex w-full items-center justify-between gap-4 rounded-[22px] border border-[#1a2438] bg-[#0b1220]/86 px-6 py-4 shadow-[0_18px_60px_rgba(0,0,0,0.30)] backdrop-blur-xl">
                   <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-2xl bg-[#5F9598]/16 border border-[#5F9598]/25 flex items-center justify-center shadow-sm">
-                      <div className="h-3 w-3 rounded-full bg-[#5F9598]" />
+                    <img
+                      src="/PNG/Articton.png"
+                      alt="Articton Logo"
+                      className="h-10 w-10 scale-300 object-contain ml-4"
+                    />
+                    <div>
+                      <div className="text-base font-bold tracking-wide text-white">Articton</div>
+                      <div className="text-[11px] uppercase tracking-[0.24em] text-[#00ffb4]">3D Learning View</div>
                     </div>
-                    <div className="text-base font-bold tracking-wide">Articton</div>
                   </div>
 
-                  <button type="button" onClick={onBack} className="text-[13px] text-white/80 hover:text-white transition">
-                    Back to Dashboard
-                  </button>
-
-                  <div className="flex items-center gap-3">
-                    <div className="text-[13px] text-white/80">{user.name}</div>
-                    <div className="h-10 w-10 rounded-full bg-white/10 border border-white/10" />
-                  </div>
+                  <HeaderDropdown
+                    userName={user.name}
+                    onBack={onBack}
+                    onLogout={onLogout}
+                  />
                 </div>
               </div>
 
-              {/* viewer */}
-              <div className="flex-1 px-6 md:px-10 py-6 min-h-0">
-                <div className="relative h-full rounded-[22px] border border-white/10 bg-black/20 backdrop-blur-xl overflow-hidden shadow-[0_28px_90px_rgba(0,0,0,0.45)]">
+              <div className="min-h-0 flex-1 px-6 py-6 md:px-10">
+                <div className="relative h-full overflow-hidden rounded-[24px] border border-[#1a2438] bg-[#0d1220]/78 shadow-[0_28px_90px_rgba(0,0,0,0.45)] backdrop-blur-xl">
                   <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_22%_0%,rgba(255,255,255,0.08),transparent_40%)]" />
                   <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_120px_rgba(0,0,0,0.55)]" />
 
-                  <div className="absolute inset-6 rounded-[18px] border border-white/10 bg-black/10">
-                    <div className="pointer-events-none absolute inset-0 rounded-[18px] ring-1 ring-[#5F9598]/20 shadow-[0_0_0_1px_rgba(95,149,152,0.14)]" />
-                    <div className="pointer-events-none absolute -top-24 -left-24 h-56 w-56 rounded-full bg-[#5F9598]/12 blur-3xl" />
+                  <div className="absolute inset-6 overflow-hidden rounded-[18px] border border-[#1a2438] bg-black/10">
+                    <div className="pointer-events-none absolute inset-0 rounded-[18px] ring-1 ring-[#00ffb4]/15 shadow-[0_0_0_1px_rgba(0,255,180,0.08)]" />
+                    <div className="pointer-events-none absolute -left-24 -top-24 h-56 w-56 rounded-full bg-[#00ffb4]/10 blur-3xl" />
+                    <div className="pointer-events-none absolute left-[10%] top-[8%] h-[58%] w-[2px] animate-pulse bg-[linear-gradient(180deg,transparent,#00ffb4,transparent)] opacity-25" />
                   </div>
 
                   {!showIntro ? <HotspotInfoCard hotspot={activeHotspot} onClose={() => setActiveId(null)} /> : null}
 
-                  <div className="absolute inset-6 rounded-[18px] overflow-hidden">
+                  <div className="absolute inset-6 overflow-hidden rounded-[18px]">
                     <AnimatePresence mode="wait">
                       {showIntro ? (
                         <motion.div
@@ -726,7 +730,7 @@ export default function Module1Page({ onBack }) {
                           transition={{ duration: 0.28 }}
                         >
                           <Canvas key={current.url} camera={{ position: current.view.cameraPos, fov: 45 }} dpr={[1, 1.8]}>
-                            <color attach="background" args={["#071f29"]} />
+                            <color attach="background" args={["#071520"]} />
                             <ambientLight intensity={0.75} />
                             <directionalLight position={[6, 8, 6]} intensity={1.25} />
                             <directionalLight position={[-6, -2, -6]} intensity={0.4} />
@@ -767,36 +771,25 @@ export default function Module1Page({ onBack }) {
                     </AnimatePresence>
                   </div>
 
-                  {/* module navigation */}
                   <button
                     type="button"
-                    onClick={() => {
-                      setActiveId(null);
-                      setLastCoords(null);
-                      setModuleIndex((i) => (i - 1 + modules.length) % modules.length);
-                      setShowIntro(true);
-                    }}
+                    onClick={goPrevModule}
                     aria-label="Previous module"
-                    className="absolute left-7 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full border border-white/15 bg-black/35 backdrop-blur-md hover:bg-white/10 transition flex items-center justify-center shadow-[0_18px_60px_rgba(0,0,0,0.35)]"
+                    className="absolute left-7 top-1/2 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-[#1a2438] bg-[#0d1220]/85 shadow-[0_18px_60px_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:bg-white/[0.06]"
                   >
-                    <span className="text-white/80 text-lg">←</span>
+                    <span className="text-lg text-white/80">←</span>
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => {
-                      setActiveId(null);
-                      setLastCoords(null);
-                      setModuleIndex((i) => (i + 1) % modules.length);
-                      setShowIntro(true);
-                    }}
+                    onClick={goNextModule}
                     aria-label="Next module"
-                    className="absolute right-7 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full border border-white/15 bg-black/35 backdrop-blur-md hover:bg-white/10 transition flex items-center justify-center shadow-[0_18px_60px_rgba(0,0,0,0.35)]"
+                    className="absolute right-7 top-1/2 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-[#1a2438] bg-[#0d1220]/85 shadow-[0_18px_60px_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:bg-white/[0.06]"
                   >
-                    <span className="text-white/80 text-lg">→</span>
+                    <span className="text-lg text-white/80">→</span>
                   </button>
 
-                  <div className="absolute left-9 bottom-8 text-[12px] text-white/45">
+                  <div className="absolute bottom-8 left-9 text-[12px] text-[#7a8ba8]">
                     {showIntro ? "Read the intro slides, then start the 3D" : "Click pins to learn parts"}
                   </div>
                 </div>
@@ -811,7 +804,16 @@ export default function Module1Page({ onBack }) {
   );
 }
 
-/* preload known models (excluding pc.glb) */
+function ModulePageBackground() {
+  return (
+    <>
+      <div className="pointer-events-none absolute -left-44 -top-44 h-[720px] w-[720px] rounded-full bg-[#00ffb4]/10 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-56 -right-52 h-[820px] w-[820px] rounded-full bg-[#00ffb4]/6 blur-3xl" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#0a0e17] via-[#0a0e17] to-[#0d1220]" />
+    </>
+  );
+}
+
 useGLTF.preload("/models/cpu.glb");
 useGLTF.preload("/models/motherboard.glb");
 useGLTF.preload("/models/ram.glb");
