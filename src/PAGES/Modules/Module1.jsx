@@ -7,7 +7,7 @@ import { auth, db } from "../../firebase.js";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { useThree, useFrame } from "@react-three/fiber";
-
+import { module1Scenes } from "./module1-scenes";
 const THEME = {
   bg: "#0a0e17",
   surface: "#0d1220",
@@ -389,19 +389,27 @@ export default function Module1Page({ onBack, onLogout }) {
   const [firebaseUser, setFirebaseUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-const [localCompletedParts, setLocalCompletedParts] = useState({});
+const [localCompletedParts, setLocalCompletedParts] = useState(() => {
+  const saved = localStorage.getItem("module1CompletedParts");
+  return saved ? JSON.parse(saved) : {};
+});
 
 useEffect(() => {
-  const saved = profile?.moduleProgress?.module1?.completedParts || {};
+  const saved = profile?.moduleProgress?.module1?.completedParts;
 
-  setLocalCompletedParts({
+  if (!saved) return;
+
+  const firebaseParts = {
     cpu: !!saved.cpu,
     motherboard: !!saved.motherboard,
     ram: !!saved.ram,
     hdd: !!saved.hdd,
     psu: !!saved.psu,
     case: !!saved.case,
-  });
+  };
+
+  setLocalCompletedParts(firebaseParts);
+  localStorage.setItem("module1CompletedParts", JSON.stringify(firebaseParts));
 }, [profile]);
 
   useEffect(() => {
@@ -439,314 +447,8 @@ useEffect(() => {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  const modules = useMemo(
-    () => [
-      {
-        key: "cpu",
-        name: "CPU",
-        url: "/models/cpu.glb",
-        view: {
-          cameraPos: [0, 1.2, 3.2],
-          boundsMargin: 1.15,
-          minDistance: 1.8,
-          maxDistance: 7,
-          modelScale: 1,
-          modelRotation: [0, 0, 0],
-          modelPosition: [0, 0, 0],
-          pinStyle: { buttonPx: 36, glowRadius: 0.05, distanceFactor: 10 },
-          normalize: { enabled: false },
-        },
-        slides: [
-          {
-            id: "cpu-s1",
-            title: "CPU Disassembly Overview",
-            body:
-              "In this module, you’ll explore a CPU package in 3D.\n" +
-              "You will identify key external parts before moving into deeper disassembly steps.",
-            points: [
-              "Rotate, zoom, and inspect the CPU from any angle.",
-              "Tap numbered pins to learn each component.",
-              "Use this as a visual guide before physical disassembly.",
-            ],
-          },
-        ],
-        hotspots: [
-          {
-            id: "cpu-hs-1",
-            number: 1,
-            title: "Heat Spreader (Top Cap)",
-            position: [3.05, 0.28, 0.02],
-            frontAxis: [0, 1, 0],
-            en: "The top metal cover spreads heat from the chip to the cooler for better cooling.",
-          },
-          {
-            id: "cpu-hs-2",
-            number: 2,
-            title: "Substrate / Package Base",
-            position: [1.82, -0.35, -0.84],
-            frontAxis: [0, -1, 0],
-            en: "The base that supports the CPU package and routes signals between internal layers.",
-          },
-          {
-            id: "cpu-hs-3",
-            number: 3,
-            title: "Contact / Pin Area",
-            position: [0.58, -0.47, 0.28],
-            frontAxis: [0, -1, 0],
-            en: "The contact area connects the CPU to the motherboard socket to deliver power and data.",
-          },
-        ],
-      },
-      {
-        key: "motherboard",
-        name: "Motherboard",
-        url: "/models/motherboard.glb",
-        view: {
-          cameraPos: [0, 1.2, 3.2],
-          boundsMargin: 1.2,
-          minDistance: 1.8,
-          maxDistance: 7,
-          modelScale: 1,
-          modelRotation: [0, 0, 0],
-          modelPosition: [0, 0, 0],
-          pinStyle: { buttonPx: 36, glowRadius: 0.05, distanceFactor: 10 },
-          normalize: { enabled: false },
-        },
-        slides: [
-          {
-            id: "mb-s1",
-            title: "Motherboard Overview",
-            body:
-              "This module helps you identify major motherboard zones.\n" +
-              "Focus on where power comes in, where the CPU/RAM sit, and how storage connects.",
-            points: [
-              "Learn main connectors and slots.",
-              "Understand how parts communicate on the board.",
-              "Use pins to identify components quickly.",
-            ],
-          },
-        ],
-        hotspots: [
-          {
-            id: "mb-hs-1",
-            number: 1,
-            title: "CPU Socket Area",
-            position: [0.2, 0.3, -0.8],
-            en: "The CPU socket holds and connects the processor to the motherboard.",
-          },
-          {
-            id: "mb-hs-2",
-            number: 2,
-            title: "RAM Slots",
-            position: [1.4, 0.32, -1],
-            en: "DIMM slots where memory modules are installed.",
-          },
-          {
-            id: "mb-hs-3",
-            number: 3,
-            title: "24-pin ATX Power Connector",
-            position: [2, 0.2, -0.55],
-            en: "Main power input from the PSU to the motherboard.",
-          },
-        ],
-      },
-      {
-        key: "ram",
-        name: "RAM",
-        url: "/models/ram.glb",
-        view: {
-          cameraPos: [0, 0.55, 2.4],
-          boundsMargin: 1.05,
-          minDistance: 0.9,
-          maxDistance: 6.0,
-          modelScale: 1.5,
-          modelRotation: [0, 0.35, 0],
-          modelPosition: [0, 0, 0],
-          normalize: { enabled: true, targetSize: 2.8 },
-          pinStyle: { buttonPx: 16, glowRadius: 0.006, distanceFactor: 18 },
-        },
-        slides: [
-          {
-            id: "ram-s1",
-            title: "RAM Module Overview",
-            body:
-              "Explore a RAM stick and learn its key parts.\nRAM provides fast temporary storage while programs run.",
-            points: [
-              "Identify the IC chips and connector edge.",
-              "Understand the notch alignment.",
-              "Learn safe handling.",
-            ],
-          },
-        ],
-        hotspots: [
-          {
-            id: "ram-hs-1",
-            number: 1,
-            title: "Memory IC Chips",
-            position: [-0.55, 0, 0.03],
-            en: "These chips store data temporarily for fast access by the CPU.",
-          },
-          {
-            id: "ram-hs-2",
-            number: 2,
-            title: "Gold Contacts (Edge Connector)",
-            position: [0.4, 0, 0.3],
-            en: "The gold contacts connect the RAM electrically to the motherboard DIMM slot.",
-          },
-          {
-            id: "ram-hs-3",
-            number: 3,
-            title: "Alignment Notch",
-            position: [-1.28, -0.01, 0.06],
-            en: "The notch ensures the RAM is inserted in the correct orientation.",
-          },
-        ],
-      },
-      {
-        key: "hdd",
-        name: "HDD",
-        url: "/models/hdd.glb",
-        view: {
-          cameraPos: [0, 0.9, 3.0],
-          boundsMargin: 1.15,
-          minDistance: 1.6,
-          maxDistance: 7,
-          modelScale: 1,
-          modelRotation: [0, 0, 0],
-          modelPosition: [0, 0, 0],
-          pinStyle: { buttonPx: 34, glowRadius: 0.05, distanceFactor: 10 },
-          normalize: { enabled: false },
-        },
-        slides: [
-          {
-            id: "hdd-s1",
-            title: "Hard Disk Drive Overview",
-            body:
-              "This module introduces the HDD exterior and connection points.\nHDDs store data long-term using spinning platters internally.",
-            points: [
-              "Identify SATA data + power ports.",
-              "Recognize the casing and mounting holes.",
-              "Learn handling precautions.",
-            ],
-          },
-        ],
-        hotspots: [
-           { id: "hdd-hs-1", number: 1, title: "SATA Data Port", position: [239.735, 0.039, -9.351],frontAxis: [0, 1, 1], en: "Transfers data between the HDD and motherboard via a SATA cable." },
-          { id: "hdd-hs-2", number: 2, title: "SATA Power Port", position: [239.735, -0.045, 80.445],frontAxis: [0, 1, 1], en: "Receives power from the PSU through the SATA power connector." },
-          { id: "hdd-hs-3", number: 3, title: "Drive Casing", position: [-13.835, 16.201, -133.387],frontAxis: [0, 1, 0], en: "Protective metal enclosure that houses internal parts." },
-        ],
-      },
-      {
-        key: "psu",
-        name: "PSU",
-        url: "/models/psu.glb",
-        view: {
-          cameraPos: [0, 1.15, 6.2],
-          boundsMargin: 1.2,
-          minDistance: 3.8,
-          maxDistance: 12,
-          modelScale: 1.0,
-          modelRotation: [0, -0.25, 0],
-          modelPosition: [0, 0, 0],
-          normalize: { enabled: true, targetSize: 2.6 },
-          pinStyle: { buttonPx: 34, glowRadius: 0.05, distanceFactor: 14 },
-        },
-        slides: [
-          {
-            id: "psu-s1",
-            title: "Power Supply Unit Overview",
-            body:
-              "The PSU converts AC wall power into regulated DC power for the PC.",
-            points: [
-              "Identify the AC input and main output area.",
-              "PSUs must not be opened.",
-              "Use pins to locate key areas.",
-            ],
-          },
-        ],
-        hotspots: [
-          {
-            id: "psu-hs-1",
-            number: 1,
-            title: "PSU Fan / Vent",
-            position: [-0.294, -5.234, -0.641],
-            frontAxis: [0, 1, 0],
-            en: "Moves air to cool internal components and maintain stable power delivery.",
-          },
-          {
-            id: "psu-hs-2",
-            number: 2,
-            title: "AC Input Socket",
-            position: [-0.717, -5.778, -1.699],
-            frontAxis: [0, 1, -1],
-            en: "Where the power cable from the wall plugs into the PSU.",
-          },
-          {
-            id: "psu-hs-3",
-            number: 3,
-            title: "DC Output / Cable Interface",
-            position: [0.019, -5.759, 0.795],
-            frontAxis: [0, 0, 1],
-            en: "Where PSU cables connect to supply power to the motherboard, GPU, and storage.",
-          },
-        ],
-      },
-      {
-        key: "case",
-        name: "Case",
-        url: "/models/case.glb",
-        view: {
-          cameraPos: [0, 1.25, 5.3],
-          boundsMargin: 1.25,
-          minDistance: 2.2,
-          maxDistance: 10,
-          modelScale: 1,
-          modelRotation: [0, 0, 0],
-          modelPosition: [0, 0, 0],
-          pinStyle: { buttonPx: 36, glowRadius: 0.05, distanceFactor: 10 },
-          normalize: { enabled: false },
-        },
-        slides: [
-          {
-            id: "case-s1",
-            title: "PC Case Overview",
-            body:
-              "The case provides structure, airflow, and mounting points for components.",
-            points: [
-              "Identify motherboard tray and PSU bay.",
-              "Find storage mounting areas.",
-              "Understand airflow direction.",
-            ],
-          },
-        ],
-        hotspots: [
-          {
-            id: "case-hs-1",
-            number: 1,
-            title: "Motherboard Tray Area",
-            position: [0.0, 0.2, 0.0],
-            en: "Where the motherboard mounts using standoffs and screws.",
-          },
-          {
-            id: "case-hs-2",
-            number: 2,
-            title: "PSU Bay",
-            position: [-0.25, -0.15, 0.15],
-            en: "The compartment where the power supply is installed.",
-          },
-          {
-            id: "case-hs-3",
-            number: 3,
-            title: "Drive Bay / Storage Mount",
-            position: [0.28, -0.05, 0.2],
-            en: "Where HDD/SSD mounts are located in many case designs.",
-          },
-        ],
-      },
-    ],
-    []
-  );
-
+  
+const modules = module1Scenes;
   const current = modules[moduleIndex];
 
  const completedParts = localCompletedParts;
@@ -789,12 +491,11 @@ const moduleFinished = useMemo(() => {
   if (!firebaseUser) return;
 
   const totalPages = modules.length;
-  const prevParts = profile?.moduleProgress?.module1?.completedParts || {};
 
   const mergedParts = {
-    ...prevParts,
-    ...partsPatch,
-  };
+  ...localCompletedParts,
+  ...partsPatch,
+};
 
   const completedCount = modules.filter((m) => mergedParts[m.key]).length;
   const allCompleted = completedCount === totalPages;
@@ -803,6 +504,7 @@ const moduleFinished = useMemo(() => {
   const percent = Math.round((completedCount / totalPages) * 100);
   
 setLocalCompletedParts(mergedParts);
+localStorage.setItem("module1CompletedParts", JSON.stringify(mergedParts));
   try {
     const userRef = doc(db, "users", firebaseUser.uid);
 
@@ -838,14 +540,11 @@ const goNextModule = async () => {
   setModuleIndex(nextIndex);
   setShowIntro(true);
 
-  await saveModule1Progress({
-    page: nextPage,
-    introDone: false,
-    moduleKey: modules[nextIndex].key,
-    completedParts: {
-      [current.key]: true,
-    },
-  });
+ await saveModule1Progress({
+  page: nextPage,
+  introDone: false,
+  moduleKey: modules[nextIndex].key,
+});
 };
 
   const goPrevModule = async () => {
@@ -858,13 +557,11 @@ const goNextModule = async () => {
   setShowIntro(true);
 
   await saveModule1Progress({
-    page: prevPage,
-    introDone: false,
-    moduleKey: modules[prevIndex].key,
-    completedParts: {
-      [current.key]: true,
-    },
-  });
+  page: prevPage,
+  introDone: false,
+  moduleKey: modules[prevIndex].key,
+ 
+});
 };
 const handleFinishModule = async () => {
   await saveModule1Progress({
@@ -906,13 +603,11 @@ const handleFinishModule = async () => {
   setShowIntro(!isFinished);
 
   await saveModule1Progress({
-    page: index + 1,
-    introDone: isFinished,
-    moduleKey: key,
-    completedParts: {
-      [current.key]: true,
-    },
-  });
+  page: index + 1,
+  introDone: isFinished,
+  moduleKey: key,
+ 
+});
 };
 
   return (
