@@ -5,9 +5,12 @@ import MBtoCaseScene from "./module2-scenes/MBtoCase";
 import HDDtoCaseScene from "./module2-scenes/HDDtoCase";
 import PSUtoCaseScene from "./module2-scenes/PSUtoCase";
 import FullAssemblyScene from "./module2-scenes/FullAssembly";
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { auth, db } from "../../firebase.js";
+import { onAuthStateChanged } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
 
-function HeaderDropdown({ userName = "John Doe", onBack, onLogout }) {
+function HeaderDropdown({ userName = "Loading...", userEmail = "No email", onBack, onLogout }) {
   const handleBack = () => {
     if (typeof onBack === "function") onBack("Modules");
   };
@@ -29,9 +32,9 @@ function HeaderDropdown({ userName = "John Doe", onBack, onLogout }) {
               {(userName || "U").charAt(0).toUpperCase()}
             </div>
             <div className="leading-tight text-left">
-              <div className="text-sm font-semibold text-white">{userName}</div>
-              <div className="text-[11px] text-[#7a8ba8]">Student</div>
-            </div>
+            <div className="text-sm font-semibold text-white">{userName}</div>
+            <div className="text-[11px] text-[#7a8ba8]">{userEmail}</div>
+          </div>
             <div className="text-sm text-[#7a8ba8] transition group-open:rotate-180">▾</div>
           </div>
         </summary>
@@ -65,13 +68,86 @@ function Module2Background() {
   );
 }
 
-export default function Module2Assembly({
-  onFinish,
-  onBack,
-  onLogout,
-  userName = "John Doe",
+export default function Module2Assembly({ onFinish, onBack, onLogout, userName = "John Doe",
 }) {
   const [step, setStep] = useState(0);
+  const [cpuPlaced, setCpuPlaced] = useState(false);
+
+  const [firebaseUser, setFirebaseUser] = useState(null);
+const [profile, setProfile] = useState(null);
+
+  const [toast, setToast] = useState({
+  show: false,
+  message: "",
+});
+
+const hasAdvancedRef = useRef(false);
+const toastTimeoutRef = useRef(null);
+
+const showSuccessAndNext = (message) => {
+  // prevent duplicate trigger
+  if (hasAdvancedRef.current) return;
+
+  hasAdvancedRef.current = true;
+
+  setToast({
+    show: true,
+    message,
+  });
+
+  // clear previous timeout (safety)
+  if (toastTimeoutRef.current) {
+    clearTimeout(toastTimeoutRef.current);
+  }
+
+  toastTimeoutRef.current = setTimeout(() => {
+    setToast({ show: false, message: "" });
+  
+  }, 3000);
+};
+useEffect(() => {
+  hasAdvancedRef.current = false;
+
+  return () => {
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+    }
+  };
+}, [step]);
+
+useEffect(() => {
+  const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    if (!user) {
+      setFirebaseUser(null);
+      setProfile(null);
+      return;
+    }
+
+    setFirebaseUser(user);
+
+    try {
+      const userRef = doc(db, "users", user.uid);
+      const userSnap = await getDoc(userRef);
+
+      if (userSnap.exists()) {
+        setProfile(userSnap.data());
+      } else {
+        setProfile(null);
+      }
+    } catch (err) {
+      console.error("Error reading profile:", err);
+    }
+  });
+
+  return () => unsubscribe();
+}, []);
+
+const user = {
+  name: profile
+    ? `${profile.firstName || ""} ${profile.lastName || ""}`.trim()
+    : "Loading...",
+  email: firebaseUser?.email || "No email",
+};
 
   return (
     <div className="min-h-screen w-full overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased">
@@ -114,7 +190,8 @@ export default function Module2Assembly({
                   </div>
 
                   <HeaderDropdown
-                    userName={userName}
+                    userName={user.name}
+                    userEmail={user.email}
                     onBack={onBack}
                     onLogout={onLogout}
                   />
@@ -133,7 +210,17 @@ export default function Module2Assembly({
                   </div>
 
                   <div className="relative h-full w-full">
-                    {step === 0 && <CPUtoMBScene />}
+                 {step === 0 && (
+                    <CPUtoMBScene
+                      onCpuPlaced={(placed) => {
+                        setCpuPlaced(placed); // ← YOU NEED THIS
+
+                        if (placed) {
+                          showSuccessAndNext("Excellent! CPU installed successfully.");
+                        }
+                      }}
+                    />
+                  )}
                     {step === 1 && <RAMtoMBScene />}
                     {step === 2 && <SSDtoMBScene />}
                     {step === 3 && <MBtoCaseScene />}
@@ -144,38 +231,73 @@ export default function Module2Assembly({
                 </div>
               </div>
 
-              <div className="flex justify-center items-center gap-4 border-t border-[#1a2438] px-6 pb-6 pt-4">
-                {step > 0 && (
-                  <button
-                    onClick={() => setStep((prev) => prev - 1)}
-                    className="px-6 py-3 rounded-2xl border border-[#1a2438] bg-white/[0.03] text-sm font-semibold text-[#dbe6f5] transition hover:bg-white/[0.06] shadow-[0_12px_40px_rgba(0,0,0,0.3)]"
-                  >
-                    ← Previous
-                  </button>
-                )}
+              <div className="pointer-events-none absolute inset-y-0 left-0 right-0 z-[130]">
+                  {step > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setStep((prev) => prev - 1)}
+                      aria-label="Previous step"
+                      className="pointer-events-auto absolute left-7 top-1/2 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-[#1a2438] bg-[#0d1220]/85 shadow-[0_18px_60px_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:bg-white/[0.06]"
+                    >
+                      <span className="text-lg text-white/80">←</span>
+                    </button>
+                  )}
 
-                {step < 6 ? (
-                  <button
-                    onClick={() => setStep((prev) => prev + 1)}
-                    className="px-7 py-3 rounded-2xl bg-[#00ffb4] text-[#0a0e17] font-semibold text-sm shadow-[0_12px_40px_rgba(0,255,180,0.25)] transition hover:scale-[1.03]"
-                  >
-                    Next →
-                  </button>
-                ) : (
-                  <button
-                    onClick={onFinish}
-                    className="px-7 py-3 rounded-2xl bg-[#00ffb4] text-[#0a0e17] font-semibold text-sm shadow-[0_12px_40px_rgba(0,255,180,0.25)] transition hover:scale-[1.03]"
-                  >
-                    Finish ✓
-                  </button>
-                )}
-              </div>
+                  {step < 6 && step !== 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setStep((prev) => prev + 1)}
+                      aria-label="Next step"
+                      className="pointer-events-auto absolute right-7 top-1/2 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-[#1a2438] bg-[#0d1220]/85 shadow-[0_18px_60px_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:bg-white/[0.06]"
+                    >
+                      <span className="text-lg text-white/80">→</span>
+                    </button>
+                  )}
+
+                  {step < 6 && step === 0 && cpuPlaced && (
+                    <button
+                      type="button"
+                      onClick={() => setStep((prev) => prev + 1)}
+                      aria-label="Next step"
+                      className="pointer-events-auto absolute right-7 top-1/2 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-[#1a2438] bg-[#0d1220]/85 shadow-[0_18px_60px_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:bg-white/[0.06]"
+                    >
+                      <span className="text-lg text-white/80">→</span>
+                    </button>
+                  )}
+
+                  {step === 6 && (
+                    <button
+                      type="button"
+                      onClick={onFinish}
+                      aria-label="Finish module"
+                      className="pointer-events-auto absolute right-7 top-1/2 flex h-12 min-w-[110px] -translate-y-1/2 items-center justify-center rounded-full border border-[#1a2438] bg-[#00ffb4] px-5 shadow-[0_18px_60px_rgba(0,0,0,0.35)] transition hover:scale-[1.03]"
+                    >
+                      <span className="text-sm font-semibold text-[#0a0e17]">Finish ✓</span>
+                    </button>
+                  )}
+                </div>
 
               <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_120px_rgba(0,0,0,0.45)]" />
+              {toast.show && (
+                <div className="pointer-events-none absolute left-1/2 top-8 z-[200] -translate-x-1/2">
+                  <div className="rounded-2xl border border-[#1a2438] bg-[#0d1220]/95 px-5 py-4 shadow-[0_18px_60px_rgba(0,0,0,0.35)] backdrop-blur-xl">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#00ffb4]/15 text-[#00ffb4]">
+                        ✓
+                      </div>
+                      <div>
+                        <div className="text-sm font-semibold text-white">Success</div>
+                        <div className="text-xs text-[#a9b6cc]">{toast.message}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}     
             </div>
           </div>
         </div>
       </div>
     </div>
+    
   );
 }

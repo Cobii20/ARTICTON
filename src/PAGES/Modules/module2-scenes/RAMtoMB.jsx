@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState, useEffect } from "react";
+import React, { useMemo, useRef, useState, useEffect, useCallback } from "react";
 import * as THREE from "three";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import {
@@ -146,10 +146,17 @@ function RamDraggable() {
   const [distance, setDistance] = useState(null);
 
   const dragOffset = useRef(new THREE.Vector3());
+<<<<<<< HEAD
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const mouse = useMemo(() => new THREE.Vector2(), []);
   const hitPoint = useMemo(() => new THREE.Vector3(), []);
   const dragPlane = useMemo(() => new THREE.Plane(), []);
+=======
+  const raycaster = useRef(new THREE.Raycaster());
+  const mouse = useRef(new THREE.Vector2());
+  const hitPoint = useRef(new THREE.Vector3());
+  const dragPlane = useRef(new THREE.Plane());
+>>>>>>> 7b6c5a3aa251b987a1480b08588a801e0e7c256d
 
   const startQuat = useMemo(
     () => new THREE.Quaternion().setFromEuler(RAM_ROTATION),
@@ -167,11 +174,14 @@ function RamDraggable() {
     ramRef.current.scale.setScalar(RAM_SCALE);
   }, [startQuat]);
 
-  const updateMouse = (ev) => {
-    const rect = gl.domElement.getBoundingClientRect();
-    mouse.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
-    mouse.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
-  };
+  const updateMouse = useCallback(
+    (ev) => {
+      const rect = gl.domElement.getBoundingClientRect();
+      mouse.current.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.current.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
+    },
+    [gl]
+  );
 
   /** Tap anywhere toggle dragging **/
   useEffect(() => {
@@ -182,14 +192,29 @@ function RamDraggable() {
       if (!dragging) {
         const planeNormal = new THREE.Vector3();
         camera.getWorldDirection(planeNormal);
+<<<<<<< HEAD
         dragPlane.setFromNormalAndCoplanarPoint(
+=======
+        dragPlane.current.setFromNormalAndCoplanarPoint(
+>>>>>>> 7b6c5a3aa251b987a1480b08588a801e0e7c256d
           planeNormal,
           ramRef.current.position
         );
 
+<<<<<<< HEAD
         raycaster.setFromCamera(mouse, camera);
         if (raycaster.ray.intersectPlane(dragPlane, hitPoint)) {
           dragOffset.current.copy(ramRef.current.position).sub(hitPoint);
+=======
+        raycaster.current.setFromCamera(mouse.current, camera);
+        if (
+          raycaster.current.ray.intersectPlane(
+            dragPlane.current,
+            hitPoint.current
+          )
+        ) {
+          dragOffset.current.copy(ramRef.current.position).sub(hitPoint.current);
+>>>>>>> 7b6c5a3aa251b987a1480b08588a801e0e7c256d
         }
         setDragging(true);
       } else {
@@ -201,14 +226,22 @@ function RamDraggable() {
 
     gl.domElement.addEventListener("pointerdown", handleTap);
     return () => gl.domElement.removeEventListener("pointerdown", handleTap);
+<<<<<<< HEAD
   }, [dragging, snapped, gl, camera, dragPlane, raycaster, hitPoint]);
+=======
+  }, [dragging, snapped, gl, camera, updateMouse]);
+>>>>>>> 7b6c5a3aa251b987a1480b08588a801e0e7c256d
 
   /** track pointer move */
   useEffect(() => {
     const move = (e) => updateMouse(e);
     gl.domElement.addEventListener("pointermove", move);
     return () => gl.domElement.removeEventListener("pointermove", move);
+<<<<<<< HEAD
   }, [gl]);
+=======
+  }, [gl, updateMouse]);
+>>>>>>> 7b6c5a3aa251b987a1480b08588a801e0e7c256d
 
   /** animation loop */
   useFrame(() => {
@@ -229,9 +262,20 @@ function RamDraggable() {
     }
 
     if (dragging) {
+<<<<<<< HEAD
       raycaster.setFromCamera(mouse, camera);
       if (raycaster.ray.intersectPlane(dragPlane, hitPoint)) {
         const target = hitPoint.clone().add(dragOffset.current);
+=======
+      raycaster.current.setFromCamera(mouse.current, camera);
+      if (
+        raycaster.current.ray.intersectPlane(
+          dragPlane.current,
+          hitPoint.current
+        )
+      ) {
+        const target = hitPoint.current.clone().add(dragOffset.current);
+>>>>>>> 7b6c5a3aa251b987a1480b08588a801e0e7c256d
         target.y = targetY; // keep it flat
         ramRef.current.position.lerp(target, 0.3);
       }

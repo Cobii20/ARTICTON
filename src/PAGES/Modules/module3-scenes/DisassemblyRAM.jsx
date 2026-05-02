@@ -15,6 +15,8 @@ const MB_URL = "/models/MB(BLENDER).glb";
 const CPU_URL = "/models/CPU(BLENDER).glb";
 const RAM_URL = "/models/RAM(BLENDER).glb";
 const SSD_URL = "/models/SSD(BLENDER).glb";
+const HDD_URL = "/models/HDD(BLENDER).glb";
+const PSU_URL = "/models/PSU(BLENDER).glb"; // ← added
 
 /** BASE SETTINGS */
 const CASE_POSITION = new THREE.Vector3(0, -15, 0);
@@ -41,14 +43,17 @@ const CPU_ROTATION = new THREE.Euler(Math.PI / 2, 0, -Math.PI / 2);
 const SSD_POSITION = new THREE.Vector3(-2.75, -0.66, -6.24);
 const SSD_ROTATION = new THREE.Euler(0, 0, -Math.PI / 2);
 
+/** HDD seated position (from file 1) */
+const HDD_SEATED_POSITION = new THREE.Vector3(4.16, -14.32, -0.49);
+const HDD_ROTATION = new THREE.Euler(0, 0, 0);
+
+/** PSU seated position (from PSU file) */
+const PSU_SEATED_POSITION = new THREE.Vector3(4.27, -15.66, 6.22); // ← added
+const PSU_ROTATION = new THREE.Euler(0, Math.PI, 0);               // ← added
+
 const RAM_INSTALLED_POSITION = new THREE.Vector3(-6.44, -0.59, 3.79);
 const RAM_INSTALLED_ROTATION = new THREE.Euler(0, 0, -Math.PI / 2);
 
-/**
- * Detached / floor rotation:
- * Installed rotation remains unchanged.
- * Detached / dragged / snapped RAM stays flat.
- */
 const RAM_FLAT_ROTATION = new THREE.Euler(Math.PI / 2, 0, 0);
 
 /** CHECKERBOARD POSITION */
@@ -59,9 +64,7 @@ const BOARD_SIZE = 22;
 const GRID_DIVISIONS = 11;
 const CELL_SIZE = BOARD_SIZE / GRID_DIVISIONS;
 
-/**
- * RAM seated position
- */
+/** RAM seated position */
 const RAM_TARGET_X = 13.73;
 const RAM_TARGET_Y = -24.61;
 const RAM_TARGET_Z = 9.06;
@@ -72,17 +75,10 @@ const RAM_FLOOR_POSITION = new THREE.Vector3(
   RAM_TARGET_Z
 );
 
-/** LOCKED DRAG Y LEVEL */
 const LOCKED_DRAG_Y = RAM_TARGET_Y;
 
-/**
- * Fixed ring position
- */
 const RING_POSITION = new THREE.Vector3(15.85, -14.9, 15.46);
 
-/**
- * Board label position only.
- */
 const RAM_LABEL_POSITION = new THREE.Vector3(
   BOARD_CENTER_X,
   BOARD_Y + 0.18,
@@ -240,12 +236,14 @@ function PCCase() {
   );
 }
 
-/** ================= STATIC ASSEMBLY FOR CONTEXT ================= */
+/** ================= STATIC ASSEMBLY (MB + CPU + SSD + HDD + PSU) ================= */
 
 function MotherboardAssemblySeated() {
-  const mbGltf = useGLTF(MB_URL);
+  const mbGltf  = useGLTF(MB_URL);
   const cpuGltf = useGLTF(CPU_URL);
   const ssdGltf = useGLTF(SSD_URL);
+  const hddGltf = useGLTF(HDD_URL);
+  const psuGltf = useGLTF(PSU_URL); // ← added
 
   const seatedGroup = useMemo(() => {
     const group = new THREE.Group();
@@ -265,6 +263,19 @@ function MotherboardAssemblySeated() {
     ssd.rotation.copy(SSD_ROTATION);
     group.add(ssd);
 
+    // HDD seated in case
+    const hdd = hddGltf.scene.clone(true);
+    hdd.position.copy(HDD_SEATED_POSITION);
+    hdd.rotation.copy(HDD_ROTATION);
+    group.add(hdd);
+
+    // PSU seated in case ─────────────────────────────────────────
+    const psu = psuGltf.scene.clone(true);
+    psu.position.copy(PSU_SEATED_POSITION);
+    psu.rotation.copy(PSU_ROTATION);
+    group.add(psu);
+    // ────────────────────────────────────────────────────────────
+
     group.traverse((o) => {
       if (o.isMesh) {
         o.castShadow = true;
@@ -273,7 +284,7 @@ function MotherboardAssemblySeated() {
     });
 
     return group;
-  }, [mbGltf.scene, cpuGltf.scene, ssdGltf.scene]);
+  }, [mbGltf.scene, cpuGltf.scene, ssdGltf.scene, hddGltf.scene, psuGltf.scene]); // ← psuGltf.scene added
 
   return <primitive object={seatedGroup} />;
 }
@@ -582,8 +593,11 @@ export default function DisassemblyRAM({ placementApi }) {
   );
 }
 
+// Preload models
 useGLTF.preload(CASE_URL);
 useGLTF.preload(MB_URL);
 useGLTF.preload(CPU_URL);
 useGLTF.preload(RAM_URL);
 useGLTF.preload(SSD_URL);
+useGLTF.preload(HDD_URL);
+useGLTF.preload(PSU_URL);

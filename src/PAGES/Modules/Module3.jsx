@@ -5,6 +5,7 @@ import DisassemblySSD from "./module3-scenes/DisassemblySSD";
 import DisassemblyPSU from "./module3-scenes/DisassemblyPSU";
 import DisassemblyCPU from "./module3-scenes/DisassemblyCPU";
 import DisassemblyMB from "./module3-scenes/DisassemblyMB";
+import FullDisassembly from "./module3-scenes/FullDisassembly";
 
 function HeaderDropdown({ userName = "John Doe", onBack, onLogout }) {
   const handleBack = () => {
@@ -73,6 +74,7 @@ const STEP_TITLES = [
   "PSU Disassembly",
   "CPU Disassembly",
   "Motherboard Disassembly",
+  "Full Disassembly",
 ];
 
 export default function Module3Disassembly({
@@ -204,6 +206,7 @@ export default function Module3Disassembly({
                     {step === 3 && <DisassemblyPSU {...sharedProps} />}
                     {step === 4 && <DisassemblyCPU {...sharedProps} />}
                     {step === 5 && <DisassemblyMB {...sharedProps} />}
+                    {step === 6 && <FullDisassembly {...sharedProps} />}
                   </div>
                 </div>
               </div>
@@ -218,7 +221,7 @@ export default function Module3Disassembly({
                   </button>
                 )}
 
-                {step < 5 ? (
+                {step < 6 ? (
                   <button
                     onClick={() => setStep((prev) => prev + 1)}
                     className="px-7 py-3 rounded-2xl bg-[#00ffb4] text-[#0a0e17] font-semibold text-sm shadow-[0_12px_40px_rgba(0,255,180,0.25)] transition hover:scale-[1.03]"
