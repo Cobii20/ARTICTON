@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { auth, db } from "../firebase.js";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc,updateDoc, serverTimestamp } from "firebase/firestore";
 
 function getCurrentWeekKey(date = new Date()) {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
@@ -89,14 +89,15 @@ export default function Dashboard({
     const currentWeekKey = getCurrentWeekKey();
 
     const user = {
-      name: profile
-        ? `${profile.firstName || ""} ${profile.lastName || ""}`.trim()
-        : "Loading...",
-      email: firebaseUser?.email || "No email",
-      avatarUrl: "",
-      streakDays: profile?.streakDays || 0,
-      minutesThisWeek: profile?.weeklyMinutes?.[currentWeekKey] || 0,
-    };
+  name: profile
+    ? `${profile.firstName || ""} ${profile.middleInitial ? profile.middleInitial + "." : ""} ${profile.lastName || ""}`.trim()
+    : "Loading...",
+  email: firebaseUser?.email || "No email",
+  avatarUrl: profile?.avatarUrl || "",
+  middleInitial: profile?.middleInitial || "",
+  streakDays: profile?.streakDays || 0,
+  minutesThisWeek: profile?.weeklyMinutes?.[currentWeekKey] || 0,
+};
 
     const module1Progress = profile?.moduleProgress?.module1;
     const module1CompletedParts = module1Progress?.completedParts || {};
@@ -484,7 +485,13 @@ export default function Dashboard({
                             exit={{ opacity: 0, y: -8 }}
                             transition={reduce ? { duration: 0 } : { duration: 0.18 }}
                           >
-                            <ProfilePage user={user} stats={stats} achievements={data.achievements} />
+                          <ProfilePage
+                            user={user}
+                            stats={stats}
+                            achievements={data.achievements}
+                            firebaseUser={firebaseUser}
+                            setProfile={setProfile}
+                          />
                           </motion.div>
                         ) : null}
                       </AnimatePresence>
@@ -667,68 +674,281 @@ function PracticalTestsPage({ tests, onOpen }) {
   );
 }
 
-function ProfilePage({ user, stats, achievements }) {
+function ProfilePage({ user, stats, achievements,firebaseUser, setProfile }) {
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [mi, setMi] = useState("");
+  const [previewImage, setPreviewImage] = useState(user.avatarUrl || "");
+
+  useEffect(() => {
+    const parts = (user.name || "").trim().split(" ");
+
+    setFirstName(parts[0] || "");
+    setLastName(parts.length > 1 ? parts[parts.length - 1] : "");
+    setMi(user.middleInitial || "");
+    setPreviewImage(user.avatarUrl || "");
+  }, [user.name, user.avatarUrl]);
+
+  const fullName = `${firstName} ${mi ? mi + "." : ""} ${lastName}`.trim();
+
+  const handleImageChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const imageUrl = URL.createObjectURL(file);
+    setPreviewImage(imageUrl);
+  };
+
+  const handleSave = async () => {
+  if (!firebaseUser?.uid) {
+    console.error("No logged-in user found.");
+    return;
+  }
+
+  const cleanFirstName = firstName.trim();
+  const cleanLastName = lastName.trim();
+  const cleanMi = mi.trim().toUpperCase();
+
+  try {
+    const userRef = doc(db, "users", firebaseUser.uid);
+
+    await updateDoc(userRef, {
+      firstName: cleanFirstName,
+      lastName: cleanLastName,
+      middleInitial: cleanMi,
+      updatedAt: serverTimestamp(),
+    });
+
+    setProfile((prev) => ({
+      ...prev,
+      firstName: cleanFirstName,
+      lastName: cleanLastName,
+      middleInitial: cleanMi,
+    }));
+
+    setIsEditOpen(false);
+  } catch (err) {
+    console.error("Error updating profile:", err);
+  }
+};
+
   return (
-    <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-      <div className="overflow-hidden rounded-[28px] border border-[#1a2438] bg-[#0d1220] shadow-[0_30px_90px_rgba(0,0,0,0.42)]">
-        <div className="p-8">
-          <div className="text-lg font-bold tracking-tight text-[#e8ecf4]">My Profile</div>
-
-          <div className="mt-6 flex items-center gap-4">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/10 text-lg font-bold text-[#00ffb4]">
-              {(user.name || "U").charAt(0).toUpperCase()}
+    <>
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+        <div className="overflow-hidden rounded-[28px] border border-[#1a2438] bg-[#0d1220] shadow-[0_30px_90px_rgba(0,0,0,0.42)]">
+          <div className="p-8">
+            <div className="text-lg font-bold tracking-tight text-[#e8ecf4]">
+              My Profile
             </div>
-            <div>
-              <div className="text-base font-semibold text-white">{user.name}</div>
-              <div className="text-sm text-[#7a8ba8]">{user.email}</div>
+
+            <div className="mt-6 flex items-center gap-4">
+              <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/10 text-lg font-bold text-[#00ffb4]">
+                {previewImage ? (
+                  <img
+                    src={previewImage}
+                    alt="Profile"
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  (firstName || user.name || "U").charAt(0).toUpperCase()
+                )}
+              </div>
+
+              <div>
+                <div className="text-base font-semibold text-white">
+                  {fullName || user.name}
+                </div>
+                <div className="text-sm text-[#7a8ba8]">{user.email}</div>
+              </div>
+            </div>
+
+            <div className="mt-7 grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <MiniStat title="Streak" value={`${user.streakDays} days`} />
+              <MiniStat title="This week" value={`${user.minutesThisWeek} min`} />
+              <MiniStat title="Completed" value={`${stats.completed}`} />
+            </div>
+
+            <div className="mt-7 rounded-2xl border border-[#1a2438] bg-white/[0.03] p-6">
+              <div className="text-sm font-semibold text-white">Quick actions</div>
+
+              <div className="mt-4 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsEditOpen(true)}
+                  className="rounded-xl border border-[#1a2438] bg-white/[0.03] px-4 py-2.5 text-sm font-semibold text-[#dbe6f5] transition hover:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-[#00ffb4]/25"
+                >
+                  Edit profile
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => console.log("View achievements")}
+                  className="rounded-xl border border-[#1a2438] bg-white/[0.03] px-4 py-2.5 text-sm font-semibold text-[#dbe6f5] transition hover:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-[#00ffb4]/25"
+                >
+                  View achievements
+                </button>
+              </div>
             </div>
           </div>
+        </div>
 
-          <div className="mt-7 grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <MiniStat title="Streak" value={`${user.streakDays} days`} />
-            <MiniStat title="This week" value={`${user.minutesThisWeek} min`} />
-            <MiniStat title="Completed" value={`${stats.completed}`} />
-          </div>
+        <div className="overflow-hidden rounded-[28px] border border-[#1a2438] bg-[#0d1220] shadow-[0_30px_90px_rgba(0,0,0,0.42)]">
+          <div className="p-7">
+            <div className="text-lg font-bold tracking-tight text-[#e8ecf4]">
+              Badges
+            </div>
 
-          <div className="mt-7 rounded-2xl border border-[#1a2438] bg-white/[0.03] p-6">
-            <div className="text-sm font-semibold text-white">Quick actions</div>
-            <div className="mt-4 flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={() => console.log("Edit profile")}
-                className="rounded-xl border border-[#1a2438] bg-white/[0.03] px-4 py-2.5 text-sm font-semibold text-[#dbe6f5] transition hover:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-[#00ffb4]/25"
-              >
-                Edit profile
-              </button>
-              <button
-                type="button"
-                onClick={() => console.log("View achievements")}
-                className="rounded-xl border border-[#1a2438] bg-white/[0.03] px-4 py-2.5 text-sm font-semibold text-[#dbe6f5] transition hover:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-[#00ffb4]/25"
-              >
-                View achievements
-              </button>
+            <div className="mt-5 space-y-3">
+              {achievements.map((a) => (
+                <AchievementRow
+                  key={a.id}
+                  icon={a.icon}
+                  title={a.title}
+                  subtitle={a.subtitle}
+                  onClick={() => console.log(a.id)}
+                />
+              ))}
             </div>
           </div>
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-[28px] border border-[#1a2438] bg-[#0d1220] shadow-[0_30px_90px_rgba(0,0,0,0.42)]">
-        <div className="p-7">
-          <div className="text-lg font-bold tracking-tight text-[#e8ecf4]">Badges</div>
-          <div className="mt-5 space-y-3">
-            {achievements.map((a) => (
-              <AchievementRow
-                key={a.id}
-                icon={a.icon}
-                title={a.title}
-                subtitle={a.subtitle}
-                onClick={() => console.log(a.id)}
-              />
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
+      <AnimatePresence>
+        {isEditOpen && (
+          <motion.div
+            className="fixed inset-0 z-[999] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 18, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 12, scale: 0.97 }}
+              transition={{ duration: 0.18 }}
+              className="w-full max-w-lg overflow-hidden rounded-[28px] border border-[#1a2438] bg-[#0d1220] shadow-[0_30px_100px_rgba(0,0,0,0.65)]"
+            >
+              <div className="flex items-center justify-between border-b border-[#1a2438] px-6 py-5">
+                <div>
+                  <div className="text-lg font-bold text-white">Edit Profile</div>
+                  <div className="text-xs text-[#7a8ba8]">Front-end preview only</div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsEditOpen(false)}
+                  className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#1a2438] bg-white/[0.03] text-white/70 transition hover:bg-white/[0.06]"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="p-6">
+                <div className="flex items-center gap-5">
+                  <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/10 text-2xl font-bold text-[#00ffb4]">
+                    {previewImage ? (
+                      <img
+                        src={previewImage}
+                        alt="Preview"
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      (firstName || "U").charAt(0).toUpperCase()
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="inline-flex cursor-pointer rounded-xl border border-[#00ffb4]/30 bg-[#00ffb4]/12 px-4 py-2.5 text-sm font-semibold text-[#00ffb4] transition hover:bg-[#00ffb4]/18">
+                      Upload picture
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageChange}
+                        className="hidden"
+                      />
+                    </label>
+
+                    <div className="mt-2 text-xs text-[#7a8ba8]">
+                      Preview only for now. Firebase upload can be added later.
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-[0.2em] text-[#7a8ba8]">
+                      First Name
+                    </label>
+                    <input
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      className="mt-2 w-full rounded-2xl border border-[#1a2438] bg-white/[0.03] px-4 py-3 text-sm text-white outline-none focus:border-[#00ffb4]/40 focus:ring-2 focus:ring-[#00ffb4]/15"
+                      placeholder="First name"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-[0.2em] text-[#7a8ba8]">
+                      Last Name
+                    </label>
+                    <input
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      className="mt-2 w-full rounded-2xl border border-[#1a2438] bg-white/[0.03] px-4 py-3 text-sm text-white outline-none focus:border-[#00ffb4]/40 focus:ring-2 focus:ring-[#00ffb4]/15"
+                      placeholder="Last name"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-[0.2em] text-[#7a8ba8]">
+                      MI
+                    </label>
+                    <input
+                      value={mi}
+                      maxLength={1}
+                      onChange={(e) => setMi(e.target.value.toUpperCase())}
+                      className="mt-2 w-full rounded-2xl border border-[#1a2438] bg-white/[0.03] px-4 py-3 text-center text-sm text-white outline-none focus:border-[#00ffb4]/40 focus:ring-2 focus:ring-[#00ffb4]/15"
+                      placeholder="M"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <label className="text-xs font-semibold uppercase tracking-[0.2em] text-[#7a8ba8]">
+                    Email
+                  </label>
+
+                  <input
+                    value={user.email}
+                    disabled
+                    className="mt-2 w-full cursor-not-allowed rounded-2xl border border-[#1a2438] bg-white/[0.02] px-4 py-3 text-sm text-[#7a8ba8] outline-none"
+                  />
+                </div>
+
+                <div className="mt-7 flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditOpen(false)}
+                    className="rounded-xl border border-[#1a2438] bg-white/[0.03] px-5 py-2.5 text-sm font-semibold text-[#dbe6f5] transition hover:bg-white/[0.06]"
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleSave}
+                    className="rounded-xl bg-[#00ffb4] px-5 py-2.5 text-sm font-bold text-[#0a0e17] transition hover:scale-[1.02]"
+                  >
+                    Save changes
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }
 

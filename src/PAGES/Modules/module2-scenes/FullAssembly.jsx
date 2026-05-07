@@ -1,926 +1,1692 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useMemo,
+  useRef,
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
 import * as THREE from "three";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import {
-  Environment,
   OrbitControls,
+  Environment,
+  useGLTF,
   ContactShadows,
   Html,
-  useGLTF,
 } from "@react-three/drei";
 
-/** ================= MODEL URLS ================= */
-const CPU_URL = "/models/CPU(BLENDER).glb";
+/** MODEL URLS */
+const CASE_URL = "/models/PC%20CASE(BLENDER).glb";
 const MB_URL = "/models/MB(BLENDER).glb";
+const CPU_URL = "/models/CPU(BLENDER).glb";
 const RAM_URL = "/models/RAM(BLENDER).glb";
 const SSD_URL = "/models/SSD(BLENDER).glb";
 const HDD_URL = "/models/HDD(BLENDER).glb";
 const PSU_URL = "/models/PSU(BLENDER).glb";
-const CASE_URL = "/models/PC CASE(BLENDER).glb";
 
-/** ================= SETTINGS ================= */
-const SNAP_DISTANCE = 0.12;
-const MAGNET_DISTANCE = 1.25;
-const MAGNET_STRENGTH = 1.8;
+/** CAMERA */
+const CAMERA_POSITION = [45, 18, 18];
+const CONTROL_TARGET = [24, -14, 7];
 
-const CASE_POSITION = new THREE.Vector3(0, -15, 0);
-const CASE_ROTATION = new THREE.Euler(0, 0, 0);
+/** WORK AREA */
+const BOARD_Y = -14.95;
+const BOARD_CENTER_X = 24;
+const BOARD_CENTER_Z = 6.5;
+const BOARD_SIZE = 26;
+const GRID_DIVISIONS = 13;
 
-const MB_SEATED_POSITION = new THREE.Vector3(-0.6, -0.6, 2.99);
-const MB_ROTATION = new THREE.Euler(0, 0, -Math.PI / 2);
+/** COLORS */
+const MB_COLOR = "#4aa3ff";
+const CPU_COLOR = "#b56dff";
+const RAM_COLOR = "#00ffb4";
+const SSD_COLOR = "#ffcc00";
+const HDD_COLOR = "#ff8a3d";
+const PSU_COLOR = "#ff4d6d";
 
-/** motherboard parts seated positions */
-const CPU_SEATED_POSITION = new THREE.Vector3(-1.25, -4.95, -2.66);
-const CPU_ROTATION = new THREE.Euler(Math.PI / 2, 0, -Math.PI / 2);
+/** GENERAL SNAP / MAGNET */
+const SNAP_DISTANCE = 0.75;
+const MAGNET_DISTANCE = 3.2;
+const MAGNET_STRENGTH = 0.22;
 
-const RAM_SEATED_POSITION = new THREE.Vector3(-6.44, -0.59, 3.79);
-const RAM_ROTATION = new THREE.Euler(0, 0, -Math.PI / 2);
+/** CASE */
+const CASE_POSITION = new THREE.Vector3(27.88, -12.79, 35.74);
+const CASE_ROTATION = new THREE.Euler(0, Math.PI / 2, 0);
+const CASE_SCALE = 1;
 
-const SSD_SEATED_POSITION = new THREE.Vector3(-2.75, -0.66, -6.24);
-const SSD_ROTATION = new THREE.Euler(0, 0, -Math.PI / 2);
+/** MOTHERBOARD ON WORKBENCH */
+const MB_POSITION = new THREE.Vector3(33.54, -14.87, 11.32);
+const MB_ROTATION = new THREE.Euler(0, Math.PI / 2, 0);
+const MB_SCALE = 1;
 
-/** motherboard build starting positions */
-const CPU_START_POSITION = new THREE.Vector3(3, -4.95, -2.66);
-const RAM_START_POSITION = new THREE.Vector3(3, -0.59, 3.79);
-const SSD_START_POSITION = new THREE.Vector3(3, -0.66, -6.24);
+/** CPU - starts from final full disassembly checkerboard output */
+const CPU_START_POSITION = new THREE.Vector3(17.49, -15.8, 0.3);
+const CPU_DRAG_Y_LOCK = -15.49;
+const CPU_SEATED_POSITION = new THREE.Vector3(27.91, -15.49, 6.98);
+const CPU_HIGHLIGHT_POSITION = new THREE.Vector3(27.91, -15.44, 6.98);
+const CPU_START_ROTATION = new THREE.Euler(0, Math.PI / 2, 0);
+const CPU_TARGET_ROTATION = new THREE.Euler(0, Math.PI, 0);
 
-/** motherboard assembly to case */
-const MB_ASSEMBLY_START_POSITION = new THREE.Vector3(-0.6, -12, 24);
+/** RAM - starts from final full disassembly checkerboard output */
+const RAM_START_POSITION = new THREE.Vector3(13.73, -24.61, 9.06);
+const RAM_DRAG_Y_LOCK = -20.74;
+const RAM_SEATED_POSITION = new THREE.Vector3(34.35, -20.74, 11.32);
+const RAM_HIGHLIGHT_POSITION = new THREE.Vector3(34.35, -20.69, 11.32);
+const RAM_START_ROTATION = new THREE.Euler(Math.PI / 2, 0, 0);
+const RAM_TARGET_ROTATION = new THREE.Euler(0, Math.PI / 2, 0);
 
-/** HDD */
-const HDD_LOCK_X = 4.16;
-const HDD_LOCK_Y = -14.32;
-const HDD_SEATED_POSITION = new THREE.Vector3(4.16, -14.32, -0.49);
-const HDD_START_POSITION = new THREE.Vector3(4.16, -14.32, 15);
-const HDD_ROTATION = new THREE.Euler(0, 0, 0);
+/** SSD - starts from final full disassembly checkerboard output */
+const SSD_START_POSITION = new THREE.Vector3(12.94, -17.21, 7.36);
+const SSD_DRAG_Y_LOCK = -17.03;
+const SSD_SEATED_POSITION = new THREE.Vector3(24.39, -17.03, 11.26);
+const SSD_HIGHLIGHT_POSITION = new THREE.Vector3(24.39, -16.98, 11.26);
+const SSD_START_ROTATION = new THREE.Euler(0, 0, 0);
+const SSD_TARGET_ROTATION = new THREE.Euler(0, Math.PI / 2, 0);
 
-/** PSU */
-const PSU_LOCK_X = 4.27;
-const PSU_LOCK_Y = -15.66;
-const PSU_SEATED_POSITION = new THREE.Vector3(4.27, -15.66, 6.22);
-const PSU_START_POSITION = new THREE.Vector3(4.27, -15.66, 15);
-const PSU_ROTATION = new THREE.Euler(0, Math.PI, 0);
+/** MOTHERBOARD TO CASE */
+const MB_ASSEMBLY_START_OFFSET = new THREE.Vector3(0, 0, 0);
+const MB_ASSEMBLY_FRONT_OF_CASE_OFFSET = new THREE.Vector3(-4.5, -9.3, 11.5);
+const MB_ASSEMBLY_FLOAT_HEIGHT_Y = 0.4;
+const MB_DRAG_Y_LOCK = -9.13;
+const MB_ASSEMBLY_CASE_TARGET_OFFSET = new THREE.Vector3(-2.49, -9.13, 21.59);
+const MB_ASSEMBLY_START_ROTATION = new THREE.Euler(0, 0, 0);
+const MB_ASSEMBLY_FRONT_ROTATION = new THREE.Euler(-Math.PI / 2, 0, 0);
+const MB_ASSEMBLY_CASE_ROTATION = new THREE.Euler(-Math.PI / 2, 0, 0);
+const MB_CASE_HIGHLIGHT_POSITION = new THREE.Vector3(-2.49, -9.08, 21.59);
+const MB_FLOAT_TRANSITION_SPEED = 0.22;
+const MB_CASE_SNAP_DISTANCE = 1.1;
+const MB_CASE_MAGNET_DISTANCE = 7.0;
+const MB_CASE_MAGNET_STRENGTH = 0.32;
 
-function cloneWithShadows(scene) {
+/** HDD TO CASE - starts from final full disassembly checkerboard output */
+const HDD_START_POSITION = new THREE.Vector3(15.5, -16.06, 10.96);
+const HDD_DRAG_Y_LOCK = -12.18;
+const HDD_INSERT_READY_POSITION = new THREE.Vector3(19.92, -12.18, 31.67);
+const HDD_SEATED_POSITION = new THREE.Vector3(27.47, -12.18, 31.67);
+const HDD_CLEARANCE_POSITION = new THREE.Vector3(25.8, -12.18, 31.67);
+const HDD_TARGET_HIGHLIGHT_POSITION = new THREE.Vector3(19.92, -12.08, 31.36);
+const HDD_START_ROTATION = new THREE.Euler(0, 0, 0);
+const HDD_INSERT_READY_ROTATION = new THREE.Euler(0, Math.PI / 2, 0);
+const HDD_SEATED_ROTATION = new THREE.Euler(0, Math.PI / 2, 0);
+const HDD_INSERT_TRANSITION_SPEED = 0.24;
+
+/** PSU TO CASE - starts from final full disassembly checkerboard output */
+const PSU_START_POSITION = new THREE.Vector3(19.38, -15.81, 11.75);
+const PSU_DRAG_Y_LOCK = -13.46;
+const PSU_INSERT_READY_POSITION = new THREE.Vector3(14.16, -13.46, 38.36);
+const PSU_SEATED_POSITION = new THREE.Vector3(20.83, -13.46, 38.36);
+const PSU_CLEARANCE_POSITION = new THREE.Vector3(18.8, -13.46, 38.36);
+const PSU_TARGET_HIGHLIGHT_POSITION = new THREE.Vector3(14.16, -13.36, 38.36);
+const PSU_START_ROTATION = new THREE.Euler(0, Math.PI, 0);
+const PSU_INSERT_READY_ROTATION = new THREE.Euler(0, Math.PI / 2, 0);
+const PSU_SEATED_ROTATION = new THREE.Euler(0, Math.PI / 2, 0);
+const PSU_INSERT_TRANSITION_SPEED = 0.24;
+
+/** INSERT SNAP / MAGNET */
+const INSERT_TRIGGER_DISTANCE = 1.15;
+const INSERT_TRIGGER_MAGNET_DISTANCE = 5.2;
+const INSERT_TRIGGER_MAGNET_STRENGTH = 0.28;
+
+const STEPS = [
+  { id: "cpu", label: "CPU to motherboard", color: CPU_COLOR },
+  { id: "ram", label: "RAM to motherboard", color: RAM_COLOR },
+  { id: "ssd", label: "SSD to motherboard", color: SSD_COLOR },
+  { id: "mb", label: "Motherboard to case", color: MB_COLOR },
+  { id: "hdd", label: "HDD to case", color: HDD_COLOR },
+  { id: "psu", label: "PSU to case", color: PSU_COLOR },
+];
+
+function cloneScene(scene, transparent = false) {
   const clone = scene.clone(true);
+
   clone.traverse((o) => {
-    if (o.isMesh) {
-      o.castShadow = true;
-      o.receiveShadow = true;
+    if (!o.isMesh) return;
+
+    o.castShadow = true;
+    o.receiveShadow = true;
+
+    if (transparent && o.material) {
+      if (Array.isArray(o.material)) {
+        o.material = o.material.map((mat) => mat.clone());
+      } else {
+        o.material = o.material.clone();
+      }
     }
   });
+
   return clone;
 }
 
-function quatFromEuler(euler) {
-  return new THREE.Quaternion().setFromEuler(euler);
+function setObjectOpacity(root, opacity) {
+  root.traverse((o) => {
+    if (!o.isMesh || !o.material) return;
+
+    const materials = Array.isArray(o.material) ? o.material : [o.material];
+
+    materials.forEach((mat) => {
+      mat.transparent = opacity < 1;
+      mat.opacity = opacity;
+      mat.depthWrite = opacity >= 0.98;
+      mat.needsUpdate = true;
+    });
+  });
 }
 
-function getLocalTransform(worldPosition, worldRotation) {
-  const root = new THREE.Group();
-  root.position.copy(MB_SEATED_POSITION);
-  root.quaternion.copy(quatFromEuler(MB_ROTATION));
-
-  const child = new THREE.Object3D();
-  child.position.copy(worldPosition);
-  child.quaternion.copy(quatFromEuler(worldRotation));
-  root.add(child);
-
-  root.updateMatrixWorld(true);
-  child.updateMatrixWorld(true);
-
-  const inv = new THREE.Matrix4().copy(root.matrixWorld).invert();
-  const localMatrix = new THREE.Matrix4().multiplyMatrices(inv, child.matrixWorld);
-
-  const pos = new THREE.Vector3();
-  const quat = new THREE.Quaternion();
-  const scale = new THREE.Vector3();
-  localMatrix.decompose(pos, quat, scale);
-
-  return { position: pos, quaternion: quat };
+function easeInOutCubic(t) {
+  return t < 0.5
+    ? 4 * t * t * t
+    : 1 - Math.pow(-2 * t + 2, 3) / 2;
 }
 
-const CPU_LOCAL = getLocalTransform(CPU_SEATED_POSITION, CPU_ROTATION);
-const RAM_LOCAL = getLocalTransform(RAM_SEATED_POSITION, RAM_ROTATION);
-const SSD_LOCAL = getLocalTransform(SSD_SEATED_POSITION, SSD_ROTATION);
-
-/** ================= UI ================= */
-function GuidePanel({ step, installed, onReset }) {
-  const titles = {
-    cpu: "Install CPU",
-    ram: "Install RAM",
-    ssd: "Install SSD",
-    motherboard: "Mount Motherboard",
-    hdd: "Install HDD",
-    psu: "Install PSU",
-    done: "Build Complete",
-  };
-
-  const hints = {
-    cpu: "Drag the CPU onto the motherboard.",
-    ram: "Drag the RAM into its slot.",
-    ssd: "Drag the SSD onto the motherboard.",
-    motherboard:
-      "Drag the full motherboard assembly. Hold W to move forward and S to move backward.",
-    hdd: "Drag the HDD into the case bay.",
-    psu: "Drag the PSU into the case.",
-    done: "All major components are installed.",
-  };
-
-  return (
-    <div
-      style={{
-        position: "absolute",
-        top: 16,
-        left: 16,
-        zIndex: 20,
-        width: 290,
-        padding: 16,
-        borderRadius: 24,
-        background: "rgba(5,10,18,.78)",
-        border: "1px solid rgba(140,255,230,.16)",
-        backdropFilter: "blur(10px)",
-        color: "#eef4ff",
-        fontFamily: "Inter, system-ui, sans-serif",
-      }}
-    >
-      <div style={{ fontSize: 11, letterSpacing: ".22em", color: "#7ee7d8", marginBottom: 10 }}>
-        PC BUILD GUIDE
-      </div>
-      <div style={{ fontSize: 18, fontWeight: 700 }}>{titles[step]}</div>
-      <div style={{ marginTop: 8, fontSize: 13, opacity: 0.8, lineHeight: 1.4 }}>
-        {hints[step]}
-      </div>
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: 8,
-          marginTop: 16,
-        }}
-      >
-        {[
-          ["CPU", installed.cpu],
-          ["RAM", installed.ram],
-          ["SSD", installed.ssd],
-          ["Motherboard", installed.motherboard],
-          ["HDD", installed.hdd],
-          ["PSU", installed.psu],
-        ].map(([label, done]) => (
-          <div
-            key={label}
-            style={{
-              borderRadius: 16,
-              padding: "10px 12px",
-              background: "rgba(255,255,255,.05)",
-              border: "1px solid rgba(255,255,255,.08)",
-            }}
-          >
-            <div style={{ fontSize: 12, opacity: 0.72 }}>{label}</div>
-            <div style={{ fontSize: 13, color: done ? "#5de6a5" : "#f4cf58" }}>
-              {done ? "Installed" : "Pending"}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <button
-        onClick={onReset}
-        style={{
-          marginTop: 16,
-          width: "100%",
-          padding: "12px 14px",
-          borderRadius: 16,
-          border: "1px solid rgba(255,255,255,.1)",
-          background: "rgba(255,255,255,.08)",
-          color: "#eef4ff",
-          cursor: "pointer",
-        }}
-      >
-        Reset Full Build
-      </button>
-    </div>
-  );
+function easeOutCubic(t) {
+  return 1 - Math.pow(1 - t, 3);
 }
 
-function CameraController({ step }) {
+function getStepIndex(id) {
+  return STEPS.findIndex((step) => step.id === id);
+}
+
+function isStepUnlocked(stepId, placed) {
+  const index = getStepIndex(stepId);
+
+  if (index === 0) return true;
+
+  for (let i = 0; i < index; i += 1) {
+    if (!placed[STEPS[i].id]) return false;
+  }
+
+  return true;
+}
+
+function getCurrentStep(placed) {
+  return STEPS.find((step) => !placed[step.id])?.id || "complete";
+}
+
+function Scene() {
   const { camera } = useThree();
 
-  useEffect(() => {
-    const presets = {
-      cpu: { pos: [0, 6, 10], target: [0, 0, 0] },
-      ram: { pos: [0, 6, 10], target: [0, 0, 0] },
-      ssd: { pos: [0, 6, 12], target: [0, 0, 0] },
-      motherboard: { pos: [0, 10, 24], target: [0, -10, 0] },
-      hdd: { pos: [0, 10, 22], target: [0, -10, 0] },
-      psu: { pos: [0, 10, 24], target: [0, -10, 0] },
-      done: { pos: [0, 12, 28], target: [0, -8, 0] },
-    };
-
-    const preset = presets[step];
-    camera.position.set(...preset.pos);
-    camera.lookAt(...preset.target);
-    camera.updateProjectionMatrix();
-  }, [camera, step]);
-
-  return null;
-}
-
-/** ================= STATIC SCENE PIECES ================= */
-function PCCase() {
-  const { scene } = useGLTF(CASE_URL);
-  const clone = useMemo(() => cloneWithShadows(scene), [scene]);
-
-  return (
-    <group position={CASE_POSITION} rotation={CASE_ROTATION.toArray()}>
-      <primitive object={clone} />
-    </group>
-  );
-}
-
-function MotherboardBase() {
-  const { scene } = useGLTF(MB_URL);
-  const clone = useMemo(() => cloneWithShadows(scene), [scene]);
-
-  return (
-    <group position={MB_SEATED_POSITION} rotation={MB_ROTATION.toArray()}>
-      <primitive object={clone} />
-    </group>
-  );
-}
-
-function StaticModel({ url, position, rotation }) {
-  const { scene } = useGLTF(url);
-  const clone = useMemo(() => cloneWithShadows(scene), [scene]);
-
-  return (
-    <group position={position} rotation={rotation.toArray()}>
-      <primitive object={clone} />
-    </group>
-  );
-}
-
-function SeatedMotherboardAssembly() {
-  const mb = useGLTF(MB_URL);
-  const cpu = useGLTF(CPU_URL);
-  const ram = useGLTF(RAM_URL);
-  const ssd = useGLTF(SSD_URL);
-
-  const assembly = useMemo(() => {
-    const root = new THREE.Group();
-
-    root.add(cloneWithShadows(mb.scene));
-
-    const cpuClone = cloneWithShadows(cpu.scene);
-    cpuClone.position.copy(CPU_LOCAL.position);
-    cpuClone.quaternion.copy(CPU_LOCAL.quaternion);
-    root.add(cpuClone);
-
-    const ramClone = cloneWithShadows(ram.scene);
-    ramClone.position.copy(RAM_LOCAL.position);
-    ramClone.quaternion.copy(RAM_LOCAL.quaternion);
-    root.add(ramClone);
-
-    const ssdClone = cloneWithShadows(ssd.scene);
-    ssdClone.position.copy(SSD_LOCAL.position);
-    ssdClone.quaternion.copy(SSD_LOCAL.quaternion);
-    root.add(ssdClone);
-
-    return root;
-  }, [mb.scene, cpu.scene, ram.scene, ssd.scene]);
-
-  return (
-    <group position={MB_SEATED_POSITION} rotation={MB_ROTATION.toArray()}>
-      <primitive object={assembly} />
-    </group>
-  );
-}
-
-/** ================= GENERIC DRAG TO TARGET ================= */
-function DragToTarget({
-  url,
-  active,
-  installed,
-  onInstalled,
-  startPosition,
-  seatedPosition,
-  startRotation,
-  seatedRotation,
-  label,
-  subtitle,
-  htmlPosition = [0, 2, 0],
-  lockX,
-  lockY,
-}) {
-  const { scene } = useGLTF(url);
-  const clone = useMemo(() => cloneWithShadows(scene), [scene]);
-  const ref = useRef();
-  const { camera, gl } = useThree();
-
-  const [dragging, setDragging] = useState(false);
-  const [pos, setPos] = useState({ x: 0, y: 0, z: 0 });
-  const [distance, setDistance] = useState(null);
-
-  const dragOffset = useRef(new THREE.Vector3());
-  const raycaster = useMemo(() => new THREE.Raycaster(), []);
-  const mouse = useMemo(() => new THREE.Vector2(), []);
-  const hitPoint = useMemo(() => new THREE.Vector3(), []);
-  const dragPlane = useMemo(() => new THREE.Plane(), []);
-  const startQuat = useMemo(() => quatFromEuler(startRotation), [startRotation]);
-  const seatedQuat = useMemo(() => quatFromEuler(seatedRotation), [seatedRotation]);
-
-  useEffect(() => {
-    if (!ref.current) return;
-
-    if (installed) {
-      ref.current.position.copy(seatedPosition);
-      ref.current.quaternion.copy(seatedQuat);
-    } else {
-      ref.current.position.copy(startPosition);
-      ref.current.quaternion.copy(startQuat);
-    }
-
-    if (typeof lockX === "number") ref.current.position.x = lockX;
-    if (typeof lockY === "number") ref.current.position.y = lockY;
-  }, [installed, seatedPosition, seatedQuat, startPosition, startQuat, lockX, lockY]);
-
-  useEffect(() => {
-    const move = (e) => {
-      const rect = gl.domElement.getBoundingClientRect();
-      mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-      mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-    };
-    gl.domElement.addEventListener("pointermove", move);
-    return () => gl.domElement.removeEventListener("pointermove", move);
-  }, [gl, mouse]);
-
-  useEffect(() => {
-    const prevent = (e) => e.preventDefault();
-    gl.domElement.addEventListener("contextmenu", prevent);
-    return () => gl.domElement.removeEventListener("contextmenu", prevent);
-  }, [gl]);
-
-  useEffect(() => {
-    const onDown = (e) => {
-      if (!active || installed || e.button !== 0 || !ref.current) return;
-
-      const rect = gl.domElement.getBoundingClientRect();
-      mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-      mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-
-      if (!dragging) {
-        const normal = new THREE.Vector3();
-        camera.getWorldDirection(normal);
-        dragPlane.setFromNormalAndCoplanarPoint(normal, ref.current.position);
-
-        raycaster.setFromCamera(mouse, camera);
-        if (raycaster.ray.intersectPlane(dragPlane, hitPoint)) {
-          dragOffset.current.copy(ref.current.position).sub(hitPoint);
-        }
-
-        setDragging(true);
-        document.body.style.cursor = "grabbing";
-      } else {
-        setDragging(false);
-        document.body.style.cursor = "default";
-      }
-    };
-
-    gl.domElement.addEventListener("pointerdown", onDown);
-    return () => gl.domElement.removeEventListener("pointerdown", onDown);
-  }, [active, installed, dragging, gl, camera, mouse, raycaster, hitPoint, dragPlane]);
-
-  useFrame(() => {
-    if (!ref.current) return;
-
-    if (installed) {
-      ref.current.position.lerp(seatedPosition, 0.22);
-      ref.current.quaternion.slerp(seatedQuat, 0.22);
-      if (typeof lockX === "number") ref.current.position.x = lockX;
-      if (typeof lockY === "number") ref.current.position.y = lockY;
-      setDistance(null);
-    } else if (active) {
-      if (dragging) {
-        raycaster.setFromCamera(mouse, camera);
-        if (raycaster.ray.intersectPlane(dragPlane, hitPoint)) {
-          const target = hitPoint.clone().add(dragOffset.current);
-          if (typeof lockX === "number") target.x = lockX;
-          if (typeof lockY === "number") target.y = lockY;
-          ref.current.position.lerp(target, 0.28);
-        }
-      }
-
-      if (typeof lockX === "number") ref.current.position.x = lockX;
-      if (typeof lockY === "number") ref.current.position.y = lockY;
-
-      const dist = ref.current.position.distanceTo(seatedPosition);
-      setDistance(dragging ? dist : null);
-
-      if (dist < MAGNET_DISTANCE) {
-        const t = 1 - dist / MAGNET_DISTANCE;
-        const pull = MAGNET_STRENGTH * (t * t + 0.2);
-        ref.current.position.lerp(seatedPosition, pull);
-
-        if (typeof lockX === "number") ref.current.position.x = lockX;
-        if (typeof lockY === "number") ref.current.position.y = lockY;
-
-        if (dist < SNAP_DISTANCE) {
-          setDragging(false);
-          document.body.style.cursor = "default";
-          onInstalled();
-        }
-      }
-    }
-
-    const world = new THREE.Vector3();
-    ref.current.getWorldPosition(world);
-    setPos({ x: world.x, y: world.y, z: world.z });
-  });
-
-  if (installed || !active) return null;
-
-  return (
-    <group ref={ref}>
-      <primitive object={clone} />
-      <Html position={htmlPosition} center>
-        <div
-          style={{
-            padding: "8px 10px",
-            borderRadius: 12,
-            background: "rgba(10,14,22,.72)",
-            border: "1px solid rgba(140,255,230,.22)",
-            backdropFilter: "blur(8px)",
-            color: "rgba(234,240,255,.95)",
-            fontSize: 12,
-            fontFamily: "monospace",
-            textAlign: "center",
-            minWidth: 160,
-          }}
-        >
-          <div style={{ fontWeight: "bold", marginBottom: 4 }}>{label}</div>
-          <div style={{ fontSize: 10, opacity: 0.7, marginBottom: 6 }}>{subtitle}</div>
-          <div>{dragging ? `Dragging ${label}` : "Click to Grab"}</div>
-          <div style={{ marginTop: 6 }}>────────</div>
-          <div>x: {pos.x.toFixed(2)}</div>
-          <div>y: {pos.y.toFixed(2)}</div>
-          <div>z: {pos.z.toFixed(2)}</div>
-          {distance !== null && <div style={{ marginTop: 4 }}>d: {distance.toFixed(2)}</div>}
-        </div>
-      </Html>
-    </group>
-  );
-}
-
-/** ================= MOTHERBOARD ASSEMBLY TO CASE ================= */
-function MotherboardAssemblyDraggable({ active, installed, onInstalled }) {
-  const mb = useGLTF(MB_URL);
-  const cpu = useGLTF(CPU_URL);
-  const ram = useGLTF(RAM_URL);
-  const ssd = useGLTF(SSD_URL);
-
-  const ref = useRef();
-  const { camera, gl } = useThree();
-
-  const [dragging, setDragging] = useState(false);
-  const [pos, setPos] = useState({ x: 0, y: 0, z: 0 });
-  const [distance, setDistance] = useState(null);
-
-  const dragOffset = useRef(new THREE.Vector3());
-  const raycaster = useMemo(() => new THREE.Raycaster(), []);
-  const mouse = useMemo(() => new THREE.Vector2(), []);
-  const hitPoint = useMemo(() => new THREE.Vector3(), []);
-  const dragPlane = useMemo(() => new THREE.Plane(), []);
-  const keys = useRef({ w: false, s: false });
-  const zControl = useRef(MB_ASSEMBLY_START_POSITION.z);
-
-  const startQuat = useMemo(() => quatFromEuler(MB_ROTATION), []);
-  const seatedQuat = useMemo(() => quatFromEuler(MB_ROTATION), []);
-
-  const assembly = useMemo(() => {
-    const root = new THREE.Group();
-
-    root.add(cloneWithShadows(mb.scene));
-
-    const cpuClone = cloneWithShadows(cpu.scene);
-    cpuClone.position.copy(CPU_LOCAL.position);
-    cpuClone.quaternion.copy(CPU_LOCAL.quaternion);
-    root.add(cpuClone);
-
-    const ramClone = cloneWithShadows(ram.scene);
-    ramClone.position.copy(RAM_LOCAL.position);
-    ramClone.quaternion.copy(RAM_LOCAL.quaternion);
-    root.add(ramClone);
-
-    const ssdClone = cloneWithShadows(ssd.scene);
-    ssdClone.position.copy(SSD_LOCAL.position);
-    ssdClone.quaternion.copy(SSD_LOCAL.quaternion);
-    root.add(ssdClone);
-
-    return root;
-  }, [mb.scene, cpu.scene, ram.scene, ssd.scene]);
-
-  useEffect(() => {
-    if (!ref.current) return;
-
-    if (installed) {
-      ref.current.position.copy(MB_SEATED_POSITION);
-      ref.current.quaternion.copy(seatedQuat);
-    } else {
-      ref.current.position.copy(MB_ASSEMBLY_START_POSITION);
-      ref.current.quaternion.copy(startQuat);
-      ref.current.position.y = -12;
-      zControl.current = MB_ASSEMBLY_START_POSITION.z;
-    }
-  }, [installed, seatedQuat, startQuat]);
-
-  useEffect(() => {
-    const move = (e) => {
-      const rect = gl.domElement.getBoundingClientRect();
-      mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-      mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-    };
-    gl.domElement.addEventListener("pointermove", move);
-    return () => gl.domElement.removeEventListener("pointermove", move);
-  }, [gl, mouse]);
-
-  useEffect(() => {
-    const onKeyDown = (e) => {
-      if (!active || installed) return;
-      if (e.key === "w" || e.key === "W") keys.current.w = true;
-      if (e.key === "s" || e.key === "S") keys.current.s = true;
-    };
-
-    const onKeyUp = (e) => {
-      if (e.key === "w" || e.key === "W") keys.current.w = false;
-      if (e.key === "s" || e.key === "S") keys.current.s = false;
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    window.addEventListener("keyup", onKeyUp);
-
-    return () => {
-      window.removeEventListener("keydown", onKeyDown);
-      window.removeEventListener("keyup", onKeyUp);
-    };
-  }, [active, installed]);
-
-  useEffect(() => {
-    const prevent = (e) => e.preventDefault();
-    gl.domElement.addEventListener("contextmenu", prevent);
-    return () => gl.domElement.removeEventListener("contextmenu", prevent);
-  }, [gl]);
-
-  useEffect(() => {
-    const onDown = (e) => {
-      if (!active || installed || e.button !== 0 || !ref.current) return;
-
-      const rect = gl.domElement.getBoundingClientRect();
-      mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-      mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-
-      if (!dragging) {
-        const normal = new THREE.Vector3();
-        camera.getWorldDirection(normal);
-        dragPlane.setFromNormalAndCoplanarPoint(normal, ref.current.position);
-
-        raycaster.setFromCamera(mouse, camera);
-        if (raycaster.ray.intersectPlane(dragPlane, hitPoint)) {
-          dragOffset.current.copy(ref.current.position).sub(hitPoint);
-        }
-
-        setDragging(true);
-        document.body.style.cursor = "grabbing";
-      } else {
-        setDragging(false);
-        document.body.style.cursor = "default";
-      }
-    };
-
-    gl.domElement.addEventListener("pointerdown", onDown);
-    return () => gl.domElement.removeEventListener("pointerdown", onDown);
-  }, [active, installed, dragging, gl, camera, mouse, raycaster, hitPoint, dragPlane]);
-
-  useFrame(() => {
-    if (!ref.current) return;
-
-    if (!installed && active) {
-      if (keys.current.w) zControl.current -= 0.16;
-      if (keys.current.s) zControl.current += 0.16;
-      zControl.current = THREE.MathUtils.clamp(zControl.current, MB_SEATED_POSITION.z - 1, 26);
-    }
-
-    if (installed) {
-      ref.current.position.lerp(MB_SEATED_POSITION, 0.22);
-      ref.current.quaternion.slerp(seatedQuat, 0.22);
-      setDistance(null);
-    } else if (active) {
-      if (dragging) {
-        raycaster.setFromCamera(mouse, camera);
-        if (raycaster.ray.intersectPlane(dragPlane, hitPoint)) {
-          const target = hitPoint.clone().add(dragOffset.current);
-          target.x = -0.6;
-          target.y = -12;
-          target.z = zControl.current;
-          ref.current.position.lerp(target, 0.28);
-        }
-      }
-
-      ref.current.position.x = -0.6;
-      ref.current.position.y = -12;
-      ref.current.position.z = THREE.MathUtils.lerp(ref.current.position.z, zControl.current, 0.25);
-
-      const dist = ref.current.position.distanceTo(MB_SEATED_POSITION);
-      setDistance(dragging ? dist : null);
-
-      if (dist < MAGNET_DISTANCE) {
-        const t = 1 - dist / MAGNET_DISTANCE;
-        const pull = MAGNET_STRENGTH * (t * t + 0.2);
-        ref.current.position.lerp(MB_SEATED_POSITION, pull);
-        ref.current.position.x = -0.6;
-        ref.current.position.y = -12;
-        zControl.current = ref.current.position.z;
-
-        if (dist < SNAP_DISTANCE) {
-          setDragging(false);
-          document.body.style.cursor = "default";
-          onInstalled();
-        }
-      }
-    }
-
-    const world = new THREE.Vector3();
-    ref.current.getWorldPosition(world);
-    setPos({ x: world.x, y: world.y, z: world.z });
-  });
-
-  if (installed || !active) return null;
-
-  return (
-    <group ref={ref}>
-      <primitive object={assembly} />
-      <Html position={[0, 2.2, 0]} center>
-        <div
-          style={{
-            padding: "8px 10px",
-            borderRadius: 12,
-            background: "rgba(10,14,22,.72)",
-            border: "1px solid rgba(140,255,230,.22)",
-            backdropFilter: "blur(8px)",
-            color: "rgba(234,240,255,.95)",
-            fontSize: 12,
-            fontFamily: "monospace",
-            textAlign: "center",
-            minWidth: 180,
-          }}
-        >
-          <div style={{ fontWeight: "bold", marginBottom: 4 }}>Motherboard Assembly</div>
-          <div style={{ fontSize: 10, opacity: 0.7, marginBottom: 6 }}>
-            Drag with mouse, hold W/S to move in and out
-          </div>
-          <div>{dragging ? "Dragging Assembly" : "Click to Grab"}</div>
-          <div style={{ marginTop: 6 }}>────────</div>
-          <div>x: {pos.x.toFixed(2)}</div>
-          <div>y: {pos.y.toFixed(2)}</div>
-          <div>z: {pos.z.toFixed(2)}</div>
-          {distance !== null && <div style={{ marginTop: 4 }}>d: {distance.toFixed(2)}</div>}
-        </div>
-      </Html>
-    </group>
-  );
-}
-
-/** ================= MAIN FLOW ================= */
-function BuildFlowScene() {
-  const [installed, setInstalled] = useState({
+  const [placed, setPlaced] = useState({
     cpu: false,
     ram: false,
     ssd: false,
-    motherboard: false,
+    mb: false,
     hdd: false,
     psu: false,
   });
 
-  const step = !installed.cpu
-    ? "cpu"
-    : !installed.ram
-    ? "ram"
-    : !installed.ssd
-    ? "ssd"
-    : !installed.motherboard
-    ? "motherboard"
-    : !installed.hdd
-    ? "hdd"
-    : !installed.psu
-    ? "psu"
-    : "done";
+  const currentStep = getCurrentStep(placed);
+  const complete = currentStep === "complete";
 
-  const resetAll = () => {
-    setInstalled({
-      cpu: false,
-      ram: false,
-      ssd: false,
-      motherboard: false,
-      hdd: false,
-      psu: false,
-    });
-    document.body.style.cursor = "default";
-  };
+  useEffect(() => {
+    camera.position.set(...CAMERA_POSITION);
+    camera.lookAt(...CONTROL_TARGET);
+  }, [camera]);
+
+  const markPlaced = useCallback((id) => {
+    setPlaced((prev) => ({ ...prev, [id]: true }));
+  }, []);
+
+  const cpuActive = currentStep === "cpu";
+  const ramActive = currentStep === "ram";
+  const ssdActive = currentStep === "ssd";
+  const mbActive = currentStep === "mb";
+  const hddActive = currentStep === "hdd";
+  const psuActive = currentStep === "psu";
+
+  const showWorkbenchMotherboard = !placed.mb && !mbActive;
+  const showMotherboardAssemblyDraggable = mbActive;
+  const showInstalledMotherboardAssembly = placed.mb && !mbActive;
 
   return (
     <>
-      <GuidePanel step={step} installed={installed} onReset={resetAll} />
+      <color attach="background" args={["#05080D"]} />
 
-      <Canvas
-        shadows
-        style={{ width: "100%", height: "100%" }}
-        camera={{ position: [0, 10, 24], fov: 50 }}
-      >
-        <CameraController step={step} />
+      <ambientLight intensity={0.55} />
 
-        <color attach="background" args={["#05080D"]} />
-        <ambientLight intensity={0.45} />
-        <directionalLight
-          position={[4, 8, 4]}
-          intensity={1.35}
-          castShadow
-          shadow-mapSize={[2048, 2048]}
-        />
-        <pointLight position={[-3, 1.5, -2]} intensity={0.65} />
-        <Environment preset="city" />
+      <directionalLight
+        position={[6, 10, 6]}
+        intensity={1.4}
+        castShadow
+        shadow-mapSize={[2048, 2048]}
+      />
 
-        {(step === "cpu" || step === "ram" || step === "ssd") && <MotherboardBase />}
+      <pointLight position={[-3, 2, -2]} intensity={0.7} />
 
-        {installed.cpu && !installed.motherboard && step !== "motherboard" && (
-          <StaticModel url={CPU_URL} position={CPU_SEATED_POSITION} rotation={CPU_ROTATION} />
-        )}
-        {installed.ram && !installed.motherboard && step !== "motherboard" && (
-          <StaticModel url={RAM_URL} position={RAM_SEATED_POSITION} rotation={RAM_ROTATION} />
-        )}
-        {installed.ssd && !installed.motherboard && step !== "motherboard" && (
-          <StaticModel url={SSD_URL} position={SSD_SEATED_POSITION} rotation={SSD_ROTATION} />
-        )}
+      <Environment preset="city" />
 
-        {(step === "motherboard" ||
-          installed.motherboard ||
-          step === "hdd" ||
-          step === "psu" ||
-          step === "done") && <PCCase />}
+      <WorkBoard />
 
-        {(installed.motherboard || step === "hdd" || step === "psu" || step === "done") && (
-          <SeatedMotherboardAssembly />
-        )}
+      <ComputerCase />
 
-        {(installed.hdd || step === "psu" || step === "done") && (
-          <StaticModel url={HDD_URL} position={HDD_SEATED_POSITION} rotation={HDD_ROTATION} />
-        )}
+      {showWorkbenchMotherboard && <StaticMotherboard />}
 
-        {(installed.psu || step === "done") && (
-          <StaticModel url={PSU_URL} position={PSU_SEATED_POSITION} rotation={PSU_ROTATION} />
-        )}
+      {!placed.mb && !mbActive && (
+        <>
+          <FlatTarget
+            placed={!cpuActive || placed.cpu}
+            position={CPU_HIGHLIGHT_POSITION}
+            color={CPU_COLOR}
+            label="Target: CPU socket"
+            size={[1.75, 1.75]}
+          />
 
-        <DragToTarget
-          url={CPU_URL}
-          active={step === "cpu"}
-          installed={installed.cpu}
-          onInstalled={() => setInstalled((p) => ({ ...p, cpu: true }))}
-          startPosition={CPU_START_POSITION}
-          seatedPosition={CPU_SEATED_POSITION}
-          startRotation={CPU_ROTATION}
-          seatedRotation={CPU_ROTATION}
-          label="CPU"
-          subtitle="Install onto motherboard"
-          htmlPosition={[0, 1.8, 0]}
-        />
+          <FlatTarget
+            placed={!ramActive || placed.ram}
+            position={RAM_HIGHLIGHT_POSITION}
+            color={RAM_COLOR}
+            label="Target: RAM slot"
+            size={[0.65, 3.25]}
+          />
 
-        <DragToTarget
-          url={RAM_URL}
-          active={step === "ram"}
-          installed={installed.ram}
-          onInstalled={() => setInstalled((p) => ({ ...p, ram: true }))}
-          startPosition={RAM_START_POSITION}
-          seatedPosition={RAM_SEATED_POSITION}
-          startRotation={RAM_ROTATION}
-          seatedRotation={RAM_ROTATION}
-          label="RAM"
-          subtitle="Install onto motherboard"
-          htmlPosition={[0, 1.8, 0]}
-        />
+          <FlatTarget
+            placed={!ssdActive || placed.ssd}
+            position={SSD_HIGHLIGHT_POSITION}
+            color={SSD_COLOR}
+            label="Target: SSD slot"
+            size={[1.6, 2.35]}
+          />
 
-        <DragToTarget
-          url={SSD_URL}
-          active={step === "ssd"}
-          installed={installed.ssd}
-          onInstalled={() => setInstalled((p) => ({ ...p, ssd: true }))}
-          startPosition={SSD_START_POSITION}
-          seatedPosition={SSD_SEATED_POSITION}
-          startRotation={SSD_ROTATION}
-          seatedRotation={SSD_ROTATION}
-          label="SSD"
-          subtitle="Install onto motherboard"
-          htmlPosition={[0, 1.8, 0]}
-        />
+          <PlaneSnapDraggable
+            id="cpu"
+            label="CPU"
+            url={CPU_URL}
+            color={CPU_COLOR}
+            active={cpuActive}
+            unlocked={isStepUnlocked("cpu", placed)}
+            placed={placed.cpu}
+            startPosition={CPU_START_POSITION}
+            startRotation={CPU_START_ROTATION}
+            targetPosition={CPU_SEATED_POSITION}
+            targetRotation={CPU_TARGET_ROTATION}
+            yLock={CPU_DRAG_Y_LOCK}
+            onPlaced={() => markPlaced("cpu")}
+          />
 
-        <MotherboardAssemblyDraggable
-          active={step === "motherboard"}
-          installed={installed.motherboard}
-          onInstalled={() => setInstalled((p) => ({ ...p, motherboard: true }))}
-        />
+          <PlaneSnapDraggable
+            id="ram"
+            label="RAM"
+            url={RAM_URL}
+            color={RAM_COLOR}
+            active={ramActive}
+            unlocked={isStepUnlocked("ram", placed)}
+            placed={placed.ram}
+            startPosition={RAM_START_POSITION}
+            startRotation={RAM_START_ROTATION}
+            targetPosition={RAM_SEATED_POSITION}
+            targetRotation={RAM_TARGET_ROTATION}
+            yLock={RAM_DRAG_Y_LOCK}
+            onPlaced={() => markPlaced("ram")}
+          />
 
-        <DragToTarget
-          url={HDD_URL}
-          active={step === "hdd"}
-          installed={installed.hdd}
-          onInstalled={() => setInstalled((p) => ({ ...p, hdd: true }))}
-          startPosition={HDD_START_POSITION}
-          seatedPosition={HDD_SEATED_POSITION}
-          startRotation={HDD_ROTATION}
-          seatedRotation={HDD_ROTATION}
-          label="HDD"
-          subtitle="Install into case"
-          htmlPosition={[-10, 2.4, 0]}
-          lockX={HDD_LOCK_X}
-          lockY={HDD_LOCK_Y}
-        />
+          <PlaneSnapDraggable
+            id="ssd"
+            label="SSD"
+            url={SSD_URL}
+            color={SSD_COLOR}
+            active={ssdActive}
+            unlocked={isStepUnlocked("ssd", placed)}
+            placed={placed.ssd}
+            startPosition={SSD_START_POSITION}
+            startRotation={SSD_START_ROTATION}
+            targetPosition={SSD_SEATED_POSITION}
+            targetRotation={SSD_TARGET_ROTATION}
+            yLock={SSD_DRAG_Y_LOCK}
+            onPlaced={() => markPlaced("ssd")}
+          />
+        </>
+      )}
 
-        <DragToTarget
-          url={PSU_URL}
-          active={step === "psu"}
-          installed={installed.psu}
-          onInstalled={() => setInstalled((p) => ({ ...p, psu: true }))}
-          startPosition={PSU_START_POSITION}
-          seatedPosition={PSU_SEATED_POSITION}
-          startRotation={PSU_ROTATION}
-          seatedRotation={PSU_ROTATION}
-          label="PSU"
-          subtitle="Install into case"
-          htmlPosition={[0, 2, 0]}
-          lockX={PSU_LOCK_X}
-          lockY={PSU_LOCK_Y}
-        />
+      {showMotherboardAssemblyDraggable && (
+        <>
+          <FlatTarget
+            placed={placed.mb}
+            position={MB_CASE_HIGHLIGHT_POSITION}
+            color={MB_COLOR}
+            label="Target: motherboard standoffs"
+            size={[5.4, 7.4]}
+          />
 
-        {step === "done" && (
-          <Html center position={[0, 6, 0]}>
-            <div
-              style={{
-                padding: "10px 14px",
-                borderRadius: 18,
-                background: "rgba(8,12,20,.68)",
-                border: "1px solid rgba(120,255,220,.18)",
-                color: "rgba(240,245,255,.96)",
-                backdropFilter: "blur(8px)",
-                fontFamily: "Inter, system-ui, sans-serif",
-                textAlign: "center",
-              }}
-            >
-              <div style={{ fontSize: 18, fontWeight: 700 }}>Computer Build Complete</div>
-              <div style={{ fontSize: 13, opacity: 0.82, marginTop: 4 }}>
-                You can orbit around the finished PC.
-              </div>
-            </div>
-          </Html>
-        )}
+          <MotherboardAssemblyToCase
+            active={mbActive}
+            unlocked={isStepUnlocked("mb", placed)}
+            placed={placed.mb}
+            onPlaced={() => markPlaced("mb")}
+          />
+        </>
+      )}
 
-        <ContactShadows
-          position={[0, -0.02, 0]}
-          opacity={0.35}
-          scale={14}
-          blur={2.8}
-          far={6}
-        />
+      {showInstalledMotherboardAssembly && <StaticInstalledMotherboardAssembly />}
 
-        <OrbitControls
-          makeDefault
-          enablePan={false}
-          minDistance={12}
-          maxDistance={40}
-          target={[0, -8, 0]}
-          maxPolarAngle={Math.PI / 2}
-          mouseButtons={{
-            LEFT: null,
-            MIDDLE: THREE.MOUSE.DOLLY,
-            RIGHT: THREE.MOUSE.ROTATE,
-          }}
-        />
-      </Canvas>
+      <InsertTransitionDraggable
+        id="hdd"
+        label="HDD"
+        url={HDD_URL}
+        color={HDD_COLOR}
+        active={hddActive}
+        unlocked={isStepUnlocked("hdd", placed)}
+        placed={placed.hdd}
+        startPosition={HDD_START_POSITION}
+        startRotation={HDD_START_ROTATION}
+        yLock={HDD_DRAG_Y_LOCK}
+        insertReadyPosition={HDD_INSERT_READY_POSITION}
+        insertReadyRotation={HDD_INSERT_READY_ROTATION}
+        seatedPosition={HDD_SEATED_POSITION}
+        seatedRotation={HDD_SEATED_ROTATION}
+        clearancePosition={HDD_CLEARANCE_POSITION}
+        highlightPosition={HDD_TARGET_HIGHLIGHT_POSITION}
+        transitionSpeed={HDD_INSERT_TRANSITION_SPEED}
+        highlightSize={[3.2, 4.2]}
+        targetLabel="Target: HDD insert point"
+        onPlaced={() => markPlaced("hdd")}
+      />
+
+      <InsertTransitionDraggable
+        id="psu"
+        label="PSU"
+        url={PSU_URL}
+        color={PSU_COLOR}
+        active={psuActive}
+        unlocked={isStepUnlocked("psu", placed)}
+        placed={placed.psu}
+        startPosition={PSU_START_POSITION}
+        startRotation={PSU_START_ROTATION}
+        yLock={PSU_DRAG_Y_LOCK}
+        insertReadyPosition={PSU_INSERT_READY_POSITION}
+        insertReadyRotation={PSU_INSERT_READY_ROTATION}
+        seatedPosition={PSU_SEATED_POSITION}
+        seatedRotation={PSU_SEATED_ROTATION}
+        clearancePosition={PSU_CLEARANCE_POSITION}
+        highlightPosition={PSU_TARGET_HIGHLIGHT_POSITION}
+        transitionSpeed={PSU_INSERT_TRANSITION_SPEED}
+        highlightSize={[4.2, 4.2]}
+        targetLabel="Target: PSU insert point"
+        onPlaced={() => markPlaced("psu")}
+      />
+
+      <InstructionPanel
+        currentStep={currentStep}
+        placed={placed}
+        complete={complete}
+      />
+
+      <ContactShadows
+        position={[BOARD_CENTER_X, BOARD_Y + 0.1, BOARD_CENTER_Z]}
+        opacity={0.38}
+        scale={46}
+        blur={2.8}
+        far={35}
+      />
+
+      <OrbitControls
+        makeDefault
+        enablePan={false}
+        minDistance={14}
+        maxDistance={80}
+        target={CONTROL_TARGET}
+        maxPolarAngle={Math.PI / 2}
+        mouseButtons={{
+          LEFT: null,
+          MIDDLE: THREE.MOUSE.DOLLY,
+          RIGHT: THREE.MOUSE.ROTATE,
+        }}
+      />
     </>
   );
 }
 
-/** ================= EXPORT ================= */
-export default function FullComputerAssemblyScene() {
+function WorkBoard() {
   return (
-    <div style={{ width: "100%", height: "100vh", position: "relative", background: "#05080D" }}>
-      <BuildFlowScene />
+    <group>
+      <mesh
+        position={[BOARD_CENTER_X, BOARD_Y, BOARD_CENTER_Z]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        receiveShadow
+      >
+        <planeGeometry args={[BOARD_SIZE, BOARD_SIZE]} />
+        <meshStandardMaterial color="#f6f7fb" roughness={0.58} metalness={0.02} />
+      </mesh>
+
+      <gridHelper
+        args={[BOARD_SIZE, GRID_DIVISIONS, "#050505", "#050505"]}
+        position={[BOARD_CENTER_X, BOARD_Y + 0.02, BOARD_CENTER_Z]}
+      />
+    </group>
+  );
+}
+
+function ComputerCase() {
+  const { scene } = useGLTF(CASE_URL);
+  const caseClone = useMemo(() => cloneScene(scene, true), [scene]);
+
+  useEffect(() => {
+    setObjectOpacity(caseClone, 1);
+  }, [caseClone]);
+
+  return (
+    <group
+      position={CASE_POSITION}
+      rotation={CASE_ROTATION.toArray()}
+      scale={CASE_SCALE}
+    >
+      <primitive object={caseClone} />
+    </group>
+  );
+}
+
+function StaticMotherboard() {
+  const { scene } = useGLTF(MB_URL);
+  const clone = useMemo(() => cloneScene(scene, true), [scene]);
+
+  useEffect(() => {
+    setObjectOpacity(clone, 1);
+  }, [clone]);
+
+  return (
+    <group position={MB_POSITION} rotation={MB_ROTATION.toArray()} scale={MB_SCALE}>
+      <primitive object={clone} />
+    </group>
+  );
+}
+
+function StaticCPU() {
+  const { scene } = useGLTF(CPU_URL);
+  const clone = useMemo(() => cloneScene(scene, true), [scene]);
+  const quat = useMemo(
+    () => new THREE.Quaternion().setFromEuler(CPU_TARGET_ROTATION),
+    []
+  );
+
+  useEffect(() => {
+    setObjectOpacity(clone, 1);
+  }, [clone]);
+
+  return (
+    <group position={CPU_SEATED_POSITION} quaternion={quat} scale={1}>
+      <primitive object={clone} />
+    </group>
+  );
+}
+
+function StaticRAM() {
+  const { scene } = useGLTF(RAM_URL);
+  const clone = useMemo(() => cloneScene(scene, true), [scene]);
+  const quat = useMemo(
+    () => new THREE.Quaternion().setFromEuler(RAM_TARGET_ROTATION),
+    []
+  );
+
+  useEffect(() => {
+    setObjectOpacity(clone, 1);
+  }, [clone]);
+
+  return (
+    <group position={RAM_SEATED_POSITION} quaternion={quat} scale={1}>
+      <primitive object={clone} />
+    </group>
+  );
+}
+
+function StaticSSD() {
+  const { scene } = useGLTF(SSD_URL);
+  const clone = useMemo(() => cloneScene(scene, true), [scene]);
+  const quat = useMemo(
+    () => new THREE.Quaternion().setFromEuler(SSD_TARGET_ROTATION),
+    []
+  );
+
+  useEffect(() => {
+    setObjectOpacity(clone, 1);
+  }, [clone]);
+
+  return (
+    <group position={SSD_SEATED_POSITION} quaternion={quat} scale={1}>
+      <primitive object={clone} />
+    </group>
+  );
+}
+
+function StaticInstalledMotherboardAssembly() {
+  const assemblyQuat = useMemo(
+    () => new THREE.Quaternion().setFromEuler(MB_ASSEMBLY_CASE_ROTATION),
+    []
+  );
+
+  return (
+    <group position={MB_ASSEMBLY_CASE_TARGET_OFFSET} quaternion={assemblyQuat}>
+      <StaticMotherboard />
+      <StaticCPU />
+      <StaticRAM />
+      <StaticSSD />
+    </group>
+  );
+}
+
+function FlatTarget({ placed, position, color, label, size = [1, 1] }) {
+  const ringRef = useRef();
+  const fillRef = useRef();
+
+  useFrame(({ clock }) => {
+    if (placed) return;
+
+    const t = (Math.sin(clock.getElapsedTime() * 2.5) + 1) / 2;
+
+    if (ringRef.current) {
+      ringRef.current.scale.setScalar(1 + t * 0.12);
+      ringRef.current.material.opacity = 0.5 + t * 0.35;
+    }
+
+    if (fillRef.current) {
+      fillRef.current.material.opacity = 0.14 + t * 0.14;
+    }
+  });
+
+  if (placed) return null;
+
+  return (
+    <group
+      position={[position.x, position.y, position.z]}
+      rotation={[-Math.PI / 2, 0, 0]}
+    >
+      <mesh ref={fillRef}>
+        <planeGeometry args={size} />
+        <meshBasicMaterial
+          color={color}
+          transparent
+          opacity={0.22}
+          depthTest={false}
+        />
+      </mesh>
+
+      <mesh ref={ringRef} position={[0, 0, 0.015]}>
+        <ringGeometry args={[0.45, 0.82, 48]} />
+        <meshBasicMaterial
+          color={color}
+          transparent
+          opacity={0.85}
+          depthTest={false}
+        />
+      </mesh>
+
+      <Html center position={[0, -0.05, 0.03]} style={{ pointerEvents: "none" }}>
+        <div
+          style={{
+            padding: "4px 8px",
+            borderRadius: 999,
+            background: "rgba(10,14,22,.86)",
+            border: `1px solid ${color}aa`,
+            color: "rgba(244,248,255,.95)",
+            fontSize: 10,
+            fontFamily: "monospace",
+            whiteSpace: "nowrap",
+            transform: "translateY(-18px)",
+          }}
+        >
+          {label}
+        </div>
+      </Html>
+    </group>
+  );
+}
+
+function PlaneSnapDraggable({
+  label,
+  url,
+  color,
+  active,
+  unlocked,
+  placed,
+  startPosition,
+  startRotation,
+  targetPosition,
+  targetRotation,
+  yLock,
+  onPlaced,
+}) {
+  const { scene } = useGLTF(url);
+  const { gl, camera } = useThree();
+
+  const partRef = useRef();
+  const mouse = useRef(new THREE.Vector2());
+  const dragOffset = useRef(new THREE.Vector3());
+
+  const [dragging, setDragging] = useState(false);
+  const [snapped, setSnapped] = useState(placed);
+  const [pos, setPos] = useState({
+    x: startPosition.x,
+    y: startPosition.y,
+    z: startPosition.z,
+  });
+
+  const raycaster = useMemo(() => new THREE.Raycaster(), []);
+  const hitPoint = useMemo(() => new THREE.Vector3(), []);
+
+  const dragPlane = useMemo(
+    () => new THREE.Plane(new THREE.Vector3(0, 1, 0), -yLock),
+    [yLock]
+  );
+
+  const clone = useMemo(() => cloneScene(scene, true), [scene]);
+
+  const startQuat = useMemo(
+    () => new THREE.Quaternion().setFromEuler(startRotation),
+    [startRotation]
+  );
+
+  const targetQuat = useMemo(
+    () => new THREE.Quaternion().setFromEuler(targetRotation),
+    [targetRotation]
+  );
+
+  useEffect(() => {
+    if (!partRef.current) return;
+
+    if (placed) {
+      partRef.current.position.copy(targetPosition);
+      partRef.current.quaternion.copy(targetQuat);
+      setSnapped(true);
+      setDragging(false);
+    } else {
+      partRef.current.position.copy(startPosition);
+      partRef.current.quaternion.copy(startQuat);
+      setSnapped(false);
+      setDragging(false);
+    }
+
+    partRef.current.scale.setScalar(1);
+    setObjectOpacity(partRef.current, 1);
+  }, [placed, startPosition, targetPosition, startQuat, targetQuat]);
+
+  const updateMouse = useCallback(
+    (e) => {
+      const rect = gl.domElement.getBoundingClientRect();
+
+      mouse.current.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.current.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    },
+    [gl]
+  );
+
+  const isPointerOverPart = useCallback(() => {
+    if (!partRef.current) return false;
+
+    raycaster.setFromCamera(mouse.current, camera);
+    return raycaster.intersectObject(partRef.current, true).length > 0;
+  }, [camera, raycaster]);
+
+  const moveToTarget = useCallback(() => {
+    if (!partRef.current) return;
+
+    partRef.current.position.copy(targetPosition);
+    partRef.current.quaternion.copy(targetQuat);
+  }, [targetPosition, targetQuat]);
+
+  useEffect(() => {
+    const handlePointerDown = (e) => {
+      if (
+        e.button !== 0 ||
+        !partRef.current ||
+        !active ||
+        !unlocked ||
+        snapped
+      ) {
+        return;
+      }
+
+      updateMouse(e);
+
+      const hitPart = isPointerOverPart();
+
+      if (!hitPart && !dragging) return;
+
+      if (!dragging) {
+        raycaster.setFromCamera(mouse.current, camera);
+
+        if (raycaster.ray.intersectPlane(dragPlane, hitPoint)) {
+          dragOffset.current.set(
+            partRef.current.position.x - hitPoint.x,
+            0,
+            partRef.current.position.z - hitPoint.z
+          );
+        }
+
+        setDragging(true);
+        document.body.style.cursor = "grabbing";
+      } else {
+        setDragging(false);
+        document.body.style.cursor = "default";
+
+        const dist = new THREE.Vector2(
+          partRef.current.position.x - targetPosition.x,
+          partRef.current.position.z - targetPosition.z
+        ).length();
+
+        if (dist < SNAP_DISTANCE * 1.25) {
+          moveToTarget();
+          setSnapped(true);
+          onPlaced?.();
+        }
+      }
+    };
+
+    gl.domElement.addEventListener("pointerdown", handlePointerDown);
+
+    return () => {
+      gl.domElement.removeEventListener("pointerdown", handlePointerDown);
+    };
+  }, [
+    active,
+    unlocked,
+    camera,
+    dragPlane,
+    dragging,
+    gl,
+    hitPoint,
+    isPointerOverPart,
+    moveToTarget,
+    onPlaced,
+    raycaster,
+    snapped,
+    targetPosition,
+    updateMouse,
+  ]);
+
+  useEffect(() => {
+    const handlePointerMove = (e) => updateMouse(e);
+    const preventContext = (e) => e.preventDefault();
+
+    gl.domElement.addEventListener("pointermove", handlePointerMove);
+    gl.domElement.addEventListener("contextmenu", preventContext);
+
+    return () => {
+      gl.domElement.removeEventListener("pointermove", handlePointerMove);
+      gl.domElement.removeEventListener("contextmenu", preventContext);
+      document.body.style.cursor = "default";
+    };
+  }, [gl, updateMouse]);
+
+  useFrame(() => {
+    if (!partRef.current) return;
+
+    if (snapped) {
+      partRef.current.position.lerp(targetPosition, 0.28);
+      partRef.current.quaternion.slerp(targetQuat, 0.28);
+    } else {
+      partRef.current.quaternion.slerp(active ? targetQuat : startQuat, 0.08);
+
+      if (dragging && active && unlocked) {
+        raycaster.setFromCamera(mouse.current, camera);
+
+        if (raycaster.ray.intersectPlane(dragPlane, hitPoint)) {
+          const targetDragPosition = new THREE.Vector3(
+            hitPoint.x + dragOffset.current.x,
+            yLock,
+            hitPoint.z + dragOffset.current.z
+          );
+
+          partRef.current.position.lerp(targetDragPosition, 0.35);
+        }
+      }
+
+      if (active && unlocked) {
+        partRef.current.position.y = yLock;
+
+        const dist = new THREE.Vector2(
+          partRef.current.position.x - targetPosition.x,
+          partRef.current.position.z - targetPosition.z
+        ).length();
+
+        if (dist < MAGNET_DISTANCE) {
+          const pull = MAGNET_STRENGTH + (1 - dist / MAGNET_DISTANCE) * 0.22;
+
+          const snapTarget = new THREE.Vector3(
+            targetPosition.x,
+            yLock,
+            targetPosition.z
+          );
+
+          partRef.current.position.lerp(snapTarget, pull);
+          partRef.current.quaternion.slerp(targetQuat, pull);
+
+          if (dist < SNAP_DISTANCE) {
+            moveToTarget();
+            setSnapped(true);
+            setDragging(false);
+            document.body.style.cursor = "default";
+            onPlaced?.();
+          }
+        }
+      }
+    }
+
+    const worldPos = new THREE.Vector3();
+    partRef.current.getWorldPosition(worldPos);
+
+    setPos({
+      x: worldPos.x,
+      y: worldPos.y,
+      z: worldPos.z,
+    });
+  });
+
+  return (
+    <group>
+      <group ref={partRef}>
+        <primitive object={clone} />
+      </group>
+
+      {active && !snapped && (
+        <SideStatus
+          label={label}
+          color={color}
+          text={dragging ? `Dragging ${label}` : `Click ${label} to grab`}
+          pos={pos}
+        />
+      )}
+    </group>
+  );
+}
+
+function MotherboardAssemblyToCase({ active, unlocked, placed, onPlaced }) {
+  const { gl, camera } = useThree();
+
+  const assemblyRef = useRef();
+  const mouse = useRef(new THREE.Vector2());
+  const dragOffset = useRef(new THREE.Vector3());
+
+  const transitionStartPosition = useRef(new THREE.Vector3());
+  const transitionStartQuaternion = useRef(new THREE.Quaternion());
+  const transitionProgress = useRef(0);
+
+  const [phase, setPhase] = useState(placed ? "snapped" : "idle");
+  const [snapped, setSnapped] = useState(placed);
+  const [pos, setPos] = useState({
+    x: MB_ASSEMBLY_START_OFFSET.x,
+    y: MB_ASSEMBLY_START_OFFSET.y,
+    z: MB_ASSEMBLY_START_OFFSET.z,
+  });
+
+  const raycaster = useMemo(() => new THREE.Raycaster(), []);
+  const hitPoint = useMemo(() => new THREE.Vector3(), []);
+
+  const dragPlane = useMemo(
+    () => new THREE.Plane(new THREE.Vector3(0, 1, 0), -MB_DRAG_Y_LOCK),
+    []
+  );
+
+  const startQuat = useMemo(
+    () => new THREE.Quaternion().setFromEuler(MB_ASSEMBLY_START_ROTATION),
+    []
+  );
+
+  const frontQuat = useMemo(
+    () => new THREE.Quaternion().setFromEuler(MB_ASSEMBLY_FRONT_ROTATION),
+    []
+  );
+
+  const caseQuat = useMemo(
+    () => new THREE.Quaternion().setFromEuler(MB_ASSEMBLY_CASE_ROTATION),
+    []
+  );
+
+  const updateMouse = useCallback(
+    (e) => {
+      const rect = gl.domElement.getBoundingClientRect();
+
+      mouse.current.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.current.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    },
+    [gl]
+  );
+
+  const isPointerOverAssembly = useCallback(() => {
+    if (!assemblyRef.current) return false;
+
+    raycaster.setFromCamera(mouse.current, camera);
+    return raycaster.intersectObject(assemblyRef.current, true).length > 0;
+  }, [camera, raycaster]);
+
+  const beginFrontTransition = useCallback(() => {
+    if (!assemblyRef.current) return;
+
+    transitionStartPosition.current.copy(assemblyRef.current.position);
+    transitionStartQuaternion.current.copy(assemblyRef.current.quaternion);
+    transitionProgress.current = 0;
+
+    setPhase("floatingToCaseFront");
+  }, []);
+
+  const moveToCaseTarget = useCallback(() => {
+    if (!assemblyRef.current) return;
+
+    assemblyRef.current.position.copy(MB_ASSEMBLY_CASE_TARGET_OFFSET);
+    assemblyRef.current.quaternion.copy(caseQuat);
+  }, [caseQuat]);
+
+  useEffect(() => {
+    if (!assemblyRef.current) return;
+
+    if (placed) {
+      moveToCaseTarget();
+      setSnapped(true);
+      setPhase("snapped");
+    } else {
+      assemblyRef.current.position.copy(MB_ASSEMBLY_START_OFFSET);
+      assemblyRef.current.quaternion.copy(startQuat);
+      setSnapped(false);
+      setPhase("idle");
+    }
+  }, [placed, startQuat, moveToCaseTarget]);
+
+  useEffect(() => {
+    const handlePointerDown = (e) => {
+      if (
+        e.button !== 0 ||
+        !assemblyRef.current ||
+        !active ||
+        !unlocked ||
+        snapped
+      ) {
+        return;
+      }
+
+      updateMouse(e);
+
+      const hitAssembly = isPointerOverAssembly();
+
+      if (!hitAssembly && phase !== "dragging") return;
+
+      if (phase === "idle") {
+        beginFrontTransition();
+        return;
+      }
+
+      if (phase === "floatingToCaseFront") {
+        return;
+      }
+
+      if (phase === "readyToDrag") {
+        raycaster.setFromCamera(mouse.current, camera);
+
+        if (raycaster.ray.intersectPlane(dragPlane, hitPoint)) {
+          dragOffset.current.set(
+            assemblyRef.current.position.x - hitPoint.x,
+            0,
+            assemblyRef.current.position.z - hitPoint.z
+          );
+        }
+
+        setPhase("dragging");
+        document.body.style.cursor = "grabbing";
+        return;
+      }
+
+      if (phase === "dragging") {
+        setPhase("readyToDrag");
+        document.body.style.cursor = "default";
+
+        const dist = new THREE.Vector2(
+          assemblyRef.current.position.x - MB_ASSEMBLY_CASE_TARGET_OFFSET.x,
+          assemblyRef.current.position.z - MB_ASSEMBLY_CASE_TARGET_OFFSET.z
+        ).length();
+
+        if (dist < MB_CASE_SNAP_DISTANCE * 1.35) {
+          moveToCaseTarget();
+          setSnapped(true);
+          setPhase("snapped");
+          onPlaced?.();
+        }
+      }
+    };
+
+    gl.domElement.addEventListener("pointerdown", handlePointerDown);
+
+    return () => {
+      gl.domElement.removeEventListener("pointerdown", handlePointerDown);
+    };
+  }, [
+    active,
+    unlocked,
+    beginFrontTransition,
+    camera,
+    dragPlane,
+    gl,
+    hitPoint,
+    isPointerOverAssembly,
+    moveToCaseTarget,
+    onPlaced,
+    phase,
+    raycaster,
+    snapped,
+    updateMouse,
+  ]);
+
+  useEffect(() => {
+    const handlePointerMove = (e) => updateMouse(e);
+    const preventContext = (e) => e.preventDefault();
+
+    gl.domElement.addEventListener("pointermove", handlePointerMove);
+    gl.domElement.addEventListener("contextmenu", preventContext);
+
+    return () => {
+      gl.domElement.removeEventListener("pointermove", handlePointerMove);
+      gl.domElement.removeEventListener("contextmenu", preventContext);
+      document.body.style.cursor = "default";
+    };
+  }, [gl, updateMouse]);
+
+  useFrame((_, delta) => {
+    if (!assemblyRef.current) return;
+
+    if (phase === "floatingToCaseFront") {
+      transitionProgress.current = Math.min(
+        transitionProgress.current + delta * MB_FLOAT_TRANSITION_SPEED,
+        1
+      );
+
+      const rawT = transitionProgress.current;
+      const eased = easeInOutCubic(rawT);
+
+      const start = transitionStartPosition.current;
+      const liftPoint = new THREE.Vector3(
+        start.x,
+        MB_ASSEMBLY_FLOAT_HEIGHT_Y,
+        start.z
+      );
+
+      const currentPosition = new THREE.Vector3();
+
+      if (rawT < 0.35) {
+        const t = easeOutCubic(rawT / 0.35);
+        currentPosition.lerpVectors(start, liftPoint, t);
+      } else {
+        const t = easeInOutCubic((rawT - 0.35) / 0.65);
+        currentPosition.lerpVectors(
+          liftPoint,
+          MB_ASSEMBLY_FRONT_OF_CASE_OFFSET,
+          t
+        );
+      }
+
+      assemblyRef.current.position.copy(currentPosition);
+
+      assemblyRef.current.quaternion
+        .copy(transitionStartQuaternion.current)
+        .slerp(frontQuat, eased);
+
+      if (transitionProgress.current >= 1) {
+        assemblyRef.current.position.copy(MB_ASSEMBLY_FRONT_OF_CASE_OFFSET);
+        assemblyRef.current.quaternion.copy(frontQuat);
+        setPhase("readyToDrag");
+      }
+    }
+
+    if (phase === "readyToDrag") {
+      assemblyRef.current.quaternion.slerp(frontQuat, 0.12);
+    }
+
+    if (phase === "dragging") {
+      raycaster.setFromCamera(mouse.current, camera);
+
+      if (raycaster.ray.intersectPlane(dragPlane, hitPoint)) {
+        const targetDragPosition = new THREE.Vector3(
+          hitPoint.x + dragOffset.current.x,
+          MB_DRAG_Y_LOCK,
+          hitPoint.z + dragOffset.current.z
+        );
+
+        assemblyRef.current.position.lerp(targetDragPosition, 0.35);
+      }
+
+      assemblyRef.current.position.y = MB_DRAG_Y_LOCK;
+      assemblyRef.current.quaternion.slerp(caseQuat, 0.18);
+
+      const dist = new THREE.Vector2(
+        assemblyRef.current.position.x - MB_ASSEMBLY_CASE_TARGET_OFFSET.x,
+        assemblyRef.current.position.z - MB_ASSEMBLY_CASE_TARGET_OFFSET.z
+      ).length();
+
+      if (dist < MB_CASE_MAGNET_DISTANCE) {
+        const magneticFactor = 1 - dist / MB_CASE_MAGNET_DISTANCE;
+
+        const pull = THREE.MathUtils.clamp(
+          MB_CASE_MAGNET_STRENGTH + magneticFactor * 0.35,
+          0.18,
+          0.62
+        );
+
+        const snapTarget = new THREE.Vector3(
+          MB_ASSEMBLY_CASE_TARGET_OFFSET.x,
+          MB_DRAG_Y_LOCK,
+          MB_ASSEMBLY_CASE_TARGET_OFFSET.z
+        );
+
+        assemblyRef.current.position.lerp(snapTarget, pull);
+        assemblyRef.current.quaternion.slerp(caseQuat, pull);
+
+        if (dist < MB_CASE_SNAP_DISTANCE) {
+          moveToCaseTarget();
+          setSnapped(true);
+          setPhase("snapped");
+          document.body.style.cursor = "default";
+          onPlaced?.();
+        }
+      }
+    }
+
+    if (phase === "snapped") {
+      assemblyRef.current.position.lerp(MB_ASSEMBLY_CASE_TARGET_OFFSET, 0.28);
+      assemblyRef.current.quaternion.slerp(caseQuat, 0.28);
+    }
+
+    const worldPos = new THREE.Vector3();
+    assemblyRef.current.getWorldPosition(worldPos);
+
+    setPos({
+      x: worldPos.x,
+      y: worldPos.y,
+      z: worldPos.z,
+    });
+  });
+
+  const statusText =
+    phase === "idle"
+      ? "Click motherboard assembly to start transition"
+      : phase === "floatingToCaseFront"
+      ? "Floating motherboard assembly to case..."
+      : phase === "readyToDrag"
+      ? "Click motherboard assembly again to grab"
+      : phase === "dragging"
+      ? "Drag motherboard assembly into case"
+      : "Motherboard assembly installed";
+
+  return (
+    <group>
+      <group ref={assemblyRef} position={MB_ASSEMBLY_START_OFFSET}>
+        <StaticMotherboard />
+        <StaticCPU />
+        <StaticRAM />
+        <StaticSSD />
+      </group>
+
+      {active && !snapped && (
+        <SideStatus
+          label="Motherboard Assembly"
+          color={MB_COLOR}
+          text={statusText}
+          pos={pos}
+        />
+      )}
+    </group>
+  );
+}
+
+function InsertTransitionDraggable({
+  label,
+  url,
+  color,
+  active,
+  unlocked,
+  placed,
+  startPosition,
+  startRotation,
+  yLock,
+  insertReadyPosition,
+  insertReadyRotation,
+  seatedPosition,
+  seatedRotation,
+  clearancePosition,
+  highlightPosition,
+  transitionSpeed,
+  highlightSize,
+  targetLabel,
+  onPlaced,
+}) {
+  const { scene } = useGLTF(url);
+  const { gl, camera } = useThree();
+
+  const partRef = useRef();
+  const mouse = useRef(new THREE.Vector2());
+  const dragOffset = useRef(new THREE.Vector3());
+
+  const insertStartPosition = useRef(new THREE.Vector3());
+  const insertStartQuaternion = useRef(new THREE.Quaternion());
+  const insertProgress = useRef(0);
+
+  const [phase, setPhase] = useState(placed ? "snapped" : "readyToDrag");
+  const [pos, setPos] = useState({
+    x: startPosition.x,
+    y: startPosition.y,
+    z: startPosition.z,
+  });
+
+  const raycaster = useMemo(() => new THREE.Raycaster(), []);
+  const hitPoint = useMemo(() => new THREE.Vector3(), []);
+
+  const dragPlane = useMemo(
+    () => new THREE.Plane(new THREE.Vector3(0, 1, 0), -yLock),
+    [yLock]
+  );
+
+  const clone = useMemo(() => cloneScene(scene, true), [scene]);
+
+  const startQuat = useMemo(
+    () => new THREE.Quaternion().setFromEuler(startRotation),
+    [startRotation]
+  );
+
+  const insertReadyQuat = useMemo(
+    () => new THREE.Quaternion().setFromEuler(insertReadyRotation),
+    [insertReadyRotation]
+  );
+
+  const seatedQuat = useMemo(
+    () => new THREE.Quaternion().setFromEuler(seatedRotation),
+    [seatedRotation]
+  );
+
+  useEffect(() => {
+    if (!partRef.current) return;
+
+    if (placed) {
+      partRef.current.position.copy(seatedPosition);
+      partRef.current.quaternion.copy(seatedQuat);
+      setPhase("snapped");
+    } else {
+      partRef.current.position.copy(startPosition);
+      partRef.current.quaternion.copy(startQuat);
+      setPhase("readyToDrag");
+    }
+
+    partRef.current.scale.setScalar(1);
+    setObjectOpacity(partRef.current, 1);
+  }, [placed, seatedPosition, startPosition, seatedQuat, startQuat]);
+
+  const updateMouse = useCallback(
+    (e) => {
+      const rect = gl.domElement.getBoundingClientRect();
+
+      mouse.current.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.current.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    },
+    [gl]
+  );
+
+  const isPointerOverPart = useCallback(() => {
+    if (!partRef.current) return false;
+
+    raycaster.setFromCamera(mouse.current, camera);
+    return raycaster.intersectObject(partRef.current, true).length > 0;
+  }, [camera, raycaster]);
+
+  const beginInsertTransition = useCallback(() => {
+    if (!partRef.current) return;
+
+    insertStartPosition.current.copy(partRef.current.position);
+    insertStartQuaternion.current.copy(partRef.current.quaternion);
+    insertProgress.current = 0;
+
+    setPhase("inserting");
+    document.body.style.cursor = "default";
+  }, []);
+
+  const moveToSeatedPosition = useCallback(() => {
+    if (!partRef.current) return;
+
+    partRef.current.position.copy(seatedPosition);
+    partRef.current.quaternion.copy(seatedQuat);
+  }, [seatedPosition, seatedQuat]);
+
+  useEffect(() => {
+    const handlePointerDown = (e) => {
+      if (
+        e.button !== 0 ||
+        !partRef.current ||
+        !active ||
+        !unlocked ||
+        phase === "snapped" ||
+        phase === "inserting"
+      ) {
+        return;
+      }
+
+      updateMouse(e);
+
+      const hitPart = isPointerOverPart();
+
+      if (!hitPart && phase !== "dragging") return;
+
+      if (phase === "readyToDrag") {
+        partRef.current.position.y = yLock;
+
+        raycaster.setFromCamera(mouse.current, camera);
+
+        if (raycaster.ray.intersectPlane(dragPlane, hitPoint)) {
+          dragOffset.current.set(
+            partRef.current.position.x - hitPoint.x,
+            0,
+            partRef.current.position.z - hitPoint.z
+          );
+        }
+
+        setPhase("dragging");
+        document.body.style.cursor = "grabbing";
+        return;
+      }
+
+      if (phase === "dragging") {
+        setPhase("readyToDrag");
+        document.body.style.cursor = "default";
+
+        const dist = new THREE.Vector2(
+          partRef.current.position.x - insertReadyPosition.x,
+          partRef.current.position.z - insertReadyPosition.z
+        ).length();
+
+        if (dist < INSERT_TRIGGER_DISTANCE * 1.35) {
+          partRef.current.position.copy(insertReadyPosition);
+          partRef.current.quaternion.copy(insertReadyQuat);
+          beginInsertTransition();
+        }
+      }
+    };
+
+    gl.domElement.addEventListener("pointerdown", handlePointerDown);
+
+    return () => {
+      gl.domElement.removeEventListener("pointerdown", handlePointerDown);
+    };
+  }, [
+    active,
+    unlocked,
+    beginInsertTransition,
+    camera,
+    dragPlane,
+    gl,
+    hitPoint,
+    insertReadyPosition,
+    insertReadyQuat,
+    isPointerOverPart,
+    phase,
+    raycaster,
+    updateMouse,
+    yLock,
+  ]);
+
+  useEffect(() => {
+    const handlePointerMove = (e) => updateMouse(e);
+    const preventContext = (e) => e.preventDefault();
+
+    gl.domElement.addEventListener("pointermove", handlePointerMove);
+    gl.domElement.addEventListener("contextmenu", preventContext);
+
+    return () => {
+      gl.domElement.removeEventListener("pointermove", handlePointerMove);
+      gl.domElement.removeEventListener("contextmenu", preventContext);
+      document.body.style.cursor = "default";
+    };
+  }, [gl, updateMouse]);
+
+  useFrame((_, delta) => {
+    if (!partRef.current) return;
+
+    if (phase === "readyToDrag") {
+      partRef.current.quaternion.slerp(active ? insertReadyQuat : startQuat, 0.12);
+    }
+
+    if (phase === "dragging" && active && unlocked) {
+      raycaster.setFromCamera(mouse.current, camera);
+
+      if (raycaster.ray.intersectPlane(dragPlane, hitPoint)) {
+        const targetDragPosition = new THREE.Vector3(
+          hitPoint.x + dragOffset.current.x,
+          yLock,
+          hitPoint.z + dragOffset.current.z
+        );
+
+        partRef.current.position.lerp(targetDragPosition, 0.35);
+      }
+
+      partRef.current.position.y = yLock;
+      partRef.current.quaternion.slerp(insertReadyQuat, 0.16);
+
+      const dist = new THREE.Vector2(
+        partRef.current.position.x - insertReadyPosition.x,
+        partRef.current.position.z - insertReadyPosition.z
+      ).length();
+
+      if (dist < INSERT_TRIGGER_MAGNET_DISTANCE) {
+        const magneticFactor = 1 - dist / INSERT_TRIGGER_MAGNET_DISTANCE;
+
+        const pull = THREE.MathUtils.clamp(
+          INSERT_TRIGGER_MAGNET_STRENGTH + magneticFactor * 0.3,
+          0.14,
+          0.52
+        );
+
+        const triggerTarget = new THREE.Vector3(
+          insertReadyPosition.x,
+          yLock,
+          insertReadyPosition.z
+        );
+
+        partRef.current.position.lerp(triggerTarget, pull);
+        partRef.current.quaternion.slerp(insertReadyQuat, pull);
+
+        if (dist < INSERT_TRIGGER_DISTANCE) {
+          partRef.current.position.copy(insertReadyPosition);
+          partRef.current.quaternion.copy(insertReadyQuat);
+          beginInsertTransition();
+        }
+      }
+    }
+
+    if (phase === "inserting") {
+      insertProgress.current = Math.min(
+        insertProgress.current + delta * transitionSpeed,
+        1
+      );
+
+      const eased = easeInOutCubic(insertProgress.current);
+      const currentPosition = new THREE.Vector3();
+
+      if (eased < 0.5) {
+        const t = easeInOutCubic(eased / 0.5);
+        currentPosition.lerpVectors(
+          insertStartPosition.current,
+          clearancePosition,
+          t
+        );
+      } else {
+        const t = easeInOutCubic((eased - 0.5) / 0.5);
+        currentPosition.lerpVectors(clearancePosition, seatedPosition, t);
+      }
+
+      partRef.current.position.copy(currentPosition);
+
+      partRef.current.quaternion
+        .copy(insertStartQuaternion.current)
+        .slerp(seatedQuat, eased);
+
+      if (insertProgress.current >= 1) {
+        moveToSeatedPosition();
+        setPhase("snapped");
+        onPlaced?.();
+      }
+    }
+
+    if (phase === "snapped") {
+      partRef.current.position.lerp(seatedPosition, 0.28);
+      partRef.current.quaternion.slerp(seatedQuat, 0.28);
+    }
+
+    const worldPos = new THREE.Vector3();
+    partRef.current.getWorldPosition(worldPos);
+
+    setPos({
+      x: worldPos.x,
+      y: worldPos.y,
+      z: worldPos.z,
+    });
+  });
+
+  const statusText =
+    phase === "readyToDrag"
+      ? `Click ${label} to grab`
+      : phase === "dragging"
+      ? `Drag ${label} to insert point`
+      : phase === "inserting"
+      ? `Sliding ${label} into seated position...`
+      : `${label} installed`;
+
+  return (
+    <group>
+      {active && phase !== "snapped" && phase !== "inserting" && (
+        <FlatTarget
+          placed={false}
+          position={highlightPosition}
+          color={color}
+          label={targetLabel}
+          size={highlightSize}
+        />
+      )}
+
+      <group ref={partRef}>
+        <primitive object={clone} />
+      </group>
+
+      {active && phase !== "snapped" && (
+        <SideStatus label={label} color={color} text={statusText} pos={pos} />
+      )}
+    </group>
+  );
+}
+
+function SideStatus({ label, color, text, pos }) {
+  return (
+    <Html fullscreen style={{ pointerEvents: "none" }}>
+      <div
+        style={{
+          position: "absolute",
+          left: 24,
+          bottom: 24,
+          padding: "12px 16px",
+          minWidth: 300,
+          borderRadius: 16,
+          background: "rgba(10,14,22,.78)",
+          border: `1px solid ${color}66`,
+          backdropFilter: "blur(8px)",
+          color: "rgba(234,240,255,.95)",
+          fontSize: 12,
+          fontFamily: "monospace",
+          textAlign: "center",
+          boxShadow: "0 10px 30px rgba(0,0,0,.35)",
+        }}
+      >
+        <div style={{ fontWeight: "bold", marginBottom: 4 }}>{label}</div>
+        <div style={{ marginBottom: 8 }}>{text}</div>
+        <div>x: {pos.x.toFixed(2)}</div>
+        <div>y: {pos.y.toFixed(2)}</div>
+        <div>z: {pos.z.toFixed(2)}</div>
+      </div>
+    </Html>
+  );
+}
+
+function InstructionPanel({ currentStep, placed, complete }) {
+  return (
+    <Html fullscreen style={{ pointerEvents: "none" }}>
+      <div
+        style={{
+          position: "absolute",
+          top: 22,
+          left: 24,
+          padding: "12px 16px",
+          minWidth: 430,
+          borderRadius: 16,
+          background: "rgba(10,14,22,.78)",
+          border: "1px solid rgba(255,255,255,.14)",
+          backdropFilter: "blur(8px)",
+          color: "rgba(234,240,255,.95)",
+          fontSize: 12,
+          fontFamily: "monospace",
+          boxShadow: "0 10px 30px rgba(0,0,0,.35)",
+        }}
+      >
+        <div style={{ fontWeight: "bold", marginBottom: 8 }}>
+          Full PC Assembly
+        </div>
+
+        <div style={{ marginBottom: 10 }}>
+          {complete
+            ? "Assembly complete."
+            : `Current step: ${
+                STEPS.find((step) => step.id === currentStep)?.label || "Done"
+              }`}
+        </div>
+
+        <div style={{ display: "grid", gap: 5 }}>
+          {STEPS.map((step, index) => {
+            const isDone = placed[step.id];
+            const isActive = currentStep === step.id && !isDone;
+
+            return (
+              <StepDot
+                key={step.id}
+                color={step.color}
+                label={`${index + 1}. ${step.label}`}
+                state={isDone ? "done" : isActive ? "active" : "locked"}
+                glow={isActive}
+                muted={!isDone && !isActive}
+              />
+            );
+          })}
+        </div>
+      </div>
+    </Html>
+  );
+}
+
+function StepDot({ color, label, state, glow = false, muted = false }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        opacity: muted ? 0.45 : 1,
+      }}
+    >
+      <span
+        style={{
+          width: 9,
+          height: 9,
+          borderRadius: 999,
+          background: color,
+          display: "inline-block",
+          boxShadow: glow ? `0 0 14px ${color}` : "none",
+        }}
+      />
+      <span>{label}</span>
+      <span style={{ marginLeft: "auto" }}>{state}</span>
     </div>
   );
 }
 
-/** ================= PRELOAD ================= */
-useGLTF.preload(CPU_URL);
+export default function FullAssembly() {
+  return (
+    <Canvas
+      shadows
+      style={{ width: "100%", height: "100%" }}
+      camera={{ position: CAMERA_POSITION, fov: 50 }}
+    >
+      <Scene />
+    </Canvas>
+  );
+}
+
+useGLTF.preload(CASE_URL);
 useGLTF.preload(MB_URL);
+useGLTF.preload(CPU_URL);
 useGLTF.preload(RAM_URL);
 useGLTF.preload(SSD_URL);
 useGLTF.preload(HDD_URL);
 useGLTF.preload(PSU_URL);
-useGLTF.preload(CASE_URL);
