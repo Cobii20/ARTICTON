@@ -39,21 +39,33 @@ export default function App() {
   };
 
   // ✅ central handler for module pages
-  const handleModuleBack = (target) => {
-    if (target === "logout") {
-      handleLogout();
-      return;
-    }
+const handleModuleBack = (target = "Dashboard") => {
+  if (target === "logout") {
+    handleLogout();
+    return;
+  }
 
-    if (target === "Modules") {
-      setDashboardSection("Modules");
-      setPage("dashboard");
-      return;
-    }
-
-    setDashboardSection("Dashboard");
+  if (target === "Modules") {
+    setDashboardSection("Modules");
     setPage("dashboard");
-  };
+    return;
+  }
+
+  if (target === "Profile") {
+    setDashboardSection("Profile");
+    setPage("dashboard");
+    return;
+  }
+
+  if (target === "Practice Tests") {
+    setDashboardSection("Practice Tests");
+    setPage("dashboard");
+    return;
+  }
+
+  setDashboardSection("Dashboard");
+  setPage("dashboard");
+};
 
   if (page === "landing") {
     return <ArtictonLandingPage onLogin={handleLogin} />;

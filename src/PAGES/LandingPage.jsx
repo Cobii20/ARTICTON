@@ -94,7 +94,7 @@ function Navbar({ isHome, onHome, onAbout, onOpenLogin, onSignup }) {
         <img
           src="/PNG/Articton.png"
           alt="Articton Logo"
-          className="h-10 w-10 scale-500 object-contain"
+          className="h-10 w-10 scale-300 object-contain mr-2"
         />
         <h1 className="text-2xl font-bold tracking-wide text-white">Articton</h1>
       </button>

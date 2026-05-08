@@ -495,7 +495,7 @@ function CPUDraggable({ placed, onPlaced }) {
       </group>
 
       {!snapped && (
-        <Html fullscreen style={{ pointerEvents: "none" }}>
+        <Html fullscreen style={{ pointerEvents: "none", overflow: "hidden" }}>
           <div
             style={{
               position: "absolute",

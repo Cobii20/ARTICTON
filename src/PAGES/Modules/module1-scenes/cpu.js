@@ -16,7 +16,7 @@ export const cpuScene = {
         slides: [
           {
             id: "cpu-s1",
-            title: "CPU Disassembly Overview",
+            title: "CPU Overview",
             body:
               "In this module, you’ll explore a CPU package in 3D.\n" +
               "You will identify key external parts before moving into deeper disassembly steps.",

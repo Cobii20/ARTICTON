@@ -1,8 +1,14 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import Settings from "../Components/Settings";
 import { auth, db } from "../firebase.js";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc,updateDoc, serverTimestamp } from "firebase/firestore";
+import {doc,getDoc,updateDoc,serverTimestamp,addDoc,collection,} from "firebase/firestore";
+import {getStorage,ref,uploadBytes,getDownloadURL,} from "firebase/storage";
+
+const storage = getStorage();
+
+export { auth, db, storage };
 
 function getCurrentWeekKey(date = new Date()) {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
@@ -24,6 +30,22 @@ export default function Dashboard({
   const [error, setError] = useState("");
   const [firebaseUser, setFirebaseUser] = useState(null);
   const [profile, setProfile] = useState(null);
+  const [isFaqOpen, setIsFaqOpen] = useState(false);
+  const [isSupportOpen, setIsSupportOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+const [settings, setSettings] = useState({
+  sound: true,
+  animations: true,
+  darkMode: true,
+});
+
+const handleSettingChange = (key, value) => {
+  setSettings((prev) => ({
+    ...prev,
+    [key]: value,
+  }));
+};
 
   useEffect(() => {
     setSection(initialSection);
@@ -103,6 +125,16 @@ export default function Dashboard({
     const module1CompletedParts = module1Progress?.completedParts || {};
     const module1CompletedCount = Object.values(module1CompletedParts).filter(Boolean).length;
 
+    const module2Progress = profile?.moduleProgress?.module2;
+    const module2CompletedSteps = module2Progress?.completedSteps || {};
+    const module2CompletedCount = Object.values(module2CompletedSteps).filter(Boolean).length;
+    const module2TotalSteps = 7;
+
+    const module3Progress = profile?.moduleProgress?.module3;
+  const module3CompletedSteps = module3Progress?.completedSteps || {};
+  const module3CompletedCount = Object.values(module3CompletedSteps).filter(Boolean).length;
+  const module3TotalSteps = 7;
+
     const moduleNames = {
       cpu: "CPU",
       motherboard: "Motherboard",
@@ -130,35 +162,58 @@ export default function Dashboard({
        selectionProgressText: module1Progress
         ? `${module1CompletedCount} of ${module1Progress.totalPages} parts completed`
         : "Start Module",
-        selectionCta: "Start",
+        selectionCta:
+        (module1Progress?.percent || 0) >= 100
+          ? "Review"
+          : (module1Progress?.percent || 0) > 0
+          ? "Continue"
+          : "Start",
         selectionImage: "/PNG/module1.png",
       },
-      {
+     {
         id: "module-2",
         title: "Module 2",
-        subtitle: "Assembly",
-        progress: 40,
-        lessonsCompleted: 2,
-        lessonsTotal: 5,
+        subtitle: module2Progress
+          ? `Step ${(module2Progress.currentStep ?? 0) + 1} • Assembly`
+          : "Assembly",
+        progress: module2Progress?.percent || 0,
+        lessonsCompleted: module2CompletedCount,
+        lessonsTotal: module2TotalSteps,
         lastOpenedAt: Date.now() - 1000 * 60 * 60 * 20,
         selectionTitle: "Assembly",
         selectionModuleNo: "Module 2",
-        selectionProgressText: "Module Progress 1/7 Lessons",
-        selectionCta: "Start",
+        selectionProgressText: module2Progress
+          ? `${module2CompletedCount} of ${module2TotalSteps} steps completed`
+          : "Start Module",
+        selectionCta:
+  (module2Progress?.percent || 0) >= 100
+    ? "Review"
+    : (module2Progress?.percent || 0) > 0
+    ? "Continue"
+    : "Start",
         selectionImage: "/PNG/module2.png",
       },
-      {
+     {
         id: "module-3",
         title: "Module 3",
-        subtitle: "Disassembly",
-        progress: 15,
-        lessonsCompleted: 1,
-        lessonsTotal: 7,
+        subtitle: module3Progress
+          ? `Step ${(module3Progress.currentStep ?? 0) + 1} • Disassembly`
+          : "Disassembly",
+        progress: module3Progress?.percent || 0,
+        lessonsCompleted: module3CompletedCount,
+        lessonsTotal: module3TotalSteps,
         lastOpenedAt: Date.now() - 1000 * 60 * 60 * 36,
         selectionTitle: "Disassembly",
         selectionModuleNo: "Module 3",
-        selectionProgressText: "Module Progress 1/7 Lessons",
-        selectionCta: "Start",
+        selectionProgressText: module3Progress
+          ? `${module3CompletedCount} of ${module3TotalSteps} steps completed`
+          : "Start Module",
+        selectionCta:
+  (module3Progress?.percent || 0) >= 100
+    ? "Review"
+    : (module3Progress?.percent || 0) > 0
+    ? "Continue"
+    : "Start",
         selectionImage: "/PNG/module3.png",
       },
       {
@@ -307,7 +362,7 @@ export default function Dashboard({
                     <button
                       type="button"
                       className="w-full rounded-2xl border border-[#1a2438] bg-white/[0.03] px-4 py-3 text-left text-sm font-semibold text-[#c8d4e6] transition hover:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-[#00ffb4]/25"
-                      onClick={() => go("/faqs")}
+                    onClick={() => setIsFaqOpen(true)}
                     >
                       <div className="flex items-center gap-3">
                         <span className="flex h-10 w-10 items-center justify-center rounded-2xl border border-[#1a2438] bg-[#0d1220]">
@@ -320,7 +375,7 @@ export default function Dashboard({
                     <button
                       type="button"
                       className="w-full rounded-2xl border border-[#1a2438] bg-white/[0.03] px-4 py-3 text-left text-sm font-semibold text-[#c8d4e6] transition hover:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-[#00ffb4]/25"
-                      onClick={() => go("/support")}
+                      onClick={() => setIsSupportOpen(true)}
                     >
                       <div className="flex items-center gap-3">
                         <span className="flex h-10 w-10 items-center justify-center rounded-2xl border border-[#1a2438] bg-[#0d1220]">
@@ -372,7 +427,7 @@ export default function Dashboard({
 
                         <div className="absolute right-0 mt-2 w-48 rounded-2xl border border-[#1a2438] bg-[#0d1220]/98 p-2 shadow-[0_18px_50px_rgba(0,0,0,0.35)] backdrop-blur-xl">
                           <button
-                            onClick={() => go("/settings")}
+                            onClick={() => setIsSettingsOpen(true)}
                             className="w-full rounded-xl px-4 py-2 text-left text-sm text-[#dbe6f5] transition hover:bg-white/5"
                           >
                             Settings
@@ -505,6 +560,18 @@ export default function Dashboard({
           </div>
         </div>
       </div>
+      <FAQModal isOpen={isFaqOpen} onClose={() => setIsFaqOpen(false)} />
+        <CustomerServiceModal
+  isOpen={isSupportOpen}
+  onClose={() => setIsSupportOpen(false)}
+  user={user}
+/>
+<Settings
+  isOpen={isSettingsOpen}
+  onClose={() => setIsSettingsOpen(false)}
+  settings={settings}
+  onChange={handleSettingChange}
+/>
     </div>
   );
 }
@@ -518,6 +585,294 @@ function DashboardBackground() {
       <div className="pointer-events-none absolute left-[14%] top-[8%] h-[58%] w-[2px] animate-pulse bg-[linear-gradient(180deg,transparent,#00ffb4,transparent)] opacity-30" />
       <div className="pointer-events-none absolute right-[20%] top-[6%] h-[62%] w-[2px] animate-pulse bg-[linear-gradient(180deg,transparent,#00b4ff,transparent)] opacity-20" />
     </>
+  );
+}
+function FAQModal({ isOpen, onClose }) {
+  const faqs = [
+    {
+      q: "What is Articton?",
+      a: "Articton is an interactive PC hardware learning system that helps students learn computer parts, assembly, disassembly, and configuration through modules and 3D activities.",
+    },
+    {
+      q: "How do modules work?",
+      a: "Each module contains guided steps. Your progress is tracked as you complete lessons or activities, so you can continue where you left off.",
+    },
+    {
+      q: "How is my progress saved?",
+      a: "Progress is saved locally and also synced to Firebase when you are logged in. This allows your dashboard to show completed steps, percentages, and current module status.",
+    },
+    {
+      q: "Why is my module showing Continue instead of Start?",
+      a: "Continue appears when you already have saved progress for that module. Start appears when you have not started it yet.",
+    },
+    {
+      q: "What does the streak mean?",
+      a: "Your streak shows how many days you have actively used the learning system. It encourages consistent practice.",
+    },
+    {
+      q: "What does time spent mean?",
+      a: "Time spent shows how many minutes you have studied during the current week. This can be used to track learning activity.",
+    },
+    {
+      q: "What should I do if a 3D model does not load?",
+      a: "Refresh the page first. If the issue continues, check your internet connection or contact support so the model path or file can be checked.",
+    },
+    {
+      q: "Can I reset my module progress?",
+      a: "Currently, progress reset depends on the module controls. Some modules include reset options for placements, but full progress reset can be added later.",
+    },
+  ];
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          className="fixed inset-0 z-[999] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          <motion.div
+            initial={{ opacity: 0, y: 18, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 12, scale: 0.97 }}
+            transition={{ duration: 0.18 }}
+            className="w-full max-w-3xl overflow-hidden rounded-[28px] border border-[#1a2438] bg-[#0d1220] shadow-[0_30px_100px_rgba(0,0,0,0.65)]"
+          >
+            <div className="flex items-center justify-between border-b border-[#1a2438] px-6 py-5">
+              <div>
+                <div className="text-lg font-bold text-white">FAQs</div>
+                <div className="text-xs text-[#7a8ba8]">
+                  Common questions about the Articton learning system
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#1a2438] bg-white/[0.03] text-white/70 transition hover:bg-white/[0.06]"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="max-h-[70vh] overflow-y-auto p-6">
+              <div className="space-y-3">
+                {faqs.map((item, index) => (
+                  <details
+                    key={index}
+                    className="group rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4"
+                  >
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-sm font-semibold text-white">
+                      {item.q}
+                      <span className="text-[#7a8ba8] transition group-open:rotate-180">
+                        ▾
+                      </span>
+                    </summary>
+
+                    <p className="mt-3 text-sm leading-relaxed text-[#9fb0c9]">
+                      {item.a}
+                    </p>
+                  </details>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+function CustomerServiceModal({ isOpen, onClose, user }) {
+  const [subject, setSubject] = useState("");
+  const [message, setMessage] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const [screenshot, setScreenshot] = useState(null);
+const [uploading, setUploading] = useState(false);
+
+
+const handleSubmit = async () => {
+  if (!subject.trim() || !message.trim()) return;
+
+  try {
+    setUploading(true);
+
+    let screenshotURL = "";
+
+    // UPLOAD SCREENSHOT
+    if (screenshot) {
+      const fileRef = ref(
+        storage,
+        `supportTickets/${Date.now()}-${screenshot.name}`
+      );
+
+      await uploadBytes(fileRef, screenshot);
+
+      screenshotURL = await getDownloadURL(fileRef);
+    }
+
+    // SAVE TICKET
+    await addDoc(collection(db, "supportTickets"), {
+      name: user.name,
+      email: user.email,
+      subject,
+      message,
+      screenshotURL,
+      status: "open",
+      createdAt: serverTimestamp(),
+    });
+
+    setSubmitted(true);
+
+    setTimeout(() => {
+      setSubmitted(false);
+      setSubject("");
+      setMessage("");
+      setScreenshot(null);
+      onClose();
+    }, 1800);
+  } catch (err) {
+    console.error("Error submitting support ticket:", err);
+  } finally {
+    setUploading(false);
+  }
+};
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          className="fixed inset-0 z-[999] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          <motion.div
+            initial={{ opacity: 0, y: 18, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 12, scale: 0.97 }}
+            transition={{ duration: 0.18 }}
+            className="w-full max-w-2xl overflow-hidden rounded-[28px] border border-[#1a2438] bg-[#0d1220] shadow-[0_30px_100px_rgba(0,0,0,0.65)]"
+          >
+            <div className="flex items-center justify-between border-b border-[#1a2438] px-6 py-5">
+              <div>
+                <div className="text-lg font-bold text-white">
+                  Customer Service
+                </div>
+
+                <div className="text-xs text-[#7a8ba8]">
+                  Need help? Send us your concern.
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#1a2438] bg-white/[0.03] text-white/70 transition hover:bg-white/[0.06]"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-5 p-6">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-[0.2em] text-[#7a8ba8]">
+                    Name
+                  </label>
+
+                  <input
+                    value={user.name}
+                    disabled
+                    className="mt-2 w-full cursor-not-allowed rounded-2xl border border-[#1a2438] bg-white/[0.02] px-4 py-3 text-sm text-[#7a8ba8]"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-[0.2em] text-[#7a8ba8]">
+                    Email
+                  </label>
+
+                  <input
+                    value={user.email}
+                    disabled
+                    className="mt-2 w-full cursor-not-allowed rounded-2xl border border-[#1a2438] bg-white/[0.02] px-4 py-3 text-sm text-[#7a8ba8]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-[0.2em] text-[#7a8ba8]">
+                  Subject
+                </label>
+
+                <input
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  placeholder="Enter your concern"
+                  className="mt-2 w-full rounded-2xl border border-[#1a2438] bg-white/[0.03] px-4 py-3 text-sm text-white outline-none focus:border-[#00ffb4]/40 focus:ring-2 focus:ring-[#00ffb4]/15"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-[0.2em] text-[#7a8ba8]">
+                  Message
+                </label>
+
+                <textarea
+                  rows={6}
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  placeholder="Describe your issue or concern..."
+                  className="mt-2 w-full resize-none rounded-2xl border border-[#1a2438] bg-white/[0.03] px-4 py-3 text-sm text-white outline-none focus:border-[#00ffb4]/40 focus:ring-2 focus:ring-[#00ffb4]/15"
+                />
+              </div>
+              {/* SCREENSHOT UPLOAD */}
+
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-[0.2em] text-[#7a8ba8]">
+                  Screenshot / Snippet
+                </label>
+
+                <label className="mt-2 flex cursor-pointer items-center justify-center rounded-2xl border border-dashed border-[#1a2438] bg-white/[0.03] px-4 py-6 text-sm text-[#9fb0c9] transition hover:border-[#00ffb4]/40 hover:bg-white/[0.05]">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => setScreenshot(e.target.files?.[0] || null)}
+                  />
+
+                  {screenshot ? screenshot.name : "Upload screenshot"}
+                </label>
+              </div>
+              {submitted ? (
+                <div className="rounded-2xl border border-[#00ffb4]/25 bg-[#00ffb4]/10 px-4 py-3 text-sm font-semibold text-[#00ffb4]">
+                  Support request submitted successfully ✓
+                </div>
+              ) : null}
+
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="rounded-xl border border-[#1a2438] bg-white/[0.03] px-5 py-2.5 text-sm font-semibold text-[#dbe6f5] transition hover:bg-white/[0.06]"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  className="rounded-xl bg-[#00ffb4] px-5 py-2.5 text-sm font-bold text-[#0a0e17] transition hover:scale-[1.02]"
+                >
+                  {uploading ? "Submitting..." : "Submit Ticket"}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 

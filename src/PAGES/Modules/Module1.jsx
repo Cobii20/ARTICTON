@@ -2,6 +2,7 @@ import React, { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { Bounds, Environment, Html, OrbitControls, useGLTF } from "@react-three/drei";
 import { motion, AnimatePresence } from "framer-motion";
+import Settings from "../../Components/Settings";
 import * as THREE from "three";
 import { auth, db } from "../../firebase.js";
 import { onAuthStateChanged } from "firebase/auth";
@@ -330,7 +331,7 @@ function HotspotInfoCard({ hotspot, onClose }) {
   );
 }
 
-function HeaderDropdown({ userName, onBack, onLogout }) {
+function HeaderDropdown({ userName, onBack, onLogout, setIsSettingsOpen }) {
   const handleBack = () => {
     if (typeof onBack === "function") onBack("Modules");
   };
@@ -362,12 +363,20 @@ function HeaderDropdown({ userName, onBack, onLogout }) {
         </summary>
 
         <div className="absolute right-0 mt-2 w-52 rounded-2xl border border-[#1a2438] bg-[#0d1220]/98 p-2 shadow-[0_18px_50px_rgba(0,0,0,0.35)] backdrop-blur-xl">
-          <button className="w-full rounded-xl px-4 py-2 text-left text-sm text-[#dbe6f5] transition hover:bg-white/5">
-            Settings
-          </button>
-          <button className="w-full rounded-xl px-4 py-2 text-left text-sm text-[#dbe6f5] transition hover:bg-white/5">
-            Profile
-          </button>
+          <button
+          onClick={() => setIsSettingsOpen(true)}
+          className="w-full rounded-xl px-4 py-2 text-left text-sm text-[#dbe6f5] transition hover:bg-white/5"
+        >
+          Settings
+        </button>
+         <button
+          onClick={() => {
+            if (typeof onBack === "function") onBack("Profile");
+          }}
+          className="w-full rounded-xl px-4 py-2 text-left text-sm text-[#dbe6f5] transition hover:bg-white/5"
+        >
+          Profile
+        </button>
           <button
             onClick={onLogout}
             className="w-full rounded-xl px-4 py-2 text-left text-sm text-red-400 transition hover:bg-red-500/10"
@@ -389,6 +398,21 @@ export default function Module1Page({ onBack, onLogout }) {
   const [firebaseUser, setFirebaseUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+const [settings, setSettings] = useState({
+  sound: true,
+  animations: true,
+  darkMode: true,
+});
+
+const handleSettingChange = (key, value) => {
+  setSettings((prev) => ({
+    ...prev,
+    [key]: value,
+  }));
+};
+
 const [localCompletedParts, setLocalCompletedParts] = useState(() => {
   const saved = localStorage.getItem("module1CompletedParts");
   return saved ? JSON.parse(saved) : {};
@@ -667,11 +691,18 @@ const handleFinishModule = async () => {
                   </div>
 
                   <HeaderDropdown
-                    userName={user.name}
-                    onBack={onBack}
-                    onLogout={onLogout}
-                  />
+                  userName={user.name}
+                  onBack={onBack}
+                  onLogout={onLogout}
+                  setIsSettingsOpen={setIsSettingsOpen}
+                />
                 </div>
+                <Settings
+                isOpen={isSettingsOpen}
+                onClose={() => setIsSettingsOpen(false)}
+                settings={settings}
+                onChange={handleSettingChange}
+              />
               </div>
 
               <div className="min-h-0 flex-1 px-6 py-6 md:px-10">
