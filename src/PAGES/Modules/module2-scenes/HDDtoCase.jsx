@@ -176,10 +176,23 @@ function easeInOutCubic(t) {
     : 1 - Math.pow(-2 * t + 2, 3) / 2;
 }
 
-function Scene() {
+function Scene({
+  onNext,
+  onComplete,
+}) {
   const { camera } = useThree();
   const [hddPlaced, setHddPlaced] = useState(false);
   const [hddInserting, setHddInserting] = useState(false);
+  const completedRef = useRef(false);
+
+  const handleHddPlaced = useCallback(() => {
+    if (completedRef.current) return;
+
+    completedRef.current = true;
+    setHddInserting(false);
+    setHddPlaced(true);
+    onComplete?.();
+  }, [onComplete]);
 
   useEffect(() => {
     camera.position.set(...CAMERA_POSITION);
@@ -214,13 +227,15 @@ function Scene() {
       <HDDDraggable
         placed={hddPlaced}
         onInsertStart={() => setHddInserting(true)}
-        onPlaced={() => {
-          setHddInserting(false);
-          setHddPlaced(true);
-        }}
+        onPlaced={handleHddPlaced}
       />
 
-      <InstructionPanel placed={hddPlaced} inserting={hddInserting} />
+      <InstructionPanel
+      placed={hddPlaced}
+      inserting={hddInserting}
+      isCompleted={hddPlaced}
+      onNext={onNext}
+      />
 
       <ContactShadows
         position={[BOARD_CENTER_X, BOARD_Y + 0.1, BOARD_CENTER_Z]}
@@ -794,7 +809,7 @@ function HDDDraggable({ placed, onInsertStart, onPlaced }) {
   );
 }
 
-function InstructionPanel({ placed, inserting }) {
+function InstructionPanel({ placed, inserting, isCompleted, onNext }) {
   return (
     <Html fullscreen style={{ pointerEvents: "none" }}>
       <div
@@ -814,6 +829,21 @@ function InstructionPanel({ placed, inserting }) {
           boxShadow: "0 10px 30px rgba(0,0,0,.35)",
         }}
       >
+        {(placed || isCompleted) && (
+          <button
+            onClick={() => {
+              if (typeof onNext === "function") {
+                onNext();
+                return;
+              }
+
+              window.location.href = "/psu-scene";
+            }}
+          >
+            Next →
+          </button>
+        )}
+
         <div style={{ fontWeight: "bold", marginBottom: 8 }}>
           Step 5: HDD to Case
         </div>
@@ -862,14 +892,20 @@ function StepDot({ color, label, state, glow = false }) {
   );
 }
 
-export default function HDDtoCase() {
+export default function HDDtoCase({
+  onNext,
+  onComplete,
+}) {
   return (
     <Canvas
       shadows
       style={{ width: "100%", height: "100%" }}
       camera={{ position: CAMERA_POSITION, fov: 50 }}
     >
-      <Scene />
+      <Scene
+      onNext={onNext}
+      onComplete={onComplete}
+      />
     </Canvas>
   );
 }

@@ -122,9 +122,21 @@ function setObjectOpacity(root, opacity) {
   });
 }
 
-function Scene() {
+function Scene({
+  onNext,
+  onComplete,
+}) {
   const { camera } = useThree();
   const [ssdPlaced, setSsdPlaced] = useState(false);
+  const completedRef = useRef(false);
+
+  const handleSsdPlaced = useCallback(() => {
+    if (completedRef.current) return;
+
+    completedRef.current = true;
+    setSsdPlaced(true);
+    onComplete?.();
+  }, [onComplete]);
 
   useEffect(() => {
     camera.position.set(...CAMERA_POSITION);
@@ -154,9 +166,13 @@ function Scene() {
       <InstalledRAM />
 
       <SsdTarget placed={ssdPlaced} />
-      <SSDDraggable placed={ssdPlaced} onPlaced={() => setSsdPlaced(true)} />
+      <SSDDraggable placed={ssdPlaced} onPlaced={handleSsdPlaced} />
 
-      <InstructionPanel placed={ssdPlaced} />
+      <InstructionPanel
+      placed={ssdPlaced}
+      isCompleted={ssdPlaced}
+      onNext={onNext}
+      />
 
       <ContactShadows
         position={[BOARD_CENTER_X, BOARD_Y + 0.1, BOARD_CENTER_Z]}
@@ -591,7 +607,7 @@ function SSDDraggable({ placed, onPlaced }) {
   );
 }
 
-function InstructionPanel({ placed }) {
+function InstructionPanel({ placed, isCompleted, onNext }) {
   return (
     <Html fullscreen style={{ pointerEvents: "none" }}>
       <div
@@ -610,7 +626,22 @@ function InstructionPanel({ placed }) {
           fontFamily: "monospace",
           boxShadow: "0 10px 30px rgba(0,0,0,.35)",
         }}
-      >
+
+        >{(placed || isCompleted) && (
+          <button
+            onClick={() => {
+              if (typeof onNext === "function") {
+                onNext();
+                return;
+              }
+
+              window.location.href = "/mb-case-scene";
+            }}
+          >
+            Next →
+          </button>
+          
+        )}
         <div style={{ fontWeight: "bold", marginBottom: 8 }}>
           Step 3: SSD to Motherboard
         </div>
@@ -693,14 +724,20 @@ function InstructionPanel({ placed }) {
   );
 }
 
-export default function SSDtoMB() {
+export default function SSDtoMB({
+  onNext,
+  onComplete,
+}) {
   return (
     <Canvas
       shadows
       style={{ width: "100%", height: "100%" }}
       camera={{ position: CAMERA_POSITION, fov: 50 }}
     >
-      <Scene />
+      <Scene
+      onNext={onNext}
+      onComplete={onComplete}
+      />
     </Canvas>
   );
 }

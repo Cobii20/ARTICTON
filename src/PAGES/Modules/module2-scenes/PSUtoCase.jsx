@@ -180,10 +180,23 @@ function easeInOutCubic(t) {
     : 1 - Math.pow(-2 * t + 2, 3) / 2;
 }
 
-function Scene() {
+function Scene({
+  onNext,
+  onComplete,
+}) {
   const { camera } = useThree();
   const [psuPlaced, setPsuPlaced] = useState(false);
   const [psuInserting, setPsuInserting] = useState(false);
+  const completedRef = useRef(false);
+
+  const handlePsuPlaced = useCallback(() => {
+    if (completedRef.current) return;
+
+    completedRef.current = true;
+    setPsuInserting(false);
+    setPsuPlaced(true);
+    onComplete?.();
+  }, [onComplete]);
 
   useEffect(() => {
     camera.position.set(...CAMERA_POSITION);
@@ -220,13 +233,15 @@ function Scene() {
       <PSUDraggable
         placed={psuPlaced}
         onInsertStart={() => setPsuInserting(true)}
-        onPlaced={() => {
-          setPsuInserting(false);
-          setPsuPlaced(true);
-        }}
+        onPlaced={handlePsuPlaced}
       />
 
-      <InstructionPanel placed={psuPlaced} inserting={psuInserting} />
+      <InstructionPanel
+      placed={psuPlaced}
+      inserting={psuInserting}
+      isCompleted={psuPlaced}
+      onNext={onNext}
+      />
 
       <ContactShadows
         position={[BOARD_CENTER_X, BOARD_Y + 0.1, BOARD_CENTER_Z]}
@@ -813,7 +828,7 @@ function PSUDraggable({ placed, onInsertStart, onPlaced }) {
   );
 }
 
-function InstructionPanel({ placed, inserting }) {
+function InstructionPanel({ placed, inserting, isCompleted, onNext }) {
   return (
     <Html fullscreen style={{ pointerEvents: "none" }}>
       <div
@@ -833,6 +848,21 @@ function InstructionPanel({ placed, inserting }) {
           boxShadow: "0 10px 30px rgba(0,0,0,.35)",
         }}
       >
+        {(placed || isCompleted) && (
+          <button
+            onClick={() => {
+              if (typeof onNext === "function") {
+                onNext();
+                return;
+              }
+
+              window.location.href = "/full-assembly-scene";
+            }}
+          >
+            Finish →
+          </button>
+        )}
+
         <div style={{ fontWeight: "bold", marginBottom: 8 }}>
           Step 6: PSU to Case
         </div>
@@ -882,14 +912,20 @@ function StepDot({ color, label, state, glow = false }) {
   );
 }
 
-export default function PSUtoCase() {
+export default function PSUtoCase({
+  onNext,
+  onComplete,
+}) {
   return (
     <Canvas
       shadows
       style={{ width: "100%", height: "100%" }}
       camera={{ position: CAMERA_POSITION, fov: 50 }}
     >
-      <Scene />
+      <Scene
+      onNext={onNext}
+      onComplete={onComplete}
+      />
     </Canvas>
   );
 }

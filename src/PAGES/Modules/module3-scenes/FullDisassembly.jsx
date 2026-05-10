@@ -155,8 +155,10 @@ function getPlacementKey(id) {
   return `${id}Placed`;
 }
 
-function Scene({ placementApi }) {
+function Scene({ placementApi, onComplete }) {
   const { camera } = useThree();
+  const completedRef = useRef(false);
+
   const [placements, setPlacements] = useState(() => ({
     ramPlaced: false,
     hddPlaced: false,
@@ -180,6 +182,20 @@ function Scene({ placementApi }) {
   const activePart = useMemo(() => {
     return PARTS.find((part) => !placements[getPlacementKey(part.id)]) || null;
   }, [placements]);
+
+  const complete = !activePart;
+
+  useEffect(() => {
+    if (!complete) {
+      completedRef.current = false;
+      return;
+    }
+
+    if (completedRef.current) return;
+
+    completedRef.current = true;
+    onComplete?.();
+  }, [complete, onComplete]);
 
   const setPlaced = useCallback(
     (id) => {
@@ -1177,14 +1193,17 @@ function MotherboardDraggable({ part, active, isPlaced = false, onPlaced, onRese
   );
 }
 
-export default function FullDisassemblyPC({ placementApi }) {
+export default function FullDisassemblyPC({ placementApi, onComplete }) {
   return (
     <Canvas
       shadows
       style={{ width: "100%", height: "100%" }}
       camera={{ position: CAMERA_POSITION, fov: 50 }}
     >
-      <Scene placementApi={placementApi} />
+      <Scene
+        placementApi={placementApi}
+        onComplete={onComplete}
+      />
     </Canvas>
   );
 }

@@ -170,9 +170,21 @@ function easeOutCubic(t) {
   return 1 - Math.pow(1 - t, 3);
 }
 
-function Scene() {
+function Scene({
+  onNext,
+  onComplete,
+}) {
   const { camera } = useThree();
   const [mbPlaced, setMbPlaced] = useState(false);
+  const completedRef = useRef(false);
+
+  const handleMbPlaced = useCallback(() => {
+    if (completedRef.current) return;
+
+    completedRef.current = true;
+    setMbPlaced(true);
+    onComplete?.();
+  }, [onComplete]);
 
   useEffect(() => {
     camera.position.set(...CAMERA_POSITION);
@@ -204,10 +216,14 @@ function Scene() {
 
       <MotherboardAssemblyDraggable
         placed={mbPlaced}
-        onPlaced={() => setMbPlaced(true)}
+        onPlaced={handleMbPlaced}
       />
 
-      <InstructionPanel placed={mbPlaced} />
+      <InstructionPanel
+      placed={mbPlaced}
+      isCompleted={mbPlaced}
+      onNext={onNext}
+      />
 
       <ContactShadows
         position={[BOARD_CENTER_X, BOARD_Y + 0.1, BOARD_CENTER_Z]}
@@ -801,7 +817,7 @@ function MotherboardAssemblyDraggable({ placed, onPlaced }) {
   );
 }
 
-function InstructionPanel({ placed }) {
+function InstructionPanel({ placed, isCompleted, onNext }) {
   return (
     <Html fullscreen style={{ pointerEvents: "none" }}>
       <div
@@ -821,6 +837,21 @@ function InstructionPanel({ placed }) {
           boxShadow: "0 10px 30px rgba(0,0,0,.35)",
         }}
       >
+        {(placed || isCompleted) && (
+          <button
+            onClick={() => {
+              if (typeof onNext === "function") {
+                onNext();
+                return;
+              }
+
+              window.location.href = "/hdd-scene";
+            }}
+          >
+            Next →
+          </button>
+        )}
+                
         <div style={{ fontWeight: "bold", marginBottom: 8 }}>
           Step 4: Motherboard to Case
         </div>
@@ -896,14 +927,20 @@ function InstructionPanel({ placed }) {
   );
 }
 
-export default function MBtoCase() {
+export default function MBtoCase({
+  onNext,
+  onComplete,
+}) {
   return (
     <Canvas
       shadows
       style={{ width: "100%", height: "100%" }}
       camera={{ position: CAMERA_POSITION, fov: 50 }}
     >
-      <Scene />
+      <Scene
+      onNext={onNext}
+      onComplete={onComplete}
+      />
     </Canvas>
   );
 }

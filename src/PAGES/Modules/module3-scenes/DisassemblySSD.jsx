@@ -75,9 +75,22 @@ const SSD_RING_POSITION = new THREE.Vector3(12.94, SSD_LOCKED_Y, 7.36);
 
 /** ================= SCENE ================= */
 
-function Scene({ placementApi }) {
+function Scene({ placementApi, onComplete }) {
   const { camera } = useThree();
   const snapped = placementApi?.placements?.ssdPlaced ?? false;
+  const completedRef = useRef(false);
+
+  useEffect(() => {
+    if (!snapped) {
+      completedRef.current = false;
+      return;
+    }
+
+    if (completedRef.current) return;
+
+    completedRef.current = true;
+    onComplete?.();
+  }, [snapped, onComplete]);
 
   useEffect(() => {
     camera.position.set(...CAMERA_POSITION);
@@ -559,14 +572,17 @@ function ResetSSDButton({ onReset }) {
 
 /** ================= EXPORT ================= */
 
-export default function DisassemblySSD({ placementApi }) {
+export default function DisassemblySSD({ placementApi, onComplete }) {
   return (
     <Canvas
       shadows
       style={{ width: "100%", height: "100%" }}
       camera={{ position: CAMERA_POSITION, fov: 50 }}
     >
-      <Scene placementApi={placementApi} />
+      <Scene
+        placementApi={placementApi}
+        onComplete={onComplete}
+      />
     </Canvas>
   );
 }

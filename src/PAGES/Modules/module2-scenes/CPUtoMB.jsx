@@ -104,9 +104,21 @@ function setObjectOpacity(root, opacity) {
   });
 }
 
-function Scene() {
+function Scene({
+  onNext,
+  onComplete,
+}) {
   const { camera } = useThree();
   const [cpuPlaced, setCpuPlaced] = useState(false);
+  const completedRef = useRef(false);
+
+  const handleCpuPlaced = useCallback(() => {
+    if (completedRef.current) return;
+
+    completedRef.current = true;
+    setCpuPlaced(true);
+    onComplete?.();
+  }, [onComplete]);
 
   useEffect(() => {
     camera.position.set(...CAMERA_POSITION);
@@ -131,9 +143,16 @@ function Scene() {
       <WorkBoard />
       <Motherboard />
       <CpuTarget placed={cpuPlaced} />
-      <CPUDraggable placed={cpuPlaced} onPlaced={() => setCpuPlaced(true)} />
+      <CPUDraggable
+      placed={cpuPlaced}
+      onPlaced={handleCpuPlaced}
+      />
 
-      <InstructionPanel placed={cpuPlaced} />
+      <InstructionPanel
+      placed={cpuPlaced}
+      isCompleted={cpuPlaced}
+      onNext={onNext}
+      />
 
       <ContactShadows
         position={[BOARD_CENTER_X, BOARD_Y + 0.1, BOARD_CENTER_Z]}
@@ -528,7 +547,10 @@ function CPUDraggable({ placed, onPlaced }) {
   );
 }
 
-function InstructionPanel({ placed }) {
+function InstructionPanel({
+  placed,
+  isCompleted,
+}) {
   return (
     <Html fullscreen style={{ pointerEvents: "none" }}>
       <div
@@ -536,51 +558,63 @@ function InstructionPanel({ placed }) {
           position: "absolute",
           top: 22,
           left: 24,
-          padding: "12px 16px",
-          minWidth: 300,
-          borderRadius: 16,
-          background: "rgba(10,14,22,.78)",
-          border: "1px solid rgba(255,255,255,.14)",
-          backdropFilter: "blur(8px)",
-          color: "rgba(234,240,255,.95)",
-          fontSize: 12,
-          fontFamily: "monospace",
-          boxShadow: "0 10px 30px rgba(0,0,0,.35)",
+          display: "flex",
+          flexDirection: "column",
+          gap: 12,
         }}
-      >
-        <div style={{ fontWeight: "bold", marginBottom: 8 }}>
-          Step 1: CPU to Motherboard
-        </div>
+      >nb  
+        <div
+          style={{
+            padding: "12px 16px",
+            minWidth: 300,
+            borderRadius: 16,
+            background: "rgba(10,14,22,.78)",
+            border: "1px solid rgba(255,255,255,.14)",
+            backdropFilter: "blur(8px)",
+            color: "rgba(234,240,255,.95)",
+            fontSize: 12,
+            fontFamily: "monospace",
+            boxShadow: "0 10px 30px rgba(0,0,0,.35)",
+          }}
+        >
+          <div style={{ fontWeight: "bold", marginBottom: 8 }}>
+            Step 1: CPU to Motherboard
+          </div>
 
-        <div style={{ marginBottom: 10 }}>
-          {placed
-            ? "CPU seated on motherboard."
-            : "Drag the CPU onto the CPU socket on the motherboard."}
-        </div>
+          <div style={{ marginBottom: 10 }}>
+            {(placed || isCompleted)
+              ? "CPU seated on motherboard."
+              : "Drag the CPU onto the CPU socket on the motherboard."}
+          </div>
 
-        <div style={{ display: "grid", gap: 5 }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              opacity: 1,
-            }}
-          >
-            <span
+          <div style={{ display: "grid", gap: 5 }}>
+            <div
               style={{
-                width: 9,
-                height: 9,
-                borderRadius: 999,
-                background: CPU_COLOR,
-                display: "inline-block",
-                boxShadow: placed ? "none" : `0 0 14px ${CPU_COLOR}`,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
               }}
-            />
-            <span>1. CPU</span>
-            <span style={{ marginLeft: "auto" }}>
-              {placed ? "done" : "active"}
-            </span>
+            >
+              <span
+                style={{
+                  width: 9,
+                  height: 9,
+                  borderRadius: 999,
+                  background: CPU_COLOR,
+                  display: "inline-block",
+                  boxShadow:
+                    (placed || isCompleted)
+                      ? "none"
+                      : `0 0 14px ${CPU_COLOR}`,
+                }}
+              />
+
+              <span>1. CPU</span>
+
+              <span style={{ marginLeft: "auto" }}>
+                {(placed || isCompleted) ? "done" : "active"}
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -588,14 +622,20 @@ function InstructionPanel({ placed }) {
   );
 }
 
-export default function CPUtoMB() {
+export default function CPUtoMB({
+  onNext,
+  onComplete,
+}) {
   return (
     <Canvas
       shadows
       style={{ width: "100%", height: "100%" }}
       camera={{ position: CAMERA_POSITION, fov: 50 }}
     >
-      <Scene />
+      <Scene
+  onNext={onNext}
+  onComplete={onComplete}
+/>
     </Canvas>
   );
 }

@@ -11,25 +11,25 @@ import {
 
 /** MODEL URLS */
 const CASE_URL = "/models/PC CASE(BLENDER).glb";
-const MB_URL   = "/models/MB(BLENDER).glb";
-const CPU_URL  = "/models/CPU(BLENDER).glb";
-const RAM_URL  = "/models/RAM(BLENDER).glb";
-const SSD_URL  = "/models/SSD(BLENDER).glb";
-const HDD_URL  = "/models/HDD(BLENDER).glb";
-const PSU_URL  = "/models/PSU(BLENDER).glb";
+const MB_URL = "/models/MB(BLENDER).glb";
+const CPU_URL = "/models/CPU(BLENDER).glb";
+const RAM_URL = "/models/RAM(BLENDER).glb";
+const SSD_URL = "/models/SSD(BLENDER).glb";
+const HDD_URL = "/models/HDD(BLENDER).glb";
+const PSU_URL = "/models/PSU(BLENDER).glb";
 
 /** BASE SETTINGS */
-const CASE_POSITION  = new THREE.Vector3(0, -15, 0);
-const CASE_ROTATION  = new THREE.Euler(0, 0, 0);
-const CASE_SCALE     = 1;
+const CASE_POSITION = new THREE.Vector3(0, -15, 0);
+const CASE_ROTATION = new THREE.Euler(0, 0, 0);
+const CASE_SCALE = 1;
 const ASSEMBLY_SCALE = 1;
 
 /** CAMERA */
 const CAMERA_POSITION = [70, 14, -20];
-const CONTROL_TARGET  = [20, -12, 2];
+const CONTROL_TARGET = [20, -12, 2];
 
 /** SNAP / MAGNET */
-const SNAP_DISTANCE   = 0.75;
+const SNAP_DISTANCE = 0.75;
 const MAGNET_DISTANCE = 3.2;
 const MAGNET_STRENGTH = 0.22;
 
@@ -37,35 +37,42 @@ const MAGNET_STRENGTH = 0.22;
 const MB_POSITION = new THREE.Vector3(-0.6, -0.6, 2.99);
 const MB_ROTATION = new THREE.Euler(0, 0, -Math.PI / 2);
 
+/** RAM — already seated/placed, static in this scene */
 const RAM_SEATED_POSITION = new THREE.Vector3(13.73, -24.61, 9.06);
 const RAM_SEATED_ROTATION = new THREE.Euler(Math.PI / 2, 0, 0);
 
+/** HDD — already seated/placed, static in this scene */
 const HDD_SEATED_POSITION = new THREE.Vector3(15.50, -16.06, 10.96);
 const HDD_SEATED_ROTATION = new THREE.Euler(0, 0, 0);
 
+/** SSD — already seated/placed, static in this scene */
 const SSD_SEATED_POSITION = new THREE.Vector3(12.94, -17.21, 7.36);
 const SSD_SEATED_ROTATION = new THREE.Euler(0, 0, 0);
 
-/** PSU — static floor/default position */
-const PSU_FLOOR_POSITION = new THREE.Vector3(19.38, -15.81, 11.75);
-const PSU_ROTATION = new THREE.Euler(0, Math.PI, 0);
+/** PSU — already seated/placed, static in this scene */
+const PSU_SEATED_POSITION = new THREE.Vector3(19.38, -15.81, 11.75);
+const PSU_SEATED_ROTATION = new THREE.Euler(0, Math.PI, 0);
 
-/** CPU — installed position inside the case */
+/** CPU installed start position inside the case */
 const CPU_INSTALLED_POSITION = new THREE.Vector3(-1.25, -4.95, -2.66);
 const CPU_INSTALLED_ROTATION = new THREE.Euler(Math.PI / 2, 0, -Math.PI / 2);
 
-/** CPU — detached seated position on the board */
-const CPU_FLOOR_POSITION = new THREE.Vector3(17.49, -15.80, 0.30);
+/** CPU flat rotation after detached */
 const CPU_FLAT_ROTATION = new THREE.Euler(0, Math.PI / 2, 0);
 
+/** CPU seated position on the checkerboard */
+const CPU_LOCKED_Y = -15.8;
+const CPU_FLOOR_POSITION = new THREE.Vector3(17.49, CPU_LOCKED_Y, 0.3);
+
 /** GUIDE BOARD */
-const BOARD_Y        = -14.95;
+const BOARD_Y = -14.95;
 const BOARD_CENTER_X = 24;
 const BOARD_CENTER_Z = 6.5;
-const BOARD_SIZE     = 22;
+const BOARD_SIZE = 22;
 const GRID_DIVISIONS = 11;
+const CELL_SIZE = BOARD_SIZE / GRID_DIVISIONS;
 
-/** Pulsing ring anchor */
+/** CPU ring anchor */
 const CPU_RING_POSITION = new THREE.Vector3(
   CPU_FLOOR_POSITION.x,
   BOARD_Y + 0.03,
@@ -74,9 +81,22 @@ const CPU_RING_POSITION = new THREE.Vector3(
 
 /** ================= SCENE ================= */
 
-function Scene({ placementApi }) {
+function Scene({ placementApi, onComplete }) {
   const { camera } = useThree();
   const snapped = placementApi?.placements?.cpuPlaced ?? false;
+  const completedRef = useRef(false);
+
+  useEffect(() => {
+    if (!snapped) {
+      completedRef.current = false;
+      return;
+    }
+
+    if (completedRef.current) return;
+
+    completedRef.current = true;
+    onComplete?.();
+  }, [snapped, onComplete]);
 
   useEffect(() => {
     camera.position.set(...CAMERA_POSITION);
@@ -86,22 +106,18 @@ function Scene({ placementApi }) {
   return (
     <>
       <color attach="background" args={["#05080D"]} />
-
       <ambientLight intensity={0.5} />
-
       <directionalLight
         position={[6, 10, 6]}
         intensity={1.4}
         castShadow
         shadow-mapSize={[2048, 2048]}
       />
-
       <pointLight position={[-3, 2, -2]} intensity={0.7} />
-
       <Environment preset="city" />
 
       <PCCase />
-      <StaticAssembly />
+      <MotherboardAssemblySeated />
       <PlacementGuideBoard snapped={snapped} />
 
       <CPUDraggable
@@ -138,13 +154,19 @@ function Scene({ placementApi }) {
 /** ================= PULSING RING ================= */
 
 function PulsingRing() {
-  const ringRef = useRef();
+  const outerRef = useRef();
+  const innerFillRef = useRef();
 
   useFrame(({ clock }) => {
-    if (!ringRef.current) return;
-
     const t = (Math.sin(clock.getElapsedTime() * 2.5) + 1) / 2;
-    ringRef.current.scale.setScalar(1 + t * 0.12);
+
+    if (outerRef.current) {
+      outerRef.current.material.opacity = 0.4 + t * 0.55;
+    }
+
+    if (innerFillRef.current) {
+      innerFillRef.current.material.opacity = 0.12 + t * 0.22;
+    }
   });
 
   return (
@@ -152,9 +174,19 @@ function PulsingRing() {
       position={[CPU_RING_POSITION.x, CPU_RING_POSITION.y, CPU_RING_POSITION.z]}
       rotation={[-Math.PI / 2, 0, 0]}
     >
-      <mesh ref={ringRef} position={[0, 0, 0.01]}>
-        <ringGeometry args={[0.18, 0.32, 48]} />
-        <meshBasicMaterial color="#00ffb4" transparent opacity={0.9} />
+      <mesh ref={innerFillRef}>
+        <planeGeometry args={[CELL_SIZE * 0.72, CELL_SIZE * 0.72]} />
+        <meshBasicMaterial color="#b56dff" transparent opacity={0.15} />
+      </mesh>
+
+      <mesh ref={outerRef} position={[0, 0, 0.01]}>
+        <ringGeometry args={[0.35, 0.68, 48]} />
+        <meshBasicMaterial color="#b56dff" transparent opacity={0.9} />
+      </mesh>
+
+      <mesh position={[0, 0, 0.02]}>
+        <ringGeometry args={[0.14, 0.30, 48]} />
+        <meshBasicMaterial color="#b56dff" transparent opacity={0.5} />
       </mesh>
     </group>
   );
@@ -214,10 +246,9 @@ function PCCase() {
 }
 
 /** ================= STATIC ASSEMBLY ================= */
-/** PSU is static on the floor. CPU is excluded because it is the draggable disassembly part. */
 
-function StaticAssembly() {
-  const mbGltf  = useGLTF(MB_URL);
+function MotherboardAssemblySeated() {
+  const mbGltf = useGLTF(MB_URL);
   const ramGltf = useGLTF(RAM_URL);
   const hddGltf = useGLTF(HDD_URL);
   const ssdGltf = useGLTF(SSD_URL);
@@ -247,8 +278,8 @@ function StaticAssembly() {
     group.add(ssd);
 
     const psu = psuGltf.scene.clone(true);
-    psu.position.copy(PSU_FLOOR_POSITION);
-    psu.rotation.copy(PSU_ROTATION);
+    psu.position.copy(PSU_SEATED_POSITION);
+    psu.rotation.copy(PSU_SEATED_ROTATION);
     group.add(psu);
 
     group.traverse((o) => {
@@ -276,7 +307,7 @@ function SideStatus({ detached, dragging, snapped, pos }) {
   const text = !detached
     ? "Click to detach"
     : snapped
-    ? "Placed on board"
+    ? "Placed on floor"
     : dragging
     ? "Dragging to target"
     : "Click to grab";
@@ -292,7 +323,7 @@ function SideStatus({ detached, dragging, snapped, pos }) {
           minWidth: 220,
           borderRadius: 16,
           background: "rgba(10,14,22,.78)",
-          border: "1px solid rgba(0,200,255,.22)",
+          border: "1px solid rgba(181,109,255,.28)",
           backdropFilter: "blur(8px)",
           color: "rgba(234,240,255,.95)",
           fontSize: 12,
@@ -318,7 +349,6 @@ function CPUDraggable({ isPlaced = false, onPlaced, onResetPlaced }) {
   const { gl, camera } = useThree();
 
   const cpuRef = useRef();
-
   const [dragging, setDragging] = useState(false);
   const [detached, setDetached] = useState(isPlaced);
   const [snapped, setSnapped] = useState(isPlaced);
@@ -329,14 +359,10 @@ function CPUDraggable({ isPlaced = false, onPlaced, onResetPlaced }) {
   });
 
   const dragOffset = useRef(new THREE.Vector3());
-  const mouse = useRef(new THREE.Vector2());
-
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
-  const hitPoint  = useMemo(() => new THREE.Vector3(), []);
-  const dragPlane = useMemo(
-    () => new THREE.Plane(new THREE.Vector3(0, 1, 0), -CPU_FLOOR_POSITION.y),
-    []
-  );
+  const mouse = useRef(new THREE.Vector2());
+  const hitPoint = useMemo(() => new THREE.Vector3(), []);
+  const dragPlane = useMemo(() => new THREE.Plane(), []);
 
   const installedQuat = useMemo(
     () => new THREE.Quaternion().setFromEuler(CPU_INSTALLED_ROTATION),
@@ -361,15 +387,24 @@ function CPUDraggable({ isPlaced = false, onPlaced, onResetPlaced }) {
     return clone;
   }, [scene]);
 
-  const moveCPUToBoard = useCallback(
-    (targetPosition) => {
-      if (!cpuRef.current) return;
+  useEffect(() => {
+    if (!cpuRef.current) return;
 
-      cpuRef.current.position.copy(targetPosition);
+    cpuRef.current.scale.setScalar(ASSEMBLY_SCALE);
+
+    if (isPlaced) {
+      cpuRef.current.position.copy(CPU_FLOOR_POSITION);
+      cpuRef.current.position.y = CPU_LOCKED_Y;
       cpuRef.current.quaternion.copy(flatQuat);
-    },
-    [flatQuat]
-  );
+      setDetached(true);
+      setSnapped(true);
+    } else {
+      cpuRef.current.position.copy(CPU_INSTALLED_POSITION);
+      cpuRef.current.quaternion.copy(installedQuat);
+      setDetached(false);
+      setSnapped(false);
+    }
+  }, [isPlaced, installedQuat, flatQuat]);
 
   const updateMouse = useCallback(
     (e) => {
@@ -382,99 +417,86 @@ function CPUDraggable({ isPlaced = false, onPlaced, onResetPlaced }) {
   );
 
   useEffect(() => {
-    if (!cpuRef.current) return;
-
-    cpuRef.current.scale.setScalar(ASSEMBLY_SCALE);
-
-    if (isPlaced) {
-      moveCPUToBoard(CPU_FLOOR_POSITION);
-      setDetached(true);
-      setSnapped(true);
-    } else {
-      cpuRef.current.position.copy(CPU_INSTALLED_POSITION);
-      cpuRef.current.quaternion.copy(installedQuat);
-      setDetached(false);
-      setSnapped(false);
-    }
-  }, [isPlaced, installedQuat, moveCPUToBoard]);
-
-  useEffect(() => {
-    const handlePointerDown = (e) => {
-      if (e.button !== 0 || !cpuRef.current) return;
+    const handleClick = (e) => {
+      if (e.button !== 0) return;
+      if (!cpuRef.current) return;
 
       updateMouse(e);
 
       if (!detached && !snapped) {
         setDetached(true);
-        moveCPUToBoard(CPU_FLOOR_POSITION);
+        cpuRef.current.position.y = CPU_LOCKED_Y;
+        cpuRef.current.quaternion.copy(flatQuat);
         return;
       }
 
       if (snapped) return;
 
       if (!dragging) {
+        const normal = new THREE.Vector3();
+
+        camera.getWorldDirection(normal);
+        dragPlane.setFromNormalAndCoplanarPoint(normal, cpuRef.current.position);
+
         raycaster.setFromCamera(mouse.current, camera);
 
         if (raycaster.ray.intersectPlane(dragPlane, hitPoint)) {
-          dragOffset.current.set(
-            cpuRef.current.position.x - hitPoint.x,
-            0,
-            cpuRef.current.position.z - hitPoint.z
-          );
+          dragOffset.current.copy(cpuRef.current.position).sub(hitPoint);
         }
 
-        cpuRef.current.quaternion.copy(flatQuat);
         setDragging(true);
         document.body.style.cursor = "grabbing";
       } else {
         setDragging(false);
         document.body.style.cursor = "default";
 
-        const dist = new THREE.Vector2(
-          cpuRef.current.position.x - CPU_FLOOR_POSITION.x,
-          cpuRef.current.position.z - CPU_FLOOR_POSITION.z
-        ).length();
+        const dist = cpuRef.current.position.distanceTo(CPU_FLOOR_POSITION);
 
         if (dist < SNAP_DISTANCE * 1.25) {
-          moveCPUToBoard(CPU_FLOOR_POSITION);
           setSnapped(true);
           onPlaced?.();
         }
       }
     };
 
-    gl.domElement.addEventListener("pointerdown", handlePointerDown);
+    gl.domElement.addEventListener("pointerdown", handleClick);
 
     return () => {
-      gl.domElement.removeEventListener("pointerdown", handlePointerDown);
+      gl.domElement.removeEventListener("pointerdown", handleClick);
     };
   }, [
-    camera,
     detached,
-    dragPlane,
     dragging,
-    flatQuat,
-    gl,
-    hitPoint,
-    moveCPUToBoard,
-    onPlaced,
-    raycaster,
     snapped,
+    gl,
+    camera,
+    dragPlane,
+    raycaster,
+    hitPoint,
     updateMouse,
+    onPlaced,
+    flatQuat,
   ]);
 
   useEffect(() => {
-    const handlePointerMove = (e) => updateMouse(e);
-    const preventContextMenu = (e) => e.preventDefault();
+    const move = (e) => updateMouse(e);
 
-    gl.domElement.addEventListener("pointermove", handlePointerMove);
-    gl.domElement.addEventListener("contextmenu", preventContextMenu);
+    gl.domElement.addEventListener("pointermove", move);
 
     return () => {
-      gl.domElement.removeEventListener("pointermove", handlePointerMove);
-      gl.domElement.removeEventListener("contextmenu", preventContextMenu);
+      gl.domElement.removeEventListener("pointermove", move);
     };
   }, [gl, updateMouse]);
+
+  useEffect(() => {
+    const preventContext = (e) => e.preventDefault();
+
+    gl.domElement.addEventListener("contextmenu", preventContext);
+
+    return () => {
+      gl.domElement.removeEventListener("contextmenu", preventContext);
+    };
+  }, [gl]);
 
   useFrame(() => {
     if (!cpuRef.current) return;
@@ -484,52 +506,45 @@ function CPUDraggable({ isPlaced = false, onPlaced, onResetPlaced }) {
       cpuRef.current.quaternion.slerp(installedQuat, 0.2);
     } else if (snapped) {
       cpuRef.current.position.lerp(CPU_FLOOR_POSITION, 0.28);
-      cpuRef.current.quaternion.copy(flatQuat);
+      cpuRef.current.position.y = CPU_LOCKED_Y;
+      cpuRef.current.quaternion.slerp(flatQuat, 0.28);
     } else {
-      cpuRef.current.quaternion.copy(flatQuat);
-
       if (dragging) {
         raycaster.setFromCamera(mouse.current, camera);
 
         if (raycaster.ray.intersectPlane(dragPlane, hitPoint)) {
-          const target = new THREE.Vector3(
-            hitPoint.x + dragOffset.current.x,
-            CPU_FLOOR_POSITION.y,
-            hitPoint.z + dragOffset.current.z
-          );
+          const target = hitPoint.clone().add(dragOffset.current);
 
+          target.y = CPU_LOCKED_Y;
           cpuRef.current.position.lerp(target, 0.35);
         }
       }
 
-      const dist = new THREE.Vector2(
-        cpuRef.current.position.x - CPU_FLOOR_POSITION.x,
-        cpuRef.current.position.z - CPU_FLOOR_POSITION.z
-      ).length();
+      cpuRef.current.position.y = CPU_LOCKED_Y;
+
+      const dist = cpuRef.current.position.distanceTo(CPU_FLOOR_POSITION);
 
       if (dist < MAGNET_DISTANCE) {
-        const pull = MAGNET_STRENGTH + (1 - dist / MAGNET_DISTANCE) * 0.22;
+        const t = 1 - dist / MAGNET_DISTANCE;
+        const pull = MAGNET_STRENGTH + t * 0.22;
 
-        const snapTarget = new THREE.Vector3(
-          CPU_FLOOR_POSITION.x,
-          CPU_FLOOR_POSITION.y,
-          CPU_FLOOR_POSITION.z
-        );
-
-        cpuRef.current.position.lerp(snapTarget, pull);
-        cpuRef.current.quaternion.copy(flatQuat);
+        cpuRef.current.position.lerp(CPU_FLOOR_POSITION, pull);
+        cpuRef.current.position.y = CPU_LOCKED_Y;
+        cpuRef.current.quaternion.slerp(flatQuat, pull);
 
         if (dist < SNAP_DISTANCE) {
-          moveCPUToBoard(CPU_FLOOR_POSITION);
           setSnapped(true);
           setDragging(false);
           document.body.style.cursor = "default";
           onPlaced?.();
         }
+      } else {
+        cpuRef.current.quaternion.slerp(flatQuat, 0.2);
       }
     }
 
     const worldPos = new THREE.Vector3();
+
     cpuRef.current.getWorldPosition(worldPos);
 
     setPos({
@@ -607,14 +622,17 @@ function ResetCPUButton({ onReset }) {
 
 /** ================= EXPORT ================= */
 
-export default function DisassemblyCPU({ placementApi }) {
+export default function DisassemblyCPU({ placementApi, onComplete }) {
   return (
     <Canvas
       shadows
       style={{ width: "100%", height: "100%" }}
       camera={{ position: CAMERA_POSITION, fov: 50 }}
     >
-      <Scene placementApi={placementApi} />
+      <Scene
+        placementApi={placementApi}
+        onComplete={onComplete}
+      />
     </Canvas>
   );
 }

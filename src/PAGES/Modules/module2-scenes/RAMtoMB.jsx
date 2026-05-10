@@ -113,9 +113,21 @@ function setObjectOpacity(root, opacity) {
   });
 }
 
-function Scene() {
+function Scene({
+  onNext,
+  onComplete,
+}) {
   const { camera } = useThree();
   const [ramPlaced, setRamPlaced] = useState(false);
+  const completedRef = useRef(false);
+
+  const handleRamPlaced = useCallback(() => {
+    if (completedRef.current) return;
+
+    completedRef.current = true;
+    setRamPlaced(true);
+    onComplete?.();
+  }, [onComplete]);
 
   useEffect(() => {
     camera.position.set(...CAMERA_POSITION);
@@ -144,9 +156,13 @@ function Scene() {
       <InstalledCPU />
 
       <RamTarget placed={ramPlaced} />
-      <RAMDraggable placed={ramPlaced} onPlaced={() => setRamPlaced(true)} />
+      <RAMDraggable placed={ramPlaced} onPlaced={handleRamPlaced} />
 
-      <InstructionPanel placed={ramPlaced} />
+      <InstructionPanel
+      placed={ramPlaced}
+      isCompleted={ramPlaced}
+      onNext={onNext}
+      />
 
       <ContactShadows
         position={[BOARD_CENTER_X, BOARD_Y + 0.1, BOARD_CENTER_Z]}
@@ -561,7 +577,7 @@ function RAMDraggable({ placed, onPlaced }) {
   );
 }
 
-function InstructionPanel({ placed }) {
+function InstructionPanel({ placed, isCompleted, onNext }) {
   return (
     <Html fullscreen style={{ pointerEvents: "none" }}>
       <div
@@ -569,72 +585,73 @@ function InstructionPanel({ placed }) {
           position: "absolute",
           top: 22,
           left: 24,
-          padding: "12px 16px",
-          minWidth: 330,
-          borderRadius: 16,
-          background: "rgba(10,14,22,.78)",
-          border: "1px solid rgba(255,255,255,.14)",
-          backdropFilter: "blur(8px)",
-          color: "rgba(234,240,255,.95)",
-          fontSize: 12,
-          fontFamily: "monospace",
-          boxShadow: "0 10px 30px rgba(0,0,0,.35)",
+          display: "flex",
+          flexDirection: "column",
+          gap: 12,
         }}
       >
-        <div style={{ fontWeight: "bold", marginBottom: 8 }}>
-          Step 2: RAM to Motherboard
-        </div>
-
-        <div style={{ marginBottom: 10 }}>
-          {placed
-            ? "RAM seated on motherboard."
-            : "Drag the RAM into the RAM slot with the CPU already installed."}
-        </div>
-
-        <div style={{ display: "grid", gap: 5 }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              opacity: 1,
-            }}
-          >
-            <span
-              style={{
-                width: 9,
-                height: 9,
-                borderRadius: 999,
-                background: CPU_COLOR,
-                display: "inline-block",
-              }}
-            />
-            <span>1. CPU</span>
-            <span style={{ marginLeft: "auto" }}>done</span>
+        <div
+          style={{
+            padding: "12px 16px",
+            minWidth: 330,
+            borderRadius: 16,
+            background: "rgba(10,14,22,.78)",
+            border: "1px solid rgba(255,255,255,.14)",
+            backdropFilter: "blur(8px)",
+            color: "rgba(234,240,255,.95)",
+            fontSize: 12,
+            fontFamily: "monospace",
+            boxShadow: "0 10px 30px rgba(0,0,0,.35)",
+          }}
+        >
+          <div style={{ fontWeight: "bold", marginBottom: 8 }}>
+            Step 2: RAM to Motherboard
           </div>
 
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              opacity: 1,
-            }}
-          >
-            <span
-              style={{
-                width: 9,
-                height: 9,
-                borderRadius: 999,
-                background: RAM_COLOR,
-                display: "inline-block",
-                boxShadow: placed ? "none" : `0 0 14px ${RAM_COLOR}`,
-              }}
-            />
-            <span>2. RAM</span>
-            <span style={{ marginLeft: "auto" }}>
-              {placed ? "done" : "active"}
-            </span>
+          <div style={{ marginBottom: 10 }}>
+            {(placed || isCompleted)
+              ? "RAM seated on motherboard."
+              : "Drag the RAM into the RAM slot with the CPU already installed."}
+          </div>
+
+          <div style={{ display: "grid", gap: 5 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span
+                style={{
+                  width: 9,
+                  height: 9,
+                  borderRadius: 999,
+                  background: CPU_COLOR,
+                  display: "inline-block",
+                }}
+              />
+
+              <span>1. CPU</span>
+
+              <span style={{ marginLeft: "auto" }}>done</span>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span
+                style={{
+                  width: 9,
+                  height: 9,
+                  borderRadius: 999,
+                  background: RAM_COLOR,
+                  display: "inline-block",
+                  boxShadow:
+                    (placed || isCompleted)
+                      ? "none"
+                      : `0 0 14px ${RAM_COLOR}`,
+                }}
+              />
+
+              <span>2. RAM</span>
+
+              <span style={{ marginLeft: "auto" }}>
+                {(placed || isCompleted) ? "done" : "active"}
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -642,14 +659,20 @@ function InstructionPanel({ placed }) {
   );
 }
 
-export default function RAMtoMB() {
+export default function RAMtoMB({
+  onNext,
+  onComplete,
+}) {
   return (
     <Canvas
       shadows
       style={{ width: "100%", height: "100%" }}
       camera={{ position: CAMERA_POSITION, fov: 50 }}
     >
-      <Scene />
+      <Scene
+      onNext={onNext}
+      onComplete={onComplete}
+      />
     </Canvas>
   );
 }

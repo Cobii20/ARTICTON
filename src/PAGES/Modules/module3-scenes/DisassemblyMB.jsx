@@ -159,9 +159,22 @@ function prepareTransparentMaterials(root) {
 
 /** ================= SCENE ================= */
 
-function Scene({ placementApi }) {
+function Scene({ placementApi, onComplete }) {
   const { camera } = useThree();
   const snapped = placementApi?.placements?.mbPlaced ?? false;
+  const completedRef = useRef(false);
+
+  useEffect(() => {
+    if (!snapped) {
+      completedRef.current = false;
+      return;
+    }
+
+    if (completedRef.current) return;
+
+    completedRef.current = true;
+    onComplete?.();
+  }, [snapped, onComplete]);
 
   useEffect(() => {
     camera.position.set(...CAMERA_POSITION);
@@ -1012,14 +1025,17 @@ function ResetMotherboardButton({ onReset }) {
 
 /** ================= EXPORT ================= */
 
-export default function DisassemblyMotherboard({ placementApi }) {
+export default function DisassemblyMotherboard({ placementApi, onComplete }) {
   return (
     <Canvas
       shadows
       style={{ width: "100%", height: "100%" }}
       camera={{ position: CAMERA_POSITION, fov: 50 }}
     >
-      <Scene placementApi={placementApi} />
+      <Scene
+        placementApi={placementApi}
+        onComplete={onComplete}
+      />
     </Canvas>
   );
 }

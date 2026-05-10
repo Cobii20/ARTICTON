@@ -201,7 +201,9 @@ function getCurrentStep(placed) {
   return STEPS.find((step) => !placed[step.id])?.id || "complete";
 }
 
-function Scene() {
+function Scene({
+  onFinish,
+}) {
   const { camera } = useThree();
 
   const [placed, setPlaced] = useState({
@@ -213,8 +215,20 @@ function Scene() {
     psu: false,
   });
 
+  const completionReportedRef = useRef(false);
+
   const currentStep = getCurrentStep(placed);
   const complete = currentStep === "complete";
+
+  useEffect(() => {
+    if (!complete || completionReportedRef.current) return;
+
+    completionReportedRef.current = true;
+
+    if (typeof onFinish === "function") {
+      onFinish();
+    }
+  }, [complete, onFinish]);
 
   useEffect(() => {
     camera.position.set(...CAMERA_POSITION);
@@ -490,6 +504,7 @@ function StaticMotherboard() {
 function StaticCPU() {
   const { scene } = useGLTF(CPU_URL);
   const clone = useMemo(() => cloneScene(scene, true), [scene]);
+
   const quat = useMemo(
     () => new THREE.Quaternion().setFromEuler(CPU_TARGET_ROTATION),
     []
@@ -509,6 +524,7 @@ function StaticCPU() {
 function StaticRAM() {
   const { scene } = useGLTF(RAM_URL);
   const clone = useMemo(() => cloneScene(scene, true), [scene]);
+
   const quat = useMemo(
     () => new THREE.Quaternion().setFromEuler(RAM_TARGET_ROTATION),
     []
@@ -528,6 +544,7 @@ function StaticRAM() {
 function StaticSSD() {
   const { scene } = useGLTF(SSD_URL);
   const clone = useMemo(() => cloneScene(scene, true), [scene]);
+
   const quat = useMemo(
     () => new THREE.Quaternion().setFromEuler(SSD_TARGET_ROTATION),
     []
@@ -1086,6 +1103,7 @@ function MotherboardAssemblyToCase({ active, unlocked, placed, onPlaced }) {
       const eased = easeInOutCubic(rawT);
 
       const start = transitionStartPosition.current;
+
       const liftPoint = new THREE.Vector3(
         start.x,
         MB_ASSEMBLY_FLOAT_HEIGHT_Y,
@@ -1486,6 +1504,7 @@ function InsertTransitionDraggable({
       );
 
       const eased = easeInOutCubic(insertProgress.current);
+
       const currentPosition = new THREE.Vector3();
 
       if (eased < 0.5) {
@@ -1581,8 +1600,14 @@ function SideStatus({ label, color, text, pos }) {
           boxShadow: "0 10px 30px rgba(0,0,0,.35)",
         }}
       >
-        <div style={{ fontWeight: "bold", marginBottom: 4 }}>{label}</div>
-        <div style={{ marginBottom: 8 }}>{text}</div>
+        <div style={{ fontWeight: "bold", marginBottom: 4 }}>
+          {label}
+        </div>
+
+        <div style={{ marginBottom: 8 }}>
+          {text}
+        </div>
+
         <div>x: {pos.x.toFixed(2)}</div>
         <div>y: {pos.y.toFixed(2)}</div>
         <div>z: {pos.z.toFixed(2)}</div>
@@ -1591,7 +1616,11 @@ function SideStatus({ label, color, text, pos }) {
   );
 }
 
-function InstructionPanel({ currentStep, placed, complete }) {
+function InstructionPanel({
+  currentStep,
+  placed,
+  complete,
+}) {
   return (
     <Html fullscreen style={{ pointerEvents: "none" }}>
       <div
@@ -1645,7 +1674,13 @@ function InstructionPanel({ currentStep, placed, complete }) {
   );
 }
 
-function StepDot({ color, label, state, glow = false, muted = false }) {
+function StepDot({
+  color,
+  label,
+  state,
+  glow = false,
+  muted = false,
+}) {
   return (
     <div
       style={{
@@ -1665,20 +1700,28 @@ function StepDot({ color, label, state, glow = false, muted = false }) {
           boxShadow: glow ? `0 0 14px ${color}` : "none",
         }}
       />
+
       <span>{label}</span>
-      <span style={{ marginLeft: "auto" }}>{state}</span>
+
+      <span style={{ marginLeft: "auto" }}>
+        {state}
+      </span>
     </div>
   );
 }
 
-export default function FullAssembly() {
+export default function FullAssembly({
+  onFinish,
+}) {
   return (
     <Canvas
       shadows
       style={{ width: "100%", height: "100%" }}
       camera={{ position: CAMERA_POSITION, fov: 50 }}
     >
-      <Scene />
+      <Scene
+        onFinish={onFinish}
+      />
     </Canvas>
   );
 }
