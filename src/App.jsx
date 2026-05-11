@@ -12,12 +12,13 @@ import Module2Page from "./PAGES/Modules/Module2";
 import Module3Page from "./PAGES/Modules/Module3";
 import Module4Page from "./PAGES/Modules/Module4";
 
-
-
 export default function App() {
   const [page, setPage] = useState("landing");
   const [userProfile, setUserProfile] = useState(null);
   const [activeTestId, setActiveTestId] = useState(null);
+
+  // ✅ new: remember which dashboard section should open
+  const [dashboardSection, setDashboardSection] = useState("Dashboard");
 
   const handleLogin = (profile) => {
     setUserProfile(profile || null);
@@ -25,41 +26,99 @@ export default function App() {
     if (profile?.role === "admin") {
       setPage("admin");
     } else {
+      setDashboardSection("Dashboard");
       setPage("dashboard");
     }
   };
 
   const handleLogout = () => {
     setUserProfile(null);
+    setActiveTestId(null);
+    setDashboardSection("Dashboard");
     setPage("landing");
   };
+
+  // ✅ central handler for module pages
+const handleModuleBack = (target = "Dashboard") => {
+  if (target === "logout") {
+    handleLogout();
+    return;
+  }
+
+  if (target === "Modules") {
+    setDashboardSection("Modules");
+    setPage("dashboard");
+    return;
+  }
+
+  if (target === "Profile") {
+    setDashboardSection("Profile");
+    setPage("dashboard");
+    return;
+  }
+
+  if (target === "Practice Tests") {
+    setDashboardSection("Practice Tests");
+    setPage("dashboard");
+    return;
+  }
+
+  setDashboardSection("Dashboard");
+  setPage("dashboard");
+};
 
   if (page === "landing") {
     return <ArtictonLandingPage onLogin={handleLogin} />;
   }
 
   if (page === "module-1") {
-    return <Module1Page onBack={() => setPage("dashboard")} />;
+    return (
+      <Module1Page
+        onBack={handleModuleBack}
+        onLogout={handleLogout}
+      />
+    );
   }
+
   if (page === "module-2") {
-  return <Module2Page onBack={() => setPage("dashboard")} 
-  onFinish={() => setPage("dashboard")}
-  />;
-}
-if (page === "module-3") {
-  return <Module3Page onBack={() => setPage("dashboard")} />;
-}
-if (page === "module-4") {
-  return <Module4Page onBack={() => setPage("dashboard")} />;
-}
+    return (
+      <Module2Page
+        onBack={handleModuleBack}
+        onLogout={handleLogout}
+        onFinish={() => {
+          setDashboardSection("Dashboard");
+          setPage("dashboard");
+        }}
+      />
+    );
+  }
 
+  if (page === "module-3") {
+    return (
+      <Module3Page
+        onBack={handleModuleBack}
+        onLogout={handleLogout}
+      />
+    );
+  }
 
+  if (page === "module-4") {
+    return (
+      <Module4Page
+        onBack={handleModuleBack}
+        onLogout={handleLogout}
+      />
+    );
+  }
 
   if (page === "practical-test") {
     return (
       <PracticalTestPage
         testId={activeTestId || "pc-assembly"}
-        onBack={() => setPage("dashboard")}
+        onBack={() => {
+          setDashboardSection("Practice Tests");
+          setPage("dashboard");
+        }}
       />
     );
   }
@@ -75,6 +134,7 @@ if (page === "module-4") {
 
   return (
     <Dashboard
+      initialSection={dashboardSection}
       onLogout={handleLogout}
       onOpenModule={(id) => {
         if (id === "module-1") setPage("module-1");

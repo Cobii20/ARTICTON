@@ -1,666 +1,635 @@
-import React, { useMemo, useRef, useState, useEffect } from "react";
+import React, { useMemo, useRef, useState, useEffect, useCallback } from "react";
 import * as THREE from "three";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { OrbitControls, Environment, useGLTF, ContactShadows, Html } from "@react-three/drei";
+import {
+  OrbitControls,
+  Environment,
+  useGLTF,
+  ContactShadows,
+  Html,
+} from "@react-three/drei";
 
-/** Model URLs - your files should be in public/models/ */
-const CPU_URL = "/models/CPU(BLENDER).glb";
+/** MODEL URLS */
 const MB_URL = "/models/MB(BLENDER).glb";
+const CPU_URL = "/models/CPU(BLENDER).glb";
 
-/** Motherboard transform in world space */
-const MB_POSITION = new THREE.Vector3(-0.5, 0, 0);
-const MB_ROTATION = new THREE.Euler(0, -Math.PI / 2, 0);
+/** CAMERA */
+const CAMERA_POSITION = [45, 18, 18];
+const CONTROL_TARGET = [24, -14, 7];
 
-/**
- * SOCKET / MAGNET POSITION
- * Tweak this until the red marker sits exactly at the center of the socket.
- */
-const SOCKET_WORLD_POSITION = new THREE.Vector3(5.09, 0.12, 4.03);
+/** SNAP / MAGNET */
+const SNAP_DISTANCE = 0.75;
+const MAGNET_DISTANCE = 3.2;
+const MAGNET_STRENGTH = 0.22;
 
-/**
- * Final seated offset.
- * Raise/lower the CPU here until it sits perfectly on the socket.
- */
-const CPU_SEATED_OFFSET = new THREE.Vector3(0, Math.PI / -3.75, 0);
-const SOCKET_SEATED_POSITION = SOCKET_WORLD_POSITION.clone().add(CPU_SEATED_OFFSET);
+/** WORK AREA */
+const BOARD_Y = -14.95;
+const BOARD_CENTER_X = 24;
+const BOARD_CENTER_Z = 6.5;
+const BOARD_SIZE = 22;
+const GRID_DIVISIONS = 11;
 
-/**
- * CPU orientation when fully seated.
- * Set this so the CPU becomes perfectly flat on the motherboard socket.
- */
-const CPU_SEATED_ROTATION = new THREE.Euler(0, 0, 0);
-
-/** How close CPU must be to fully snap into place */
-const SNAP_DISTANCE = 0.12;
-
-/** Magnet zone */
-const MAGNET_DISTANCE = 1.0;
-
-/** Magnetic pull strength */
-const MAGNET_STRENGTH = 0.12;
-
-/** Start rotation only */
-const START_ROTATION = new THREE.Euler(0, 0, 0);
-
-/** Scale adjustments for your models */
-const CPU_SCALE = 1;
+/** MOTHERBOARD POSITION ON WORKBENCH */
+const MB_POSITION = new THREE.Vector3(33.54, -14.87, 11.32);
+const MB_ROTATION = new THREE.Euler(0, Math.PI / 2, 0);
 const MB_SCALE = 1;
 
-function Scene() {
+/**
+ * CPU START POSITION
+ * This is where the CPU begins before being dragged.
+ */
+const CPU_START_POSITION = new THREE.Vector3(18.2, -15.49, 1.2);
+
+/**
+ * CPU DRAG Y LOCK
+ * This keeps the CPU at the correct seated height while dragging.
+ */
+const CPU_DRAG_Y_LOCK = -15.49;
+
+/**
+ * CPU FINAL SEATED POSITION
+ * Provided from your scene.
+ */
+const CPU_SEATED_POSITION = new THREE.Vector3(27.91, -15.49, 6.98);
+
+/**
+ * PURPLE HIGHLIGHT POSITION
+ * This is centered under the seated CPU.
+ * If it is still slightly off, adjust only X and Z here.
+ */
+const CPU_HIGHLIGHT_POSITION = new THREE.Vector3(27.91, -15.44, 6.98);
+
+/**
+ * CPU ROTATION
+ * Keep adjusting the Y value here only if the CPU direction is still wrong.
+ */
+const CPU_START_ROTATION = new THREE.Euler(0, Math.PI, 0);
+const CPU_TARGET_ROTATION = new THREE.Euler(0, Math.PI, 0);
+
+const CPU_COLOR = "#b56dff";
+
+function cloneScene(scene, transparent = false) {
+  const clone = scene.clone(true);
+
+  clone.traverse((o) => {
+    if (!o.isMesh) return;
+
+    o.castShadow = true;
+    o.receiveShadow = true;
+
+    if (transparent && o.material) {
+      if (Array.isArray(o.material)) {
+        o.material = o.material.map((mat) => mat.clone());
+      } else {
+        o.material = o.material.clone();
+      }
+    }
+  });
+
+  return clone;
+}
+
+function setObjectOpacity(root, opacity) {
+  root.traverse((o) => {
+    if (!o.isMesh || !o.material) return;
+
+    const materials = Array.isArray(o.material) ? o.material : [o.material];
+
+    materials.forEach((mat) => {
+      mat.transparent = opacity < 1;
+      mat.opacity = opacity;
+      mat.depthWrite = opacity >= 0.98;
+      mat.needsUpdate = true;
+    });
+  });
+}
+
+function Scene({
+  onNext,
+  onComplete,
+}) {
   const { camera } = useThree();
+  const [cpuPlaced, setCpuPlaced] = useState(false);
+  const completedRef = useRef(false);
 
   useEffect(() => {
-    camera.position.set(0, 6, 0);
-    camera.lookAt(0, 0, 0);
-    camera.updateProjectionMatrix();
+    if (!cpuPlaced) {
+      completedRef.current = false;
+      return;
+    }
+
+    if (completedRef.current) return;
+
+    completedRef.current = true;
+    onComplete?.();
+  }, [cpuPlaced, onComplete]);
+
+  useEffect(() => {
+    camera.position.set(...CAMERA_POSITION);
+    camera.lookAt(...CONTROL_TARGET);
   }, [camera]);
 
   return (
     <>
-      <color attach="background" args={["#070A0F"]} />
+      <color attach="background" args={["#05080D"]} />
 
-      <ambientLight intensity={0.45} />
+      <ambientLight intensity={0.55} />
       <directionalLight
-        position={[4, 6, 2]}
-        intensity={1.35}
+        position={[6, 10, 6]}
+        intensity={1.4}
         castShadow
         shadow-mapSize={[2048, 2048]}
       />
-      <pointLight position={[-3, 1.5, -2]} intensity={0.65} />
+      <pointLight position={[-3, 2, -2]} intensity={0.7} />
 
       <Environment preset="city" />
 
+      <WorkBoard />
       <Motherboard />
-      <SocketWorldMarker visible={true} />
-      <CpuDraggable />
+      <CpuTarget placed={cpuPlaced} />
+      <CPUDraggable
+        placed={cpuPlaced}
+        onPlaced={() => setCpuPlaced(true)}
+      />
 
-      <ContactShadows position={[0, -0.02, 0]} opacity={0.35} scale={8} blur={2.8} far={4} />
+      <InstructionPanel
+        placed={cpuPlaced}
+        onNext={onNext}
+      />
+
+      <ContactShadows
+        position={[BOARD_CENTER_X, BOARD_Y + 0.1, BOARD_CENTER_Z]}
+        opacity={0.38}
+        scale={42}
+        blur={2.8}
+        far={30}
+      />
 
       <OrbitControls
         makeDefault
         enablePan={false}
-        minDistance={15}
-        maxDistance={40}
-        target={[0, 0, 0]}
+        minDistance={14}
+        maxDistance={75}
+        target={CONTROL_TARGET}
         maxPolarAngle={Math.PI / 2}
         mouseButtons={{
-        LEFT: null, // disable left click
-        MIDDLE: THREE.MOUSE.DOLLY,
-        RIGHT: THREE.MOUSE.ROTATE,
-         }}
+          LEFT: null,
+          MIDDLE: THREE.MOUSE.DOLLY,
+          RIGHT: THREE.MOUSE.ROTATE,
+        }}
       />
     </>
   );
 }
 
-function Motherboard() {
-  const { scene } = useGLTF(MB_URL);
-
-  useMemo(() => {
-    scene.traverse((o) => {
-      if (o.isMesh) {
-        o.castShadow = true;
-        o.receiveShadow = true;
-        if (o.material) {
-          o.material.metalness = Math.min(1, (o.material.metalness ?? 0.2) + 0.15);
-          o.material.roughness = Math.min(1, (o.material.roughness ?? 0.8) + 0.05);
-        }
-      }
-    });
-  }, [scene]);
-
+function WorkBoard() {
   return (
-    <group scale={MB_SCALE} position={MB_POSITION} rotation={MB_ROTATION.toArray()}>
-      <primitive object={scene} />
-    </group>
-  );
-}
-
-function SocketWorldMarker({ visible = true }) {
-  if (!visible) return null;
-
-  return (
-    <group position={SOCKET_WORLD_POSITION}>
-      <mesh>
-        <sphereGeometry args={[0.06, 20, 20]} />
-        <meshStandardMaterial color="red" emissive="red" emissiveIntensity={3} />
+    <group>
+      <mesh
+        position={[BOARD_CENTER_X, BOARD_Y, BOARD_CENTER_Z]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        receiveShadow
+      >
+        <planeGeometry args={[BOARD_SIZE, BOARD_SIZE]} />
+        <meshStandardMaterial color="#f6f7fb" roughness={0.58} metalness={0.02} />
       </mesh>
 
-     
+      <gridHelper
+        args={[BOARD_SIZE, GRID_DIVISIONS, "#050505", "#050505"]}
+        position={[BOARD_CENTER_X, BOARD_Y + 0.02, BOARD_CENTER_Z]}
+      />
     </group>
   );
 }
 
-function CpuDraggable() {
+function Motherboard() {
+  const { scene } = useGLTF(MB_URL);
+  const mbClone = useMemo(() => cloneScene(scene, true), [scene]);
+
+  useEffect(() => {
+    setObjectOpacity(mbClone, 1);
+  }, [mbClone]);
+
+  return (
+    <group position={MB_POSITION} rotation={MB_ROTATION.toArray()} scale={MB_SCALE}>
+      <primitive object={mbClone} />
+    </group>
+  );
+}
+
+function CpuTarget({ placed }) {
+  const ringRef = useRef();
+  const fillRef = useRef();
+
+  useFrame(({ clock }) => {
+    if (placed) return;
+
+    const t = (Math.sin(clock.getElapsedTime() * 2.5) + 1) / 2;
+
+    if (ringRef.current) {
+      ringRef.current.scale.setScalar(1 + t * 0.12);
+      ringRef.current.material.opacity = 0.5 + t * 0.35;
+    }
+
+    if (fillRef.current) {
+      fillRef.current.material.opacity = 0.16 + t * 0.16;
+    }
+  });
+
+  return (
+    <group
+      position={[
+        CPU_HIGHLIGHT_POSITION.x,
+        CPU_HIGHLIGHT_POSITION.y,
+        CPU_HIGHLIGHT_POSITION.z,
+      ]}
+      rotation={[-Math.PI / 2, 0, 0]}
+    >
+      <mesh ref={fillRef}>
+        <planeGeometry args={[1.75, 1.75]} />
+        <meshBasicMaterial
+          color={CPU_COLOR}
+          transparent
+          opacity={placed ? 0.16 : 0.24}
+          depthTest={false}
+        />
+      </mesh>
+
+      {!placed && (
+        <mesh ref={ringRef} position={[0, 0, 0.015]}>
+          <ringGeometry args={[0.42, 0.78, 48]} />
+          <meshBasicMaterial
+            color={CPU_COLOR}
+            transparent
+            opacity={0.85}
+            depthTest={false}
+          />
+        </mesh>
+      )}
+
+      {!placed && (
+        <Html center position={[0, -0.05, 0.03]} style={{ pointerEvents: "none" }}>
+          <div
+            style={{
+              padding: "4px 8px",
+              borderRadius: 999,
+              background: "rgba(10,14,22,.86)",
+              border: `1px solid ${CPU_COLOR}aa`,
+              color: "rgba(244,248,255,.95)",
+              fontSize: 10,
+              fontFamily: "monospace",
+              whiteSpace: "nowrap",
+              transform: "translateY(-18px)",
+            }}
+          >
+            Target: CPU socket
+          </div>
+        </Html>
+      )}
+    </group>
+  );
+}
+
+function CPUDraggable({ placed, onPlaced }) {
   const { scene } = useGLTF(CPU_URL);
+  const { gl, camera } = useThree();
+
   const cpuRef = useRef();
-  const { camera, gl } = useThree();
-
-
-  // Interaction states
-  const [dragging, setDragging] = useState(false);
-  const [hovered, setHovered] = useState(false);
-  const [snapped, setSnapped] = useState(false);
-  const [rotating, setRotating] = useState(false);
-  const lastMouse = useRef({ x: 0, y: 0 });
-
-  const startPos = useMemo(() => new THREE.Vector3(-15, 0.18, 0.25), []);
+  const mouse = useRef(new THREE.Vector2());
   const dragOffset = useRef(new THREE.Vector3());
 
+  const [dragging, setDragging] = useState(false);
+  const [snapped, setSnapped] = useState(placed);
+  const [pos, setPos] = useState({
+    x: CPU_START_POSITION.x,
+    y: CPU_START_POSITION.y,
+    z: CPU_START_POSITION.z,
+  });
+
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
-  const mouse = useMemo(() => new THREE.Vector2(), []);
   const hitPoint = useMemo(() => new THREE.Vector3(), []);
 
-  const dragPlane = useMemo(() => new THREE.Plane(), []);
-
-  const startQuat = useMemo(() => new THREE.Quaternion().setFromEuler(START_ROTATION), []);
-  const seatedQuat = useMemo(
-    () => new THREE.Quaternion().setFromEuler(CPU_SEATED_ROTATION),
+  const dragPlane = useMemo(
+    () => new THREE.Plane(new THREE.Vector3(0, 1, 0), -CPU_DRAG_Y_LOCK),
     []
   );
 
-  const [cpuPosition, setCpuPosition] = useState({ x: 0, y: 0, z: 0 });
+  const startQuat = useMemo(
+    () => new THREE.Quaternion().setFromEuler(CPU_START_ROTATION),
+    []
+  );
 
-  useMemo(() => {
-    scene.traverse((o) => {
-      if (o.isMesh) {
-        o.castShadow = true;
-        o.receiveShadow = true;
-        if (o.material) {
-          o.material.metalness = Math.max(o.material.metalness ?? 0.1, 0.2);
-          o.material.roughness = Math.min(o.material.roughness ?? 0.7, 0.8);
-        }
-      }
-    });
-  }, [scene]);
+  const targetQuat = useMemo(
+    () => new THREE.Quaternion().setFromEuler(CPU_TARGET_ROTATION),
+    []
+  );
+
+  const cpuClone = useMemo(() => cloneScene(scene, true), [scene]);
+
+  const updateMouse = useCallback(
+    (e) => {
+      const rect = gl.domElement.getBoundingClientRect();
+
+      mouse.current.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.current.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    },
+    [gl]
+  );
+
+  const isPointerOverCPU = useCallback(() => {
+    if (!cpuRef.current) return false;
+
+    raycaster.setFromCamera(mouse.current, camera);
+    return raycaster.intersectObject(cpuRef.current, true).length > 0;
+  }, [camera, raycaster]);
+
+  const moveToStart = useCallback(() => {
+    if (!cpuRef.current) return;
+
+    cpuRef.current.position.copy(CPU_START_POSITION);
+    cpuRef.current.quaternion.copy(startQuat);
+    setObjectOpacity(cpuRef.current, 1);
+  }, [startQuat]);
+
+  const moveToSeatedPosition = useCallback(() => {
+    if (!cpuRef.current) return;
+
+    cpuRef.current.position.copy(CPU_SEATED_POSITION);
+    cpuRef.current.quaternion.copy(targetQuat);
+    setObjectOpacity(cpuRef.current, 1);
+  }, [targetQuat]);
 
   useEffect(() => {
     if (!cpuRef.current) return;
-    cpuRef.current.position.copy(startPos);
-    cpuRef.current.quaternion.copy(startQuat);
-    cpuRef.current.scale.setScalar(CPU_SCALE);
-  }, [startPos, startQuat]);
 
-  const updateMouse = (ev) => {
-    const rect = gl.domElement.getBoundingClientRect();
-    const x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
-    const y = -(((ev.clientY - rect.top) / rect.height) * 2 - 1);
-    mouse.set(x, y);
-  };
+    cpuRef.current.scale.setScalar(1);
 
-  const onPointerOver = (e) => {
-    e.stopPropagation();
-    setHovered(true);
-    document.body.style.cursor = snapped ? "not-allowed" : "grab";
-  };
+    if (placed) {
+      moveToSeatedPosition();
+      setSnapped(true);
+      setDragging(false);
+    } else {
+      moveToStart();
+      setSnapped(false);
+      setDragging(false);
+    }
+  }, [placed, moveToStart, moveToSeatedPosition]);
 
-  const onPointerOut = (e) => {
-    e.stopPropagation();
-    setHovered(false);
-    document.body.style.cursor = "default";
-  };
+  useEffect(() => {
+    const handlePointerDown = (e) => {
+      if (e.button !== 0 || !cpuRef.current || snapped) return;
 
- const onPointerDown = (e) => {
-  e.stopPropagation();
+      updateMouse(e);
 
-  // ONLY LEFT CLICK
-  if (e.button !== 0) return;
-  if (snapped || !cpuRef.current) return;
+      const hitCPU = isPointerOverCPU();
 
-  if (e.button === 2) {
-  // RIGHT CLICK = ROTATE
-  setRotating(true);
-  lastMouse.current = { x: e.clientX, y: e.clientY };
-  document.body.style.cursor = "grabbing";
-  return;
-}
-  updateMouse(e);
+      if (!hitCPU && !dragging) return;
 
-  const planeNormal = new THREE.Vector3();
-  camera.getWorldDirection(planeNormal);
-  dragPlane.setFromNormalAndCoplanarPoint(planeNormal, cpuRef.current.position);
+      if (!dragging) {
+        raycaster.setFromCamera(mouse.current, camera);
 
-  raycaster.setFromCamera(mouse, camera);
-  if (raycaster.ray.intersectPlane(dragPlane, hitPoint)) {
-    dragOffset.current.copy(cpuRef.current.position).sub(hitPoint);
-  } else {
-    dragOffset.current.set(0, 0, 0);
-  }
+        if (raycaster.ray.intersectPlane(dragPlane, hitPoint)) {
+          dragOffset.current.set(
+            cpuRef.current.position.x - hitPoint.x,
+            0,
+            cpuRef.current.position.z - hitPoint.z
+          );
+        }
 
-  setDragging(true);
-  document.body.style.cursor = "grabbing";
-};
+        setDragging(true);
+        document.body.style.cursor = "grabbing";
+      } else {
+        setDragging(false);
+        document.body.style.cursor = "default";
 
- const onPointerUp = (e) => {
-  e.stopPropagation();
+        const dist = new THREE.Vector2(
+          cpuRef.current.position.x - CPU_SEATED_POSITION.x,
+          cpuRef.current.position.z - CPU_SEATED_POSITION.z
+        ).length();
 
-  // ONLY LEFT CLICK RELEASE
-  if (e.button !== 0) return;
+        if (dist < SNAP_DISTANCE * 1.25) {
+          moveToSeatedPosition();
+          setSnapped(true);
+          onPlaced?.();
+        }
+      }
+    };
 
-  setDragging(false);
-  document.body.style.cursor = hovered ? "grab" : "default";
+    gl.domElement.addEventListener("pointerdown", handlePointerDown);
 
-  if (!cpuRef.current) return;
+    return () => {
+      gl.domElement.removeEventListener("pointerdown", handlePointerDown);
+    };
+  }, [
+    camera,
+    dragPlane,
+    dragging,
+    gl,
+    hitPoint,
+    isPointerOverCPU,
+    moveToSeatedPosition,
+    onPlaced,
+    raycaster,
+    snapped,
+    updateMouse,
+  ]);
 
-  const dist = cpuRef.current.position.distanceTo(SOCKET_WORLD_POSITION);
-  if (dist < SNAP_DISTANCE || dist < MAGNET_DISTANCE * 0.35) {
-    setSnapped(true);
-  }
-  if (e.button === 2) {
-  setRotating(false);
-  document.body.style.cursor = "default";
-  return;
-}
-};
+  useEffect(() => {
+    const handlePointerMove = (e) => updateMouse(e);
+    const preventContext = (e) => e.preventDefault();
+
+    gl.domElement.addEventListener("pointermove", handlePointerMove);
+    gl.domElement.addEventListener("contextmenu", preventContext);
+
+    return () => {
+      gl.domElement.removeEventListener("pointermove", handlePointerMove);
+      gl.domElement.removeEventListener("contextmenu", preventContext);
+      document.body.style.cursor = "default";
+    };
+  }, [gl, updateMouse]);
 
   useFrame(() => {
     if (!cpuRef.current) return;
 
     if (snapped) {
-      cpuRef.current.position.lerp(SOCKET_SEATED_POSITION, 0.18);
-      cpuRef.current.quaternion.slerp(seatedQuat, 0.18);
-      return;
-    }
+      cpuRef.current.position.lerp(CPU_SEATED_POSITION, 0.28);
+      cpuRef.current.quaternion.slerp(targetQuat, 0.28);
+    } else {
+      cpuRef.current.quaternion.slerp(targetQuat, 0.08);
 
-    if (!dragging) return;
+      if (dragging) {
+        raycaster.setFromCamera(mouse.current, camera);
 
-    const planeNormal = new THREE.Vector3();
-    camera.getWorldDirection(planeNormal);
-    dragPlane.setFromNormalAndCoplanarPoint(planeNormal, cpuRef.current.position);
+        if (raycaster.ray.intersectPlane(dragPlane, hitPoint)) {
+          const targetDragPosition = new THREE.Vector3(
+            hitPoint.x + dragOffset.current.x,
+            CPU_DRAG_Y_LOCK,
+            hitPoint.z + dragOffset.current.z
+          );
 
-    raycaster.setFromCamera(mouse, camera);
-    if (raycaster.ray.intersectPlane(dragPlane, hitPoint)) {
-      const target = hitPoint.clone().add(dragOffset.current);
+          cpuRef.current.position.lerp(targetDragPosition, 0.35);
+        }
+      }
 
-      target.x = THREE.MathUtils.clamp(target.x, -3.5, 15.5);
-      target.y = THREE.MathUtils.clamp(target.y, -0.6, 3.8);
-      target.z = THREE.MathUtils.clamp(target.z, -3.6, 15.8);
+      cpuRef.current.position.y = CPU_DRAG_Y_LOCK;
 
-      cpuRef.current.position.lerp(target, 0.35);
-    }
+      const dist = new THREE.Vector2(
+        cpuRef.current.position.x - CPU_SEATED_POSITION.x,
+        cpuRef.current.position.z - CPU_SEATED_POSITION.z
+      ).length();
 
-    const dist = cpuRef.current.position.distanceTo(SOCKET_WORLD_POSITION);
+      if (dist < MAGNET_DISTANCE) {
+        const pull = MAGNET_STRENGTH + (1 - dist / MAGNET_DISTANCE) * 0.22;
 
-    if (dist < MAGNET_DISTANCE) {
-      const t = 1 - dist / MAGNET_DISTANCE;
-      const pullStrength = MAGNET_STRENGTH + t * 0.18;
+        const snapTarget = new THREE.Vector3(
+          CPU_SEATED_POSITION.x,
+          CPU_DRAG_Y_LOCK,
+          CPU_SEATED_POSITION.z
+        );
 
-      cpuRef.current.position.lerp(SOCKET_WORLD_POSITION, pullStrength);
+        cpuRef.current.position.lerp(snapTarget, pull);
+        cpuRef.current.quaternion.slerp(targetQuat, pull);
 
-      if (dist < SNAP_DISTANCE * 1.2) {
-        setSnapped(true);
-        setDragging(false);
-        document.body.style.cursor = hovered ? "grab" : "default";
+        if (dist < SNAP_DISTANCE) {
+          moveToSeatedPosition();
+          setSnapped(true);
+          setDragging(false);
+          document.body.style.cursor = "default";
+          onPlaced?.();
+        }
       }
     }
+
+    const worldPos = new THREE.Vector3();
+    cpuRef.current.getWorldPosition(worldPos);
+
+    setPos({
+      x: worldPos.x,
+      y: worldPos.y,
+      z: worldPos.z,
+    });
   });
-
-  useEffect(() => {
-    const el = gl.domElement;
-
-    const onMove = (ev) => updateMouse(ev);
-
-    el.addEventListener("pointermove", onMove, { passive: true });
-    return () => el.removeEventListener("pointermove", onMove);
-  }, [gl]);
-
-  const [distance, setDistance] = useState(null);
-
-  useEffect(() => {
-  const preventContextMenu = (e) => e.preventDefault();
-  gl.domElement.addEventListener("contextmenu", preventContextMenu);
-
-  return () => {
-    gl.domElement.removeEventListener("contextmenu", preventContextMenu);
-  };
-}, [gl]);
-
-  useFrame(() => {
-  if (!cpuRef.current) return;
-
-  // ✅ ROTATION (RIGHT CLICK HOLD)
-  if (rotating && !snapped) {
-    const dx = mouse.x;
-    const dy = mouse.y;
-
-    cpuRef.current.rotation.y += dx * 0.05;
-    cpuRef.current.rotation.x += dy * 0.05;
-  }
-
-  // ✅ UPDATE POSITION DISPLAY
-  setCpuPosition({
-    x: cpuRef.current.position.x,
-    y: cpuRef.current.position.y,
-    z: cpuRef.current.position.z,
-  });
-
-  // ✅ DISTANCE CHECK
-  if (dragging && !snapped) {
-    setDistance(cpuRef.current.position.distanceTo(SOCKET_WORLD_POSITION));
-  } else {
-    setDistance(null);
-  }
-});
-  
-  
 
   return (
     <group>
-      <group
-        ref={cpuRef}
-        onPointerOver={onPointerOver}
-        onPointerOut={onPointerOut}
-        onPointerDown={onPointerDown}
-        onPointerUp={onPointerUp}
-      >
-        <primitive object={scene} />
-        <mesh visible={hovered && !snapped} position={[0, 0, -0.01]}>
-          <ringGeometry args={[0.06, 0.085, 40]} />
-          <meshBasicMaterial color="#7cffe1" transparent opacity={0.35} />
-        </mesh>
+      <group ref={cpuRef}>
+        <primitive object={cpuClone} />
+      </group>
 
-        <Html
-          position={[0, 0.14, 0]}
-          center
-          style={{
-            pointerEvents: "none",
-            transform: "translate3d(0,0,0)",
-            opacity: snapped ? 0.9 : hovered ? 0.98 : 0.78,
-            transition: "opacity 200ms ease",
-            fontFamily: "ui-sans-serif, system-ui",
-          }}
-        >
+      {!snapped && (
+        <Html fullscreen style={{ pointerEvents: "none", overflow: "hidden" }}>
           <div
             style={{
-              padding: "8px 10px",
-              borderRadius: 12,
-              background: "rgba(10,14,22,.72)",
-              border: "1px solid rgba(140,255,230,.22)",
+              position: "absolute",
+              left: 24,
+              bottom: 24,
+              padding: "12px 16px",
+              minWidth: 260,
+              borderRadius: 16,
+              background: "rgba(10,14,22,.78)",
+              border: `1px solid ${CPU_COLOR}66`,
               backdropFilter: "blur(8px)",
               color: "rgba(234,240,255,.95)",
               fontSize: 12,
-              letterSpacing: ".02em",
-              whiteSpace: "nowrap",
-              lineHeight: 1.45,
-              textAlign: "left",
-              minWidth: 130,
+              fontFamily: "monospace",
+              textAlign: "center",
+              boxShadow: "0 10px 30px rgba(0,0,0,.35)",
             }}
           >
-            <div>{snapped ? "CPU seated" : dragging ? "Move CPU in 3D" : "Drag CPU"}</div>
-            <div
-              style={{
-                marginTop: 6,
-                fontFamily:
-                  "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-              }}
-            >
-              x: {cpuPosition.x.toFixed(2)}
+            <div style={{ fontWeight: "bold", marginBottom: 4 }}>CPU</div>
+            <div style={{ marginBottom: 8 }}>
+              {dragging ? "Dragging to CPU socket" : "Click CPU to grab"}
             </div>
-            <div
-              style={{
-                fontFamily:
-                  "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-              }}
-            >
-              y: {cpuPosition.y.toFixed(2)}
-            </div>
-            <div
-              style={{
-                fontFamily:
-                  "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-              }}
-            >
-              z: {cpuPosition.z.toFixed(2)}
-            </div>
-            {distance != null ? (
-              <div style={{ marginTop: 6, opacity: 0.8 }}>d={distance.toFixed(2)}</div>
-            ) : null}
+            <div>x: {pos.x.toFixed(2)}</div>
+            <div>y: {pos.y.toFixed(2)}</div>
+            <div>z: {pos.z.toFixed(2)}</div>
           </div>
         </Html>
-      </group>
-
-      {snapped ? (
-        <ResetCpuButton
-          cpuRef={cpuRef}
-          startPos={startPos}
-          startQuat={startQuat}
-          onReset={() => setSnapped(false)}
-        />
-      ) : null}
+      )}
     </group>
   );
 }
 
-function ResetCpuButton({ cpuRef, startPos, startQuat, onReset }) {
-  const { gl } = useThree();
-
+function InstructionPanel({
+  placed,
+  onNext,
+}) {
   return (
-    <Html position={[-0.78, 0.45, 0]} style={{ pointerEvents: "auto" }}>
-      <button
-        onClick={() => {
-          if (!cpuRef.current) return;
-          cpuRef.current.position.copy(startPos);
-          cpuRef.current.quaternion.copy(startQuat);
-          onReset();
-          gl.domElement.blur?.();
-        }}
+    <Html fullscreen style={{ pointerEvents: "none" }}>
+      <div
         style={{
-          appearance: "none",
+          position: "absolute",
+          top: 22,
+          left: 24,
+          padding: "12px 16px",
+          minWidth: 300,
+          borderRadius: 16,
+          background: "rgba(10,14,22,.78)",
           border: "1px solid rgba(255,255,255,.14)",
-          background: "rgba(10,14,22,.6)",
-          color: "rgba(234,240,255,.9)",
-          padding: "10px 12px",
-          borderRadius: 14,
+          backdropFilter: "blur(8px)",
+          color: "rgba(234,240,255,.95)",
           fontSize: 12,
-          letterSpacing: ".02em",
-          cursor: "pointer",
+          fontFamily: "monospace",
           boxShadow: "0 10px 30px rgba(0,0,0,.35)",
         }}
-        onMouseEnter={() => (document.body.style.cursor = "pointer")}
-        onMouseLeave={() => (document.body.style.cursor = "default")}
       >
-        Reset CPU
-      </button>
+        <div style={{ fontWeight: "bold", marginBottom: 8 }}>
+          Step 1: CPU to Motherboard
+        </div>
+
+        <div style={{ marginBottom: 10 }}>
+          {placed
+            ? "CPU seated on motherboard."
+            : "Drag the CPU onto the CPU socket on the motherboard."}
+        </div>
+
+        <div style={{ display: "grid", gap: 5 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              opacity: 1,
+            }}
+          >
+            <span
+              style={{
+                width: 9,
+                height: 9,
+                borderRadius: 999,
+                background: CPU_COLOR,
+                display: "inline-block",
+                boxShadow: placed ? "none" : `0 0 14px ${CPU_COLOR}`,
+              }}
+            />
+            <span>1. CPU</span>
+            <span style={{ marginLeft: "auto" }}>
+              {placed ? "done" : "active"}
+            </span>
+          </div>
+        </div>
+      </div>
     </Html>
   );
 }
 
-export default function CPUtoMB() {
+export default function CPUtoMB({
+  onNext,
+  onComplete,
+}) {
   return (
-  
     <Canvas
+      shadows
       style={{ width: "100%", height: "100%" }}
-      camera={{ position: [0, 6, 2], fov: 50 }}
+      camera={{ position: CAMERA_POSITION, fov: 50 }}
     >
-      <Scene />
+      <Scene
+        onNext={onNext}
+        onComplete={onComplete}
+      />
     </Canvas>
-
   );
 }
 
-const styles = {
-  shell: {
-    
-    width: "100%",
-    height: "100%",
-
-    display: "grid",
-    gridTemplateRows: "auto 1fr",
-    background:
-      "radial-gradient(1200px 700px at 70% 10%, rgba(124,255,225,.10), transparent 60%), radial-gradient(900px 600px at 20% 30%, rgba(120,150,255,.08), transparent 55%), #070A0F",
-    color: "#f1f1f1",
-    fontFamily: "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
-  },
-
-  topbar: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "flex-start",
-    padding: "10px 16px",
-    borderBottom: "1px solid rgba(255,255,255,.08)",
-    background: "linear-gradient(to bottom, rgba(10,14,22,.65), rgba(10,14,22,.35))",
-    backdropFilter: "blur(10px)",
-    zIndex: 2,
-  },
-
-  brand: {
-    display: "flex",
-    alignItems: "center",
-    gap: 12,
-  },
-
-  dot: {
-    width: 10,
-    height: 10,
-    borderRadius: 999,
-    background: "rgba(124,255,225,.9)",
-    boxShadow: "0 0 0 6px rgba(124,255,225,.08)",
-  },
-
-  title: {
-    fontWeight: 700,
-    letterSpacing: ".02em",
-  },
-
-  subtitle: {
-    fontSize: 12,
-    opacity: 0.75,
-    marginTop: 2,
-  },
-
-  main: {
-    minHeight: 0,
-    display: "grid",
-    gridTemplateColumns: "1fr",
-    width: "100%",
-    height: "100%",
-  },
-
-  leftSection: {
-    minWidth: 0,
-    minHeight: 0,
-    display: "grid",
-    gridTemplateRows: "minmax(0, 1fr) auto",
-    padding: 14,
-    gap: 12,
-  },
-
-  videoFrame: {
-    position: "relative",
-    width: "100%",
-    height: "100%",
-    minHeight: 0,
-    borderRadius: 18,
-    overflow: "hidden",
-    background: "#000",
-    border: "1px solid rgba(255,255,255,.06)",
-    boxShadow: "0 18px 50px rgba(0,0,0,.35)",
-  },
-
-  canvas: {
-    width: "100%",
-    height: "100%",
-    display: "block",
-  },
-
-  videoMeta: {
-    padding: "0 4px 4px",
-    textAlign: "center",
-  },
-
-  videoTitle: {
-    fontSize: 18,
-    fontWeight: 700,
-    color: "#f8f8f8",
-  },
-
-  videoSubMeta: {
-    marginTop: 6,
-    fontSize: 12.5,
-    color: "rgba(255,255,255,.68)",
-    lineHeight: 1.5,
-  },
-
-  rightSection: {
-    minHeight: 0,
-    borderLeft: "1px solid rgba(255,255,255,.08)",
-    background: "linear-gradient(to bottom, rgba(10,14,22,.35), rgba(10,14,22,.55))",
-    backdropFilter: "blur(10px)",
-    display: "grid",
-    gridTemplateRows: "auto 1fr",
-  },
-
-  hintBar: {
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    flexWrap: "wrap",
-    padding: "12px 14px",
-    borderBottom: "1px solid rgba(255,255,255,.06)",
-  },
-
-  hintText: {
-    fontSize: 12,
-    opacity: 0.8,
-  },
-
-  kbd: {
-    fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-    fontSize: 11,
-    padding: "5px 9px",
-    borderRadius: 10,
-    border: "1px solid rgba(255,255,255,.14)",
-    background: "rgba(10,14,22,.55)",
-    color: "#f1f1f1",
-  },
-
-  panel: {
-    padding: 14,
-    overflowY: "auto",
-  },
-
-  panelBlock: {
-    padding: 14,
-    borderRadius: 18,
-    border: "1px solid rgba(255,255,255,.10)",
-    background: "rgba(6,8,12,.35)",
-    boxShadow: "0 18px 45px rgba(0,0,0,.35)",
-    marginBottom: 12,
-  },
-
-  panelH: {
-    fontWeight: 700,
-    letterSpacing: ".02em",
-    marginBottom: 8,
-    textAlign: "center",
-  },
-
-  panelP: {
-    fontSize: 12.5,
-    lineHeight: 1.7,
-    opacity: 0.85,
-    textAlign: "center",
-  },
-
-  path: {
-    marginTop: 8,
-    fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-    fontSize: 12,
-    padding: "8px 10px",
-    borderRadius: 14,
-    border: "1px solid rgba(255,255,255,.12)",
-    background: "rgba(10,14,22,.55)",
-    wordBreak: "break-all",
-  },
-
-  codeLine: {
-    marginTop: 6,
-    fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-    fontSize: 12,
-    opacity: 0.9,
-  },
-};
-
-// Preload models for better UX
-useGLTF.preload(CPU_URL);
 useGLTF.preload(MB_URL);
+useGLTF.preload(CPU_URL);
