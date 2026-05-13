@@ -242,12 +242,6 @@ function Scene({
         }}
       />
 
-      <InstructionPanel
-        placed={psuPlaced}
-        inserting={psuInserting}
-        onNext={onNext}
-      />
-
       <ContactShadows
         position={[BOARD_CENTER_X, BOARD_Y + 0.1, BOARD_CENTER_Z]}
         opacity={0.38}
@@ -507,11 +501,6 @@ function PSUDraggable({ placed, onInsertStart, onPlaced }) {
   const insertProgress = useRef(0);
 
   const [phase, setPhase] = useState(placed ? "snapped" : "readyToDrag");
-  const [pos, setPos] = useState({
-    x: PSU_START_POSITION.x,
-    y: PSU_START_POSITION.y,
-    z: PSU_START_POSITION.z,
-  });
 
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const hitPoint = useMemo(() => new THREE.Vector3(), []);
@@ -773,136 +762,14 @@ function PSUDraggable({ placed, onInsertStart, onPlaced }) {
       psuRef.current.position.lerp(PSU_SEATED_POSITION, 0.28);
       psuRef.current.quaternion.slerp(seatedQuat, 0.28);
     }
-
-    const worldPos = new THREE.Vector3();
-    psuRef.current.getWorldPosition(worldPos);
-
-    setPos({
-      x: worldPos.x,
-      y: worldPos.y,
-      z: worldPos.z,
-    });
   });
-
-  const statusText =
-    phase === "readyToDrag"
-      ? "Click PSU to grab"
-      : phase === "dragging"
-      ? "Drag PSU to insert point"
-      : phase === "inserting"
-      ? "Sliding PSU into seated position..."
-      : "PSU installed into case";
 
   return (
     <group>
       <group ref={psuRef}>
         <primitive object={psuClone} />
       </group>
-
-      {phase !== "snapped" && (
-        <Html fullscreen style={{ pointerEvents: "none" }}>
-          <div
-            style={{
-              position: "absolute",
-              left: 24,
-              bottom: 24,
-              padding: "12px 16px",
-              minWidth: 300,
-              borderRadius: 16,
-              background: "rgba(10,14,22,.78)",
-              border: `1px solid ${PSU_COLOR}66`,
-              backdropFilter: "blur(8px)",
-              color: "rgba(234,240,255,.95)",
-              fontSize: 12,
-              fontFamily: "monospace",
-              textAlign: "center",
-              boxShadow: "0 10px 30px rgba(0,0,0,.35)",
-            }}
-          >
-            <div style={{ fontWeight: "bold", marginBottom: 4 }}>PSU</div>
-
-            <div style={{ marginBottom: 8 }}>{statusText}</div>
-
-            <div>x: {pos.x.toFixed(2)}</div>
-            <div>y: {pos.y.toFixed(2)}</div>
-            <div>z: {pos.z.toFixed(2)}</div>
-          </div>
-        </Html>
-      )}
     </group>
-  );
-}
-
-function InstructionPanel({
-  placed,
-  inserting,
-  onNext,
-}) {
-  return (
-    <Html fullscreen style={{ pointerEvents: "none" }}>
-      <div
-        style={{
-          position: "absolute",
-          top: 22,
-          left: 24,
-          padding: "12px 16px",
-          minWidth: 430,
-          borderRadius: 16,
-          background: "rgba(10,14,22,.78)",
-          border: "1px solid rgba(255,255,255,.14)",
-          backdropFilter: "blur(8px)",
-          color: "rgba(234,240,255,.95)",
-          fontSize: 12,
-          fontFamily: "monospace",
-          boxShadow: "0 10px 30px rgba(0,0,0,.35)",
-        }}
-      >
-        <div style={{ fontWeight: "bold", marginBottom: 8 }}>
-          Step 6: PSU to Case
-        </div>
-
-        <div style={{ marginBottom: 10 }}>
-          {placed
-            ? "PSU seated inside the case."
-            : inserting
-            ? "PSU is smoothly sliding into its final seated position."
-            : "Click the PSU to grab it, move it to the insert point, then it will slide into the seated position."}
-        </div>
-
-        <div style={{ display: "grid", gap: 5 }}>
-          <StepDot color={CPU_COLOR} label="1. CPU" state="done" />
-          <StepDot color={RAM_COLOR} label="2. RAM" state="done" />
-          <StepDot color={SSD_COLOR} label="3. SSD" state="done" />
-          <StepDot color={MB_COLOR} label="4. Motherboard to case" state="done" />
-          <StepDot color={HDD_COLOR} label="5. HDD to case" state="done" />
-          <StepDot
-            color={PSU_COLOR}
-            label="6. PSU to case"
-            state={placed ? "done" : inserting ? "inserting" : "active"}
-            glow={!placed}
-          />
-        </div>
-      </div>
-    </Html>
-  );
-}
-
-function StepDot({ color, label, state, glow = false }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      <span
-        style={{
-          width: 9,
-          height: 9,
-          borderRadius: 999,
-          background: color,
-          display: "inline-block",
-          boxShadow: glow ? `0 0 14px ${color}` : "none",
-        }}
-      />
-      <span>{label}</span>
-      <span style={{ marginLeft: "auto" }}>{state}</span>
-    </div>
   );
 }
 

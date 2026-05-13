@@ -104,10 +104,7 @@ function setObjectOpacity(root, opacity) {
   });
 }
 
-function Scene({
-  onNext,
-  onComplete,
-}) {
+function Scene({ onComplete }) {
   const { camera } = useThree();
   const [cpuPlaced, setCpuPlaced] = useState(false);
   const completedRef = useRef(false);
@@ -150,11 +147,6 @@ function Scene({
       <CPUDraggable
         placed={cpuPlaced}
         onPlaced={() => setCpuPlaced(true)}
-      />
-
-      <InstructionPanel
-        placed={cpuPlaced}
-        onNext={onNext}
       />
 
       <ContactShadows
@@ -300,12 +292,6 @@ function CPUDraggable({ placed, onPlaced }) {
 
   const [dragging, setDragging] = useState(false);
   const [snapped, setSnapped] = useState(placed);
-  const [pos, setPos] = useState({
-    x: CPU_START_POSITION.x,
-    y: CPU_START_POSITION.y,
-    z: CPU_START_POSITION.z,
-  });
-
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const hitPoint = useMemo(() => new THREE.Vector3(), []);
 
@@ -499,15 +485,6 @@ function CPUDraggable({ placed, onPlaced }) {
         }
       }
     }
-
-    const worldPos = new THREE.Vector3();
-    cpuRef.current.getWorldPosition(worldPos);
-
-    setPos({
-      x: worldPos.x,
-      y: worldPos.y,
-      z: worldPos.z,
-    });
   });
 
   return (
@@ -515,108 +492,11 @@ function CPUDraggable({ placed, onPlaced }) {
       <group ref={cpuRef}>
         <primitive object={cpuClone} />
       </group>
-
-      {!snapped && (
-        <Html fullscreen style={{ pointerEvents: "none", overflow: "hidden" }}>
-          <div
-            style={{
-              position: "absolute",
-              left: 24,
-              bottom: 24,
-              padding: "12px 16px",
-              minWidth: 260,
-              borderRadius: 16,
-              background: "rgba(10,14,22,.78)",
-              border: `1px solid ${CPU_COLOR}66`,
-              backdropFilter: "blur(8px)",
-              color: "rgba(234,240,255,.95)",
-              fontSize: 12,
-              fontFamily: "monospace",
-              textAlign: "center",
-              boxShadow: "0 10px 30px rgba(0,0,0,.35)",
-            }}
-          >
-            <div style={{ fontWeight: "bold", marginBottom: 4 }}>CPU</div>
-            <div style={{ marginBottom: 8 }}>
-              {dragging ? "Dragging to CPU socket" : "Click CPU to grab"}
-            </div>
-            <div>x: {pos.x.toFixed(2)}</div>
-            <div>y: {pos.y.toFixed(2)}</div>
-            <div>z: {pos.z.toFixed(2)}</div>
-          </div>
-        </Html>
-      )}
     </group>
   );
 }
 
-function InstructionPanel({
-  placed,
-  onNext,
-}) {
-  return (
-    <Html fullscreen style={{ pointerEvents: "none" }}>
-      <div
-        style={{
-          position: "absolute",
-          top: 22,
-          left: 24,
-          padding: "12px 16px",
-          minWidth: 300,
-          borderRadius: 16,
-          background: "rgba(10,14,22,.78)",
-          border: "1px solid rgba(255,255,255,.14)",
-          backdropFilter: "blur(8px)",
-          color: "rgba(234,240,255,.95)",
-          fontSize: 12,
-          fontFamily: "monospace",
-          boxShadow: "0 10px 30px rgba(0,0,0,.35)",
-        }}
-      >
-        <div style={{ fontWeight: "bold", marginBottom: 8 }}>
-          Step 1: CPU to Motherboard
-        </div>
-
-        <div style={{ marginBottom: 10 }}>
-          {placed
-            ? "CPU seated on motherboard."
-            : "Drag the CPU onto the CPU socket on the motherboard."}
-        </div>
-
-        <div style={{ display: "grid", gap: 5 }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              opacity: 1,
-            }}
-          >
-            <span
-              style={{
-                width: 9,
-                height: 9,
-                borderRadius: 999,
-                background: CPU_COLOR,
-                display: "inline-block",
-                boxShadow: placed ? "none" : `0 0 14px ${CPU_COLOR}`,
-              }}
-            />
-            <span>1. CPU</span>
-            <span style={{ marginLeft: "auto" }}>
-              {placed ? "done" : "active"}
-            </span>
-          </div>
-        </div>
-      </div>
-    </Html>
-  );
-}
-
-export default function CPUtoMB({
-  onNext,
-  onComplete,
-}) {
+export default function CPUtoMB({ onComplete }) {
   return (
     <Canvas
       shadows
@@ -624,7 +504,6 @@ export default function CPUtoMB({
       camera={{ position: CAMERA_POSITION, fov: 50 }}
     >
       <Scene
-        onNext={onNext}
         onComplete={onComplete}
       />
     </Canvas>

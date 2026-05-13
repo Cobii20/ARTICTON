@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState, useEffect, useCallback } from "react";
+import React, { Suspense, useMemo, useRef, useState, useEffect, useCallback } from "react";
 import * as THREE from "three";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import {
@@ -10,7 +10,7 @@ import {
 } from "@react-three/drei";
 
 /** MODEL URLS */
-const CASE_URL = "/models/PC CASE(BLENDER).glb";
+const CASE_URL = "/models/PC%20CASE(BLENDER).glb";
 const MB_URL   = "/models/MB(BLENDER).glb";
 const CPU_URL  = "/models/CPU(BLENDER).glb";
 const RAM_URL  = "/models/RAM(BLENDER).glb";
@@ -384,149 +384,6 @@ function StaticAssembly() {
   return <primitive object={seatedGroup} />;
 }
 
-/** ================= SIDE STATUS ================= */
-
-function SideStatus({
-  detached,
-  dragging,
-  snapped,
-  animating,
-  hovered,
-  nearTarget,
-  progress,
-  pos,
-}) {
-  const text = animating
-    ? "Extracting motherboard"
-    : !detached && hovered
-    ? "Click to remove"
-    : !detached
-    ? "Hover motherboard"
-    : snapped
-    ? "Placed on board"
-    : dragging && nearTarget
-    ? "Release near target"
-    : dragging
-    ? "Guide to green ring"
-    : nearTarget
-    ? "Click to place"
-    : hovered
-    ? "Click to grab"
-    : "Move over motherboard";
-
-  return (
-    <Html fullscreen style={{ pointerEvents: "none" }}>
-      <div
-        style={{
-          position: "absolute",
-          left: 24,
-          bottom: 24,
-          padding: "12px 16px",
-          minWidth: 250,
-          borderRadius: 16,
-          background: "rgba(10,14,22,.78)",
-          border:
-            hovered || nearTarget
-              ? "1px solid rgba(0,255,180,.58)"
-              : "1px solid rgba(0,255,180,.22)",
-          backdropFilter: "blur(8px)",
-          color: "rgba(234,240,255,.95)",
-          fontSize: 12,
-          fontFamily: "monospace",
-          textAlign: "center",
-          boxShadow:
-            hovered || nearTarget
-              ? "0 10px 36px rgba(0,255,180,.16)"
-              : "0 10px 30px rgba(0,0,0,.35)",
-          transition: "border .18s ease, box-shadow .18s ease",
-        }}
-      >
-        <div style={{ fontWeight: "bold", marginBottom: 4 }}>Motherboard</div>
-        <div style={{ marginBottom: 8 }}>{text}</div>
-
-        {animating && (
-          <div
-            style={{
-              height: 5,
-              width: "100%",
-              overflow: "hidden",
-              borderRadius: 999,
-              marginBottom: 10,
-              background: "rgba(255,255,255,.12)",
-            }}
-          >
-            <div
-              style={{
-                height: "100%",
-                width: `${Math.round(progress * 100)}%`,
-                background: "rgba(0,255,180,.85)",
-                transition: "width .12s linear",
-              }}
-            />
-          </div>
-        )}
-
-        <div>x: {pos.x.toFixed(2)}</div>
-        <div>y: {pos.y.toFixed(2)}</div>
-        <div>z: {pos.z.toFixed(2)}</div>
-      </div>
-    </Html>
-  );
-}
-
-/** ================= FLOATING HINT ================= */
-
-function FloatingHint({ detached, dragging, snapped, animating, hovered, nearTarget }) {
-  if (snapped) return null;
-
-  const label = animating
-    ? "extracting..."
-    : !detached
-    ? hovered
-      ? "click to remove"
-      : "motherboard"
-    : dragging && nearTarget
-    ? "release here"
-    : dragging
-    ? "move to ring"
-    : nearTarget
-    ? "click to place"
-    : hovered
-    ? "click to grab"
-    : "drag motherboard";
-
-  return (
-    <Html
-      position={[
-        MB_RING_POSITION.x,
-        MB_FLOOR_POSITION.y + 1.25,
-        MB_RING_POSITION.z,
-      ]}
-      center
-      style={{ pointerEvents: "none" }}
-    >
-      <div
-        style={{
-          padding: "6px 10px",
-          borderRadius: 999,
-          background: "rgba(10,14,22,.76)",
-          border:
-            hovered || nearTarget
-              ? "1px solid rgba(0,255,180,.72)"
-              : "1px solid rgba(255,255,255,.16)",
-          color: "rgba(234,240,255,.92)",
-          fontFamily: "monospace",
-          fontSize: 11,
-          whiteSpace: "nowrap",
-          boxShadow: "0 8px 22px rgba(0,0,0,.32)",
-        }}
-      >
-        {label}
-      </div>
-    </Html>
-  );
-}
-
 /** ================= MOTHERBOARD DRAGGABLE ================= */
 
 function MotherboardDraggable({ isPlaced = false, onPlaced, onResetPlaced }) {
@@ -540,14 +397,7 @@ function MotherboardDraggable({ isPlaced = false, onPlaced, onResetPlaced }) {
   const [detached, setDetached] = useState(isPlaced);
   const [snapped, setSnapped] = useState(isPlaced);
   const [animatingExtract, setAnimatingExtract] = useState(false);
-  const [animationProgress, setAnimationProgress] = useState(0);
   const [nearTarget, setNearTarget] = useState(false);
-
-  const [pos, setPos] = useState({
-    x: MB_SEATED_POSITION.x,
-    y: MB_SEATED_POSITION.y,
-    z: MB_SEATED_POSITION.z,
-  });
 
   const mouse = useRef(new THREE.Vector2());
   const dragOffset = useRef(new THREE.Vector3());
@@ -634,7 +484,6 @@ function MotherboardDraggable({ isPlaced = false, onPlaced, onResetPlaced }) {
 
     extractProgress.current = 0;
 
-    setAnimationProgress(0);
     setDetached(true);
     setDragging(false);
     setSnapped(false);
@@ -672,8 +521,7 @@ function MotherboardDraggable({ isPlaced = false, onPlaced, onResetPlaced }) {
       setDetached(false);
       setSnapped(false);
       setAnimatingExtract(false);
-      setAnimationProgress(0);
-      setNearTarget(false);
+        setNearTarget(false);
     }
   }, [isPlaced, placeMotherboardInstalled, placeMotherboardOnBoard]);
 
@@ -875,8 +723,6 @@ function MotherboardDraggable({ isPlaced = false, onPlaced, onResetPlaced }) {
         setObjectOpacity(mbRef.current, t);
       }
 
-      setAnimationProgress(rawT);
-
       if (rawT >= 1) {
         placeMotherboardHoverReady();
 
@@ -885,7 +731,6 @@ function MotherboardDraggable({ isPlaced = false, onPlaced, onResetPlaced }) {
         setDragging(false);
         setHovered(false);
         setNearTarget(false);
-        setAnimationProgress(1);
       }
     } else if (!detached && !snapped) {
       mbRef.current.position.lerp(MB_SEATED_POSITION, 0.2);
@@ -931,15 +776,6 @@ function MotherboardDraggable({ isPlaced = false, onPlaced, onResetPlaced }) {
         mbRef.current.quaternion.slerp(floorQuat, 0.18 + magnetT * 0.18);
       }
     }
-
-    const worldPos = new THREE.Vector3();
-    mbRef.current.getWorldPosition(worldPos);
-
-    setPos({
-      x: worldPos.x,
-      y: worldPos.y,
-      z: worldPos.z,
-    });
   });
 
   return (
@@ -947,26 +783,6 @@ function MotherboardDraggable({ isPlaced = false, onPlaced, onResetPlaced }) {
       <group ref={mbRef}>
         <primitive object={mbClone} />
       </group>
-
-      <FloatingHint
-        detached={detached}
-        dragging={dragging}
-        snapped={snapped}
-        animating={animatingExtract}
-        hovered={hovered}
-        nearTarget={nearTarget}
-      />
-
-      <SideStatus
-        detached={detached}
-        dragging={dragging}
-        snapped={snapped}
-        animating={animatingExtract}
-        hovered={hovered}
-        nearTarget={nearTarget}
-        progress={animationProgress}
-        pos={pos}
-      />
 
       {snapped && (
         <ResetMotherboardButton
@@ -979,8 +795,7 @@ function MotherboardDraggable({ isPlaced = false, onPlaced, onResetPlaced }) {
             setAnimatingExtract(false);
             setHovered(false);
             setNearTarget(false);
-            setAnimationProgress(0);
-
+        
             document.body.style.cursor = "default";
             onResetPlaced?.();
           }}
@@ -1032,10 +847,12 @@ export default function DisassemblyMotherboard({ placementApi, onComplete }) {
       style={{ width: "100%", height: "100%" }}
       camera={{ position: CAMERA_POSITION, fov: 50 }}
     >
-      <Scene
-        placementApi={placementApi}
-        onComplete={onComplete}
-      />
+      <Suspense fallback={null}>
+        <Scene
+          placementApi={placementApi}
+          onComplete={onComplete}
+        />
+      </Suspense>
     </Canvas>
   );
 }

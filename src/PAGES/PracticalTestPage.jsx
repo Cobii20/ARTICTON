@@ -25,9 +25,11 @@ const TESTS = [
     desc: "PC Hardware Basics • Beginner",
     durationMin: 20,
     badge: "Quiz",
-    passingPercent: 70,
+    passingPercent: 60,
+    practiceUnlockPercent: 60,
     instructions: [
       "Finish Module 1 first before taking this quiz.",
+      "Score 60% or higher to unlock the practice test.",
       "Answer all questions before submitting.",
       "The quiz auto-submits when time runs out.",
     ],
@@ -85,9 +87,11 @@ const TESTS = [
     desc: "PC Assembly • Guided Build",
     durationMin: 25,
     badge: "Quiz",
-    passingPercent: 70,
+    passingPercent: 60,
+    practiceUnlockPercent: 60,
     instructions: [
       "Finish Module 2 first before taking this quiz.",
+      "Score 60% or higher to unlock the practice test.",
       "Answer all questions before submitting.",
       "The quiz auto-submits when time runs out.",
     ],
@@ -158,9 +162,11 @@ const TESTS = [
     desc: "PC Disassembly • Safe Removal",
     durationMin: 25,
     badge: "Quiz",
-    passingPercent: 70,
+    passingPercent: 60,
+    practiceUnlockPercent: 60,
     instructions: [
       "Finish Module 3 first before taking this quiz.",
+      "Score 60% or higher to unlock the practice test.",
       "Answer all questions before submitting.",
       "The quiz auto-submits when time runs out.",
     ],
@@ -246,9 +252,11 @@ const TESTS = [
     desc: "Troubleshooting and Safety • Assessment",
     durationMin: 25,
     badge: "Quiz",
-    passingPercent: 70,
+    passingPercent: 60,
+    practiceUnlockPercent: 60,
     instructions: [
       "Finish Module 4 first before taking this quiz.",
+      "Score 60% or higher to unlock the practice test.",
       "Answer all questions before submitting.",
       "The quiz auto-submits when time runs out.",
     ],
@@ -549,6 +557,7 @@ export default function PracticalTestPage({
   }, [score, total]);
 
   const passed = finished && scorePercent >= test.passingPercent;
+  const practiceUnlocked = finished && scorePercent >= test.practiceUnlockPercent;
 
   const fmt = (s) => {
     const mm = String(Math.floor(s / 60)).padStart(2, "0");
@@ -575,28 +584,105 @@ export default function PracticalTestPage({
   }) => {
     const user = auth.currentUser;
 
-    if (!user) return;
+    if (!user) {
+      throw new Error("No logged-in user. Quiz progress was not saved.");
+    }
 
     const userRef = doc(db, "users", user.uid);
+
+    const alreadyUnlocked =
+      !!profileProgress?.practiceTestAccess?.[test.quizKey]?.unlocked;
+
+    const newlyUnlocked = finalPercent >= test.practiceUnlockPercent;
+    const unlocked = alreadyUnlocked || newlyUnlocked;
+
+    const quizPayload = {
+      completed: true,
+      finished: true,
+      passed: finalPassed,
+      score: finalScore,
+      total,
+      percent: finalPercent,
+      passingPercent: test.passingPercent,
+      practiceUnlockPercent: test.practiceUnlockPercent,
+      autoSubmitted,
+      updatedAt: serverTimestamp(),
+    };
+
+    const practiceAccessPayload = {
+      unlocked,
+      requiredPercent: test.practiceUnlockPercent,
+      latestScore: finalScore,
+      latestTotal: total,
+      latestPercent: finalPercent,
+      sourceQuizId: test.id,
+      updatedAt: serverTimestamp(),
+    };
+
+    if (newlyUnlocked && !alreadyUnlocked) {
+      practiceAccessPayload.unlockedAt = serverTimestamp();
+    }
 
     await setDoc(
       userRef,
       {
         quizProgress: {
-          [test.quizKey]: {
-            completed: true,
-            passed: finalPassed,
-            score: finalScore,
-            total,
-            percent: finalPercent,
-            passingPercent: test.passingPercent,
-            autoSubmitted,
-            updatedAt: serverTimestamp(),
-          },
+          [test.quizKey]: quizPayload,
+        },
+        practiceTestAccess: {
+          [test.quizKey]: practiceAccessPayload,
         },
       },
       { merge: true }
     );
+
+    const localUpdatedAt = new Date().toISOString();
+
+    setProfileProgress((previous) => ({
+      ...(previous || {}),
+      quizProgress: {
+        ...(previous?.quizProgress || {}),
+        [test.quizKey]: {
+          ...quizPayload,
+          updatedAt: localUpdatedAt,
+        },
+      },
+      practiceTestAccess: {
+        ...(previous?.practiceTestAccess || {}),
+        [test.quizKey]: {
+          ...(previous?.practiceTestAccess?.[test.quizKey] || {}),
+          ...practiceAccessPayload,
+          updatedAt: localUpdatedAt,
+          unlockedAt:
+            newlyUnlocked && !alreadyUnlocked
+              ? localUpdatedAt
+              : previous?.practiceTestAccess?.[test.quizKey]?.unlockedAt,
+        },
+      },
+    }));
+
+    try {
+      localStorage.setItem("articton-last-progress-update", String(Date.now()));
+
+      window.dispatchEvent(
+        new CustomEvent("articton-progress-updated", {
+          detail: {
+            type: "practice-unlock",
+            module: test.quizKey,
+            completed: true,
+            unlocked,
+            percent: finalPercent,
+          },
+        })
+      );
+    } catch {
+      // Optional dashboard refresh signal only.
+    }
+
+    return {
+      quizPayload,
+      practiceAccessPayload,
+    };
   };
 
   const handleSubmit = async (auto = false) => {
@@ -618,17 +704,21 @@ export default function PracticalTestPage({
         finalPassed,
         autoSubmitted: auto,
       });
-    } catch (err) {
-      setSaveError(err.message || "Quiz was submitted, but saving failed.");
-    } finally {
+
       setFinished(true);
       setStarted(false);
-      setSubmitSaving(false);
 
       if (auto) {
         // eslint-disable-next-line no-alert
         alert("Time is up! Your quiz has been submitted automatically.");
       }
+    } catch (err) {
+      setSaveError(
+        err.message ||
+          "Quiz was not saved. Please check Firebase rules or your internet connection, then submit again."
+      );
+    } finally {
+      setSubmitSaving(false);
     }
   };
 
@@ -648,7 +738,7 @@ export default function PracticalTestPage({
   const AUTO_NEXT_DELAY_MS = 220;
 
   const selectAnswer = (idx) => {
-    if (!started || finished || isLocked) return;
+    if (!started || finished || isLocked || submitSaving) return;
 
     setAnswers((prev) => ({
       ...prev,
@@ -1110,6 +1200,20 @@ export default function PracticalTestPage({
                         ].join(" ")}
                       >
                         {passed ? "Passed" : "Needs Retake"}
+                      </span>
+                    </div>
+
+                    <div className="mt-1 text-[12px] text-white/60">
+                      Practice Test:{" "}
+                      <span
+                        className={[
+                          "font-semibold",
+                          practiceUnlocked ? "text-[#b7fff0]" : "text-red-200",
+                        ].join(" ")}
+                      >
+                        {practiceUnlocked
+                          ? "Unlocked"
+                          : `Locked until ${test.practiceUnlockPercent}%`}
                       </span>
                     </div>
 

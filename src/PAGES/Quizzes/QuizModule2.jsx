@@ -17,9 +17,11 @@ const QUIZ_SETTINGS = {
   title: "Module 2 Quiz",
   desc: "PC Assembly • Sequence and Component Placement",
   durationMin: 20,
-  passingPercent: 70,
+  passingPercent: 60,
+  practiceUnlockPercent: 60,
   instructions: [
     "Finish Module 2 first before taking this quiz.",
+    "Score 60% or higher to unlock the practice test.",
     "This quiz includes assembly sequence, component placement, and 3D identification questions.",
     "For 3D questions, inspect the model and choose the correct component.",
     "The quiz auto-submits when time runs out.",
@@ -494,7 +496,17 @@ export default function QuizModule2({ onBack, onQuizComplete }) {
       throw new Error("No logged-in user. Quiz progress was not saved.");
     }
 
-    const savedPayload = {
+    const userRef = doc(db, "users", currentUser.uid);
+
+    const alreadyUnlocked =
+      !!profile?.practiceTestAccess?.[QUIZ_SETTINGS.quizKey]?.unlocked;
+
+    const newlyUnlocked =
+      finalPercent >= QUIZ_SETTINGS.practiceUnlockPercent;
+
+    const practiceUnlocked = alreadyUnlocked || newlyUnlocked;
+
+    const quizPayload = {
       completed: true,
       finished: true,
       passed: finalPassed,
@@ -502,29 +514,59 @@ export default function QuizModule2({ onBack, onQuizComplete }) {
       total,
       percent: finalPercent,
       passingPercent: QUIZ_SETTINGS.passingPercent,
+      practiceUnlockPercent: QUIZ_SETTINGS.practiceUnlockPercent,
       autoSubmitted,
       updatedAt: serverTimestamp(),
     };
 
-    const userRef = doc(db, "users", currentUser.uid);
+    const practiceAccessPayload = {
+      unlocked: practiceUnlocked,
+      requiredPercent: QUIZ_SETTINGS.practiceUnlockPercent,
+      latestScore: finalScore,
+      latestTotal: total,
+      latestPercent: finalPercent,
+      sourceQuizId: QUIZ_SETTINGS.id,
+      updatedAt: serverTimestamp(),
+    };
+
+    if (newlyUnlocked && !alreadyUnlocked) {
+      practiceAccessPayload.unlockedAt = serverTimestamp();
+    }
 
     await setDoc(
       userRef,
       {
         quizProgress: {
-          module2: savedPayload,
+          [QUIZ_SETTINGS.quizKey]: quizPayload,
+        },
+        practiceTestAccess: {
+          [QUIZ_SETTINGS.quizKey]: practiceAccessPayload,
         },
       },
       { merge: true }
     );
 
+    const localUpdatedAt = new Date().toISOString();
+
     setProfile((previous) => ({
       ...(previous || {}),
       quizProgress: {
         ...(previous?.quizProgress || {}),
-        module2: {
-          ...savedPayload,
-          updatedAt: new Date().toISOString(),
+        [QUIZ_SETTINGS.quizKey]: {
+          ...quizPayload,
+          updatedAt: localUpdatedAt,
+        },
+      },
+      practiceTestAccess: {
+        ...(previous?.practiceTestAccess || {}),
+        [QUIZ_SETTINGS.quizKey]: {
+          ...(previous?.practiceTestAccess?.[QUIZ_SETTINGS.quizKey] || {}),
+          ...practiceAccessPayload,
+          updatedAt: localUpdatedAt,
+          unlockedAt:
+            newlyUnlocked && !alreadyUnlocked
+              ? localUpdatedAt
+              : previous?.practiceTestAccess?.[QUIZ_SETTINGS.quizKey]?.unlockedAt,
         },
       },
     }));
@@ -534,9 +576,11 @@ export default function QuizModule2({ onBack, onQuizComplete }) {
       window.dispatchEvent(
         new CustomEvent("articton-progress-updated", {
           detail: {
-            type: "quiz",
-            module: "module2",
+            type: "practice-unlock",
+            module: QUIZ_SETTINGS.quizKey,
             completed: true,
+            unlocked: practiceUnlocked,
+            percent: finalPercent,
           },
         })
       );
@@ -544,12 +588,16 @@ export default function QuizModule2({ onBack, onQuizComplete }) {
       // Optional dashboard refresh signal only.
     }
 
-    onQuizComplete?.("module2", {
-      ...savedPayload,
-      updatedAt: new Date().toISOString(),
+    onQuizComplete?.(QUIZ_SETTINGS.quizKey, {
+      ...quizPayload,
+      updatedAt: localUpdatedAt,
+      practiceUnlocked,
     });
 
-    return savedPayload;
+    return {
+      quizPayload,
+      practiceAccessPayload,
+    };
   };
 
   const handleSubmit = async (auto = false, answerOverride = answers) => {
@@ -578,8 +626,11 @@ export default function QuizModule2({ onBack, onQuizComplete }) {
         alert("Time is up! Your quiz has been submitted automatically.");
       }
     } catch (err) {
-      console.error("Quiz Module 2 save error:", err);
-      setSaveError(err.message || "Quiz was not saved. Please check Firebase rules or your internet connection, then submit again.");
+      console.error(`${QUIZ_SETTINGS.title} save error:`, err);
+      setSaveError(
+        err.message ||
+          "Quiz was not saved. Please check Firebase rules or your internet connection, then submit again."
+      );
     } finally {
       setSubmitSaving(false);
     }

@@ -201,9 +201,7 @@ function getCurrentStep(placed) {
   return STEPS.find((step) => !placed[step.id])?.id || "complete";
 }
 
-function Scene({
-  onComplete,
-}) {
+function Scene({ onComplete }) {
   const { camera } = useThree();
 
   const [placed, setPlaced] = useState({
@@ -416,12 +414,6 @@ function Scene({
         highlightSize={[4.2, 4.2]}
         targetLabel="Target: PSU insert point"
         onPlaced={() => markPlaced("psu")}
-      />
-
-      <InstructionPanel
-        currentStep={currentStep}
-        placed={placed}
-        complete={complete}
       />
 
       <ContactShadows
@@ -666,11 +658,6 @@ function PlaneSnapDraggable({
 
   const [dragging, setDragging] = useState(false);
   const [snapped, setSnapped] = useState(placed);
-  const [pos, setPos] = useState({
-    x: startPosition.x,
-    y: startPosition.y,
-    z: startPosition.z,
-  });
 
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const hitPoint = useMemo(() => new THREE.Vector3(), []);
@@ -872,15 +859,6 @@ function PlaneSnapDraggable({
         }
       }
     }
-
-    const worldPos = new THREE.Vector3();
-    partRef.current.getWorldPosition(worldPos);
-
-    setPos({
-      x: worldPos.x,
-      y: worldPos.y,
-      z: worldPos.z,
-    });
   });
 
   return (
@@ -888,15 +866,6 @@ function PlaneSnapDraggable({
       <group ref={partRef}>
         <primitive object={clone} />
       </group>
-
-      {active && !snapped && (
-        <SideStatus
-          label={label}
-          color={color}
-          text={dragging ? `Dragging ${label}` : `Click ${label} to grab`}
-          pos={pos}
-        />
-      )}
     </group>
   );
 }
@@ -914,11 +883,6 @@ function MotherboardAssemblyToCase({ active, unlocked, placed, onPlaced }) {
 
   const [phase, setPhase] = useState(placed ? "snapped" : "idle");
   const [snapped, setSnapped] = useState(placed);
-  const [pos, setPos] = useState({
-    x: MB_ASSEMBLY_START_OFFSET.x,
-    y: MB_ASSEMBLY_START_OFFSET.y,
-    z: MB_ASSEMBLY_START_OFFSET.z,
-  });
 
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const hitPoint = useMemo(() => new THREE.Vector3(), []);
@@ -1192,27 +1156,7 @@ function MotherboardAssemblyToCase({ active, unlocked, placed, onPlaced }) {
       assemblyRef.current.position.lerp(MB_ASSEMBLY_CASE_TARGET_OFFSET, 0.28);
       assemblyRef.current.quaternion.slerp(caseQuat, 0.28);
     }
-
-    const worldPos = new THREE.Vector3();
-    assemblyRef.current.getWorldPosition(worldPos);
-
-    setPos({
-      x: worldPos.x,
-      y: worldPos.y,
-      z: worldPos.z,
-    });
   });
-
-  const statusText =
-    phase === "idle"
-      ? "Click motherboard assembly to start transition"
-      : phase === "floatingToCaseFront"
-      ? "Floating motherboard assembly to case..."
-      : phase === "readyToDrag"
-      ? "Click motherboard assembly again to grab"
-      : phase === "dragging"
-      ? "Drag motherboard assembly into case"
-      : "Motherboard assembly installed";
 
   return (
     <group>
@@ -1222,15 +1166,6 @@ function MotherboardAssemblyToCase({ active, unlocked, placed, onPlaced }) {
         <StaticRAM />
         <StaticSSD />
       </group>
-
-      {active && !snapped && (
-        <SideStatus
-          label="Motherboard Assembly"
-          color={MB_COLOR}
-          text={statusText}
-          pos={pos}
-        />
-      )}
     </group>
   );
 }
@@ -1268,11 +1203,6 @@ function InsertTransitionDraggable({
   const insertProgress = useRef(0);
 
   const [phase, setPhase] = useState(placed ? "snapped" : "readyToDrag");
-  const [pos, setPos] = useState({
-    x: startPosition.x,
-    y: startPosition.y,
-    z: startPosition.z,
-  });
 
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const hitPoint = useMemo(() => new THREE.Vector3(), []);
@@ -1533,25 +1463,7 @@ function InsertTransitionDraggable({
       partRef.current.position.lerp(seatedPosition, 0.28);
       partRef.current.quaternion.slerp(seatedQuat, 0.28);
     }
-
-    const worldPos = new THREE.Vector3();
-    partRef.current.getWorldPosition(worldPos);
-
-    setPos({
-      x: worldPos.x,
-      y: worldPos.y,
-      z: worldPos.z,
-    });
   });
-
-  const statusText =
-    phase === "readyToDrag"
-      ? `Click ${label} to grab`
-      : phase === "dragging"
-      ? `Drag ${label} to insert point`
-      : phase === "inserting"
-      ? `Sliding ${label} into seated position...`
-      : `${label} installed`;
 
   return (
     <group>
@@ -1568,128 +1480,11 @@ function InsertTransitionDraggable({
       <group ref={partRef}>
         <primitive object={clone} />
       </group>
-
-      {active && phase !== "snapped" && (
-        <SideStatus label={label} color={color} text={statusText} pos={pos} />
-      )}
     </group>
   );
 }
 
-function SideStatus({ label, color, text, pos }) {
-  return (
-    <Html fullscreen style={{ pointerEvents: "none" }}>
-      <div
-        style={{
-          position: "absolute",
-          left: 24,
-          bottom: 24,
-          padding: "12px 16px",
-          minWidth: 300,
-          borderRadius: 16,
-          background: "rgba(10,14,22,.78)",
-          border: `1px solid ${color}66`,
-          backdropFilter: "blur(8px)",
-          color: "rgba(234,240,255,.95)",
-          fontSize: 12,
-          fontFamily: "monospace",
-          textAlign: "center",
-          boxShadow: "0 10px 30px rgba(0,0,0,.35)",
-        }}
-      >
-        <div style={{ fontWeight: "bold", marginBottom: 4 }}>{label}</div>
-        <div style={{ marginBottom: 8 }}>{text}</div>
-        <div>x: {pos.x.toFixed(2)}</div>
-        <div>y: {pos.y.toFixed(2)}</div>
-        <div>z: {pos.z.toFixed(2)}</div>
-      </div>
-    </Html>
-  );
-}
-
-function InstructionPanel({ currentStep, placed, complete }) {
-  return (
-    <Html fullscreen style={{ pointerEvents: "none" }}>
-      <div
-        style={{
-          position: "absolute",
-          top: 22,
-          left: 24,
-          padding: "12px 16px",
-          minWidth: 430,
-          borderRadius: 16,
-          background: "rgba(10,14,22,.78)",
-          border: "1px solid rgba(255,255,255,.14)",
-          backdropFilter: "blur(8px)",
-          color: "rgba(234,240,255,.95)",
-          fontSize: 12,
-          fontFamily: "monospace",
-          boxShadow: "0 10px 30px rgba(0,0,0,.35)",
-        }}
-      >
-        <div style={{ fontWeight: "bold", marginBottom: 8 }}>
-          Full PC Assembly
-        </div>
-
-        <div style={{ marginBottom: 10 }}>
-          {complete
-            ? "Assembly complete."
-            : `Current step: ${
-                STEPS.find((step) => step.id === currentStep)?.label || "Done"
-              }`}
-        </div>
-
-        <div style={{ display: "grid", gap: 5 }}>
-          {STEPS.map((step, index) => {
-            const isDone = placed[step.id];
-            const isActive = currentStep === step.id && !isDone;
-
-            return (
-              <StepDot
-                key={step.id}
-                color={step.color}
-                label={`${index + 1}. ${step.label}`}
-                state={isDone ? "done" : isActive ? "active" : "locked"}
-                glow={isActive}
-                muted={!isDone && !isActive}
-              />
-            );
-          })}
-        </div>
-      </div>
-    </Html>
-  );
-}
-
-function StepDot({ color, label, state, glow = false, muted = false }) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        opacity: muted ? 0.45 : 1,
-      }}
-    >
-      <span
-        style={{
-          width: 9,
-          height: 9,
-          borderRadius: 999,
-          background: color,
-          display: "inline-block",
-          boxShadow: glow ? `0 0 14px ${color}` : "none",
-        }}
-      />
-      <span>{label}</span>
-      <span style={{ marginLeft: "auto" }}>{state}</span>
-    </div>
-  );
-}
-
-export default function FullAssembly({
-  onComplete,
-}) {
+export default function FullAssembly({ onComplete }) {
   return (
     <Canvas
       shadows

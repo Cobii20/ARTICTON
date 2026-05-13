@@ -33,28 +33,31 @@ const SNAP_DISTANCE = 0.75;
 const MAGNET_DISTANCE = 3.2;
 const MAGNET_STRENGTH = 0.22;
 
-/** STATIC PART POSITIONS */
+/** STATIC PART POSITIONS INSIDE THE CASE */
 const MB_POSITION = new THREE.Vector3(-0.6, -0.6, 2.99);
 const MB_ROTATION = new THREE.Euler(0, 0, -Math.PI / 2);
 
 const CPU_POSITION = new THREE.Vector3(-1.25, -4.95, -2.66);
 const CPU_ROTATION = new THREE.Euler(Math.PI / 2, 0, -Math.PI / 2);
 
-const RAM_SEATED_POSITION = new THREE.Vector3(13.73, -24.61, 9.06);
-const RAM_SEATED_ROTATION = new THREE.Euler(Math.PI / 2, 0, 0);
+/** REMOVED PART POSITIONS ON THE BOARD */
+const RAM_FLOOR_POSITION = new THREE.Vector3(13.73, -24.61, 9.06);
+const RAM_FLOOR_ROTATION = new THREE.Euler(Math.PI / 2, 0, 0);
 
-const HDD_SEATED_POSITION = new THREE.Vector3(15.50, -16.06, 10.96);
-const HDD_SEATED_ROTATION = new THREE.Euler(0, 0, 0);
+const HDD_FLOOR_POSITION = new THREE.Vector3(15.5, -16.06, 10.96);
+const HDD_FLOOR_ROTATION = new THREE.Euler(0, 0, 0);
 
-const SSD_SEATED_POSITION = new THREE.Vector3(12.94, -17.21, 7.36);
-const SSD_SEATED_ROTATION = new THREE.Euler(0, 0, 0);
+const SSD_FLOOR_POSITION = new THREE.Vector3(12.94, -17.21, 7.36);
+const SSD_FLOOR_ROTATION = new THREE.Euler(0, 0, 0);
 
-/** PSU installed position inside the case */
+/** PSU installed start position inside the case */
 const PSU_INSTALLED_POSITION = new THREE.Vector3(4.27, -15.66, 6.22);
 const PSU_INSTALLED_ROTATION = new THREE.Euler(0, Math.PI, 0);
+
+/** PSU flat rotation after detached */
 const PSU_FLAT_ROTATION = new THREE.Euler(0, Math.PI, 0);
 
-/** PSU seated/floor position — updated from tracker */
+/** PSU seated position on checkerboard */
 const PSU_LOCKED_Y = -15.81;
 const PSU_FLOOR_POSITION = new THREE.Vector3(19.38, PSU_LOCKED_Y, 11.75);
 
@@ -66,8 +69,8 @@ const BOARD_SIZE = 22;
 const GRID_DIVISIONS = 11;
 const CELL_SIZE = BOARD_SIZE / GRID_DIVISIONS;
 
-/** Ring stays at its original calibrated position — decoupled from PSU_FLOOR_POSITION */
-const PSU_RING_POSITION = new THREE.Vector3(15.52, BOARD_Y + 0.03, 5.39);
+/** PSU ring anchor */
+const PSU_RING_POSITION = new THREE.Vector3(19.38, PSU_LOCKED_Y, 11.75);
 
 /** ================= SCENE ================= */
 
@@ -107,7 +110,7 @@ function Scene({ placementApi, onComplete }) {
       <Environment preset="city" />
 
       <PCCase />
-      <StaticAssembly />
+      <MotherboardAssemblySeated />
       <PlacementGuideBoard snapped={snapped} />
 
       <PSUDraggable
@@ -149,7 +152,7 @@ function PulsingRing() {
 
   useFrame(({ clock }) => {
     const t = (Math.sin(clock.getElapsedTime() * 2.5) + 1) / 2;
-    if (outerRef.current)     outerRef.current.material.opacity     = 0.4 + t * 0.55;
+    if (outerRef.current) outerRef.current.material.opacity = 0.4 + t * 0.55;
     if (innerFillRef.current) innerFillRef.current.material.opacity = 0.12 + t * 0.22;
   });
 
@@ -159,16 +162,18 @@ function PulsingRing() {
       rotation={[-Math.PI / 2, 0, 0]}
     >
       <mesh ref={innerFillRef}>
-        <planeGeometry args={[CELL_SIZE * 0.42, CELL_SIZE * 0.42]} />
-        <meshBasicMaterial color="#00ffb4" transparent opacity={0.15} depthTest={false} />
+        <planeGeometry args={[CELL_SIZE * 0.1, CELL_SIZE * 0.1]} />
+        <meshBasicMaterial color="#ff4d6d" transparent opacity={0.15} />
       </mesh>
+
       <mesh ref={outerRef} position={[0, 0, 0.01]}>
-        <ringGeometry args={[0.18, 0.32, 48]} />
-        <meshBasicMaterial color="#00ffb4" transparent opacity={0.9} depthTest={false} />
+        <ringGeometry args={[0.045, 0.08, 48]} />
+        <meshBasicMaterial color="#ff4d6d" transparent opacity={0.9} />
       </mesh>
+
       <mesh position={[0, 0, 0.02]}>
-        <ringGeometry args={[0.07, 0.15, 48]} />
-        <meshBasicMaterial color="#00ffb4" transparent opacity={0.5} depthTest={false} />
+        <ringGeometry args={[0.018, 0.04, 48]} />
+        <meshBasicMaterial color="#ff4d6d" transparent opacity={0.5} />
       </mesh>
     </group>
   );
@@ -187,10 +192,12 @@ function PlacementGuideBoard({ snapped }) {
         <planeGeometry args={[BOARD_SIZE, BOARD_SIZE]} />
         <meshStandardMaterial color="#ffffff" roughness={0.58} metalness={0.02} />
       </mesh>
+
       <gridHelper
         args={[BOARD_SIZE, GRID_DIVISIONS, "#000000", "#000000"]}
         position={[BOARD_CENTER_X, BOARD_Y + 0.02, BOARD_CENTER_Z]}
       />
+
       {!snapped && <PulsingRing />}
     </group>
   );
@@ -200,10 +207,14 @@ function PlacementGuideBoard({ snapped }) {
 
 function PCCase() {
   const { scene } = useGLTF(CASE_URL);
+
   const caseClone = useMemo(() => {
     const clone = scene.clone(true);
-    clone.traverse((o) => {
-      if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; }
+    clone.traverse((object) => {
+      if (object.isMesh) {
+        object.castShadow = true;
+        object.receiveShadow = true;
+      }
     });
     return clone;
   }, [scene]);
@@ -215,10 +226,10 @@ function PCCase() {
   );
 }
 
-/** ================= STATIC ASSEMBLY (MB + CPU + RAM + HDD + SSD) ================= */
+/** ================= STATIC ASSEMBLY ================= */
 
-function StaticAssembly() {
-  const mbGltf  = useGLTF(MB_URL);
+function MotherboardAssemblySeated() {
+  const mbGltf = useGLTF(MB_URL);
   const cpuGltf = useGLTF(CPU_URL);
   const ramGltf = useGLTF(RAM_URL);
   const hddGltf = useGLTF(HDD_URL);
@@ -228,68 +239,41 @@ function StaticAssembly() {
     const group = new THREE.Group();
 
     const mb = mbGltf.scene.clone(true);
-    mb.position.copy(MB_POSITION); mb.rotation.copy(MB_ROTATION); group.add(mb);
+    mb.position.copy(MB_POSITION);
+    mb.rotation.copy(MB_ROTATION);
+    group.add(mb);
 
     const cpu = cpuGltf.scene.clone(true);
-    cpu.position.copy(CPU_POSITION); cpu.rotation.copy(CPU_ROTATION); group.add(cpu);
+    cpu.position.copy(CPU_POSITION);
+    cpu.rotation.copy(CPU_ROTATION);
+    group.add(cpu);
 
     const ram = ramGltf.scene.clone(true);
-    ram.position.copy(RAM_SEATED_POSITION); ram.rotation.copy(RAM_SEATED_ROTATION); group.add(ram);
+    ram.position.copy(RAM_FLOOR_POSITION);
+    ram.rotation.copy(RAM_FLOOR_ROTATION);
+    group.add(ram);
 
     const hdd = hddGltf.scene.clone(true);
-    hdd.position.copy(HDD_SEATED_POSITION); hdd.rotation.copy(HDD_SEATED_ROTATION); group.add(hdd);
+    hdd.position.copy(HDD_FLOOR_POSITION);
+    hdd.rotation.copy(HDD_FLOOR_ROTATION);
+    group.add(hdd);
 
     const ssd = ssdGltf.scene.clone(true);
-    ssd.position.copy(SSD_SEATED_POSITION); ssd.rotation.copy(SSD_SEATED_ROTATION); group.add(ssd);
+    ssd.position.copy(SSD_FLOOR_POSITION);
+    ssd.rotation.copy(SSD_FLOOR_ROTATION);
+    group.add(ssd);
 
-    group.traverse((o) => {
-      if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; }
+    group.traverse((object) => {
+      if (object.isMesh) {
+        object.castShadow = true;
+        object.receiveShadow = true;
+      }
     });
+
     return group;
   }, [mbGltf.scene, cpuGltf.scene, ramGltf.scene, hddGltf.scene, ssdGltf.scene]);
 
   return <primitive object={seatedGroup} />;
-}
-
-/** ================= SIDE STATUS ================= */
-
-function SideStatus({ detached, dragging, snapped, pos }) {
-  const text = !detached
-    ? "Click to detach"
-    : snapped
-    ? "Placed on floor"
-    : dragging
-    ? "Dragging to target"
-    : "Click to grab";
-
-  return (
-    <Html fullscreen style={{ pointerEvents: "none" }}>
-      <div
-        style={{
-          position: "absolute",
-          left: 24,
-          bottom: 24,
-          padding: "12px 16px",
-          minWidth: 220,
-          borderRadius: 16,
-          background: "rgba(10,14,22,.78)",
-          border: "1px solid rgba(0,255,180,.22)",
-          backdropFilter: "blur(8px)",
-          color: "rgba(234,240,255,.95)",
-          fontSize: 12,
-          fontFamily: "monospace",
-          textAlign: "center",
-          boxShadow: "0 10px 30px rgba(0,0,0,.35)",
-        }}
-      >
-        <div style={{ fontWeight: "bold", marginBottom: 4 }}>PSU</div>
-        <div style={{ marginBottom: 8 }}>{text}</div>
-        <div>x: {pos.x.toFixed(2)}</div>
-        <div>y: {pos.y.toFixed(2)}</div>
-        <div>z: {pos.z.toFixed(2)}</div>
-      </div>
-    </Html>
-  );
 }
 
 /** ================= PSU DRAGGABLE ================= */
@@ -302,26 +286,18 @@ function PSUDraggable({ isPlaced = false, onPlaced, onResetPlaced }) {
   const [dragging, setDragging] = useState(false);
   const [detached, setDetached] = useState(isPlaced);
   const [snapped, setSnapped] = useState(isPlaced);
-  const [pos, setPos] = useState({
-    x: PSU_INSTALLED_POSITION.x,
-    y: PSU_INSTALLED_POSITION.y,
-    z: PSU_INSTALLED_POSITION.z,
-  });
 
   const dragOffset = useRef(new THREE.Vector3());
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const mouse = useRef(new THREE.Vector2());
   const hitPoint = useMemo(() => new THREE.Vector3(), []);
-
-  const dragPlane = useMemo(
-    () => new THREE.Plane(new THREE.Vector3(0, 1, 0), -PSU_LOCKED_Y),
-    []
-  );
+  const dragPlane = useMemo(() => new THREE.Plane(), []);
 
   const installedQuat = useMemo(
     () => new THREE.Quaternion().setFromEuler(PSU_INSTALLED_ROTATION),
     []
   );
+
   const flatQuat = useMemo(
     () => new THREE.Quaternion().setFromEuler(PSU_FLAT_ROTATION),
     []
@@ -329,18 +305,23 @@ function PSUDraggable({ isPlaced = false, onPlaced, onResetPlaced }) {
 
   const psuClone = useMemo(() => {
     const clone = scene.clone(true);
-    clone.traverse((o) => {
-      if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; }
+    clone.traverse((object) => {
+      if (object.isMesh) {
+        object.castShadow = true;
+        object.receiveShadow = true;
+      }
     });
     return clone;
   }, [scene]);
 
   useEffect(() => {
     if (!psuRef.current) return;
+
     psuRef.current.scale.setScalar(ASSEMBLY_SCALE);
 
     if (isPlaced) {
       psuRef.current.position.copy(PSU_FLOOR_POSITION);
+      psuRef.current.position.y = PSU_LOCKED_Y;
       psuRef.current.quaternion.copy(flatQuat);
       setDetached(true);
       setSnapped(true);
@@ -352,18 +333,21 @@ function PSUDraggable({ isPlaced = false, onPlaced, onResetPlaced }) {
     }
   }, [isPlaced, installedQuat, flatQuat]);
 
-  const updateMouse = useCallback((e) => {
-    const rect = gl.domElement.getBoundingClientRect();
-    mouse.current.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-    mouse.current.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-  }, [gl]);
+  const updateMouse = useCallback(
+    (event) => {
+      const rect = gl.domElement.getBoundingClientRect();
+      mouse.current.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.current.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    },
+    [gl]
+  );
 
   useEffect(() => {
-    const handleClick = (e) => {
-      if (e.button !== 0) return;
+    const handleClick = (event) => {
+      if (event.button !== 0) return;
       if (!psuRef.current) return;
 
-      updateMouse(e);
+      updateMouse(event);
 
       if (!detached && !snapped) {
         setDetached(true);
@@ -375,14 +359,15 @@ function PSUDraggable({ isPlaced = false, onPlaced, onResetPlaced }) {
       if (snapped) return;
 
       if (!dragging) {
+        const normal = new THREE.Vector3();
+        camera.getWorldDirection(normal);
+        dragPlane.setFromNormalAndCoplanarPoint(normal, psuRef.current.position);
+
         raycaster.setFromCamera(mouse.current, camera);
         if (raycaster.ray.intersectPlane(dragPlane, hitPoint)) {
-          dragOffset.current.set(
-            psuRef.current.position.x - hitPoint.x,
-            0,
-            psuRef.current.position.z - hitPoint.z
-          );
+          dragOffset.current.copy(psuRef.current.position).sub(hitPoint);
         }
+
         setDragging(true);
         document.body.style.cursor = "grabbing";
       } else {
@@ -399,16 +384,28 @@ function PSUDraggable({ isPlaced = false, onPlaced, onResetPlaced }) {
 
     gl.domElement.addEventListener("pointerdown", handleClick);
     return () => gl.domElement.removeEventListener("pointerdown", handleClick);
-  }, [detached, dragging, snapped, gl, camera, dragPlane, raycaster, hitPoint, updateMouse, onPlaced, flatQuat]);
+  }, [
+    detached,
+    dragging,
+    snapped,
+    gl,
+    camera,
+    dragPlane,
+    raycaster,
+    hitPoint,
+    updateMouse,
+    onPlaced,
+    flatQuat,
+  ]);
 
   useEffect(() => {
-    const move = (e) => updateMouse(e);
+    const move = (event) => updateMouse(event);
     gl.domElement.addEventListener("pointermove", move);
     return () => gl.domElement.removeEventListener("pointermove", move);
   }, [gl, updateMouse]);
 
   useEffect(() => {
-    const preventContext = (e) => e.preventDefault();
+    const preventContext = (event) => event.preventDefault();
     gl.domElement.addEventListener("contextmenu", preventContext);
     return () => gl.domElement.removeEventListener("contextmenu", preventContext);
   }, [gl]);
@@ -426,10 +423,10 @@ function PSUDraggable({ isPlaced = false, onPlaced, onResetPlaced }) {
     } else {
       if (dragging) {
         raycaster.setFromCamera(mouse.current, camera);
+
         if (raycaster.ray.intersectPlane(dragPlane, hitPoint)) {
-          const targetX = hitPoint.x + dragOffset.current.x;
-          const targetZ = hitPoint.z + dragOffset.current.z;
-          const target = new THREE.Vector3(targetX, PSU_LOCKED_Y, targetZ);
+          const target = hitPoint.clone().add(dragOffset.current);
+          target.y = PSU_LOCKED_Y;
           psuRef.current.position.lerp(target, 0.35);
         }
       }
@@ -441,6 +438,7 @@ function PSUDraggable({ isPlaced = false, onPlaced, onResetPlaced }) {
       if (dist < MAGNET_DISTANCE) {
         const t = 1 - dist / MAGNET_DISTANCE;
         const pull = MAGNET_STRENGTH + t * 0.22;
+
         psuRef.current.position.lerp(PSU_FLOOR_POSITION, pull);
         psuRef.current.position.y = PSU_LOCKED_Y;
         psuRef.current.quaternion.slerp(flatQuat, pull);
@@ -455,10 +453,6 @@ function PSUDraggable({ isPlaced = false, onPlaced, onResetPlaced }) {
         psuRef.current.quaternion.slerp(flatQuat, 0.2);
       }
     }
-
-    const worldPos = new THREE.Vector3();
-    psuRef.current.getWorldPosition(worldPos);
-    setPos({ x: worldPos.x, y: worldPos.y, z: worldPos.z });
   });
 
   return (
@@ -467,12 +461,11 @@ function PSUDraggable({ isPlaced = false, onPlaced, onResetPlaced }) {
         <primitive object={psuClone} />
       </group>
 
-      <SideStatus detached={detached} dragging={dragging} snapped={snapped} pos={pos} />
-
       {snapped && (
         <ResetPSUButton
           onReset={() => {
             if (!psuRef.current) return;
+
             psuRef.current.position.copy(PSU_INSTALLED_POSITION);
             psuRef.current.quaternion.copy(installedQuat);
             setDetached(false);

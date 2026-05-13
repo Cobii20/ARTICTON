@@ -302,47 +302,6 @@ function MotherboardAssemblySeated() {
   return <primitive object={seatedGroup} />;
 }
 
-/** ================= SIDE STATUS ================= */
-
-function SideStatus({ detached, dragging, snapped, pos }) {
-  const text = !detached
-    ? "Click to detach"
-    : snapped
-    ? "Placed on floor"
-    : dragging
-    ? "Dragging to target"
-    : "Click to grab";
-
-  return (
-    <Html fullscreen style={{ pointerEvents: "none" }}>
-      <div
-        style={{
-          position: "absolute",
-          left: 24,
-          bottom: 24,
-          padding: "12px 16px",
-          minWidth: 220,
-          borderRadius: 16,
-          background: "rgba(10,14,22,.78)",
-          border: "1px solid rgba(140,255,230,.22)",
-          backdropFilter: "blur(8px)",
-          color: "rgba(234,240,255,.95)",
-          fontSize: 12,
-          fontFamily: "monospace",
-          textAlign: "center",
-          boxShadow: "0 10px 30px rgba(0,0,0,.35)",
-        }}
-      >
-        <div style={{ fontWeight: "bold", marginBottom: 4 }}>RAM</div>
-        <div style={{ marginBottom: 8 }}>{text}</div>
-        <div>x: {pos.x.toFixed(2)}</div>
-        <div>y: {pos.y.toFixed(2)}</div>
-        <div>z: {pos.z.toFixed(2)}</div>
-      </div>
-    </Html>
-  );
-}
-
 /** ================= RAM DRAGGABLE ================= */
 
 function RAMDraggable({ isPlaced = false, onPlaced, onResetPlaced }) {
@@ -353,11 +312,6 @@ function RAMDraggable({ isPlaced = false, onPlaced, onResetPlaced }) {
   const [dragging, setDragging] = useState(false);
   const [detached, setDetached] = useState(isPlaced);
   const [snapped, setSnapped] = useState(isPlaced);
-  const [pos, setPos] = useState({
-    x: RAM_INSTALLED_POSITION.x,
-    y: RAM_INSTALLED_POSITION.y,
-    z: RAM_INSTALLED_POSITION.z,
-  });
 
   const dragOffset = useRef(new THREE.Vector3());
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
@@ -523,14 +477,6 @@ function RAMDraggable({ isPlaced = false, onPlaced, onResetPlaced }) {
         ramRef.current.quaternion.slerp(flatQuat, 0.2);
       }
     }
-
-    const worldPos = new THREE.Vector3();
-    ramRef.current.getWorldPosition(worldPos);
-    setPos({
-      x: worldPos.x,
-      y: worldPos.y,
-      z: worldPos.z,
-    });
   });
 
   return (
@@ -538,13 +484,6 @@ function RAMDraggable({ isPlaced = false, onPlaced, onResetPlaced }) {
       <group ref={ramRef}>
         <primitive object={ramClone} />
       </group>
-
-      <SideStatus
-        detached={detached}
-        dragging={dragging}
-        snapped={snapped}
-        pos={pos}
-      />
 
       {snapped && (
         <ResetRAMButton

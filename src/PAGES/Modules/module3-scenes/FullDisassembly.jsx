@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState, useEffect, useCallback } from "react";
+import React, { Suspense, useMemo, useRef, useState, useEffect, useCallback } from "react";
 import * as THREE from "three";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import {
@@ -10,7 +10,7 @@ import {
 } from "@react-three/drei";
 
 /** MODEL URLS */
-const CASE_URL = "/models/PC CASE(BLENDER).glb";
+const CASE_URL = "/models/PC%20CASE(BLENDER).glb";
 const MB_URL = "/models/MB(BLENDER).glb";
 const CPU_URL = "/models/CPU(BLENDER).glb";
 const RAM_URL = "/models/RAM(BLENDER).glb";
@@ -259,8 +259,6 @@ function Scene({ placementApi, onComplete }) {
         onReset={() => resetFrom("mb")}
       />
 
-      <InstructionPanel activePart={activePart} placements={placements} />
-
       <ContactShadows
         position={[BOARD_CENTER_X, BOARD_Y + 0.1, BOARD_CENTER_Z]}
         opacity={0.38}
@@ -393,111 +391,6 @@ function CheckerTarget({ part, index, active, placed }) {
   );
 }
 
-function InstructionPanel({ activePart, placements }) {
-  const complete = PARTS.every((part) => placements[getPlacementKey(part.id)]);
-  const activeText = complete
-    ? "Disassembly complete"
-    : `Remove ${activePart?.label || "next part"}`;
-
-  return (
-    <Html fullscreen style={{ pointerEvents: "none" }}>
-      <div
-        style={{
-          position: "absolute",
-          top: 22,
-          left: 24,
-          padding: "12px 16px",
-          minWidth: 260,
-          borderRadius: 16,
-          background: "rgba(10,14,22,.78)",
-          border: "1px solid rgba(255,255,255,.14)",
-          backdropFilter: "blur(8px)",
-          color: "rgba(234,240,255,.95)",
-          fontSize: 12,
-          fontFamily: "monospace",
-          boxShadow: "0 10px 30px rgba(0,0,0,.35)",
-        }}
-      >
-        <div style={{ fontWeight: "bold", marginBottom: 8 }}>Full PC Disassembly</div>
-        <div style={{ marginBottom: 10 }}>{activeText}</div>
-        <div style={{ display: "grid", gap: 5 }}>
-          {PARTS.map((part, index) => {
-            const placed = placements[getPlacementKey(part.id)];
-            const active = activePart?.id === part.id;
-            return (
-              <div
-                key={part.id}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  opacity: placed || active ? 1 : 0.42,
-                }}
-              >
-                <span
-                  style={{
-                    width: 9,
-                    height: 9,
-                    borderRadius: 999,
-                    background: part.color,
-                    display: "inline-block",
-                    boxShadow: active ? `0 0 14px ${part.color}` : "none",
-                  }}
-                />
-                <span>{index + 1}. {part.label}</span>
-                <span style={{ marginLeft: "auto" }}>
-                  {placed ? "done" : active ? "active" : "locked"}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </Html>
-  );
-}
-
-function SideStatus({ part, active, detached, dragging, snapped, pos }) {
-  const text = !active && !snapped
-    ? "Locked until previous part is placed"
-    : !detached
-    ? "Click component to detach"
-    : snapped
-    ? "Placed on checkerboard"
-    : dragging
-    ? "Dragging to colored target"
-    : "Click to grab / release";
-
-  return (
-    <Html fullscreen style={{ pointerEvents: "none" }}>
-      <div
-        style={{
-          position: "absolute",
-          left: 24,
-          bottom: 24,
-          padding: "12px 16px",
-          minWidth: 240,
-          borderRadius: 16,
-          background: "rgba(10,14,22,.78)",
-          border: `1px solid ${part.color}66`,
-          backdropFilter: "blur(8px)",
-          color: "rgba(234,240,255,.95)",
-          fontSize: 12,
-          fontFamily: "monospace",
-          textAlign: "center",
-          boxShadow: "0 10px 30px rgba(0,0,0,.35)",
-        }}
-      >
-        <div style={{ fontWeight: "bold", marginBottom: 4 }}>{part.label}</div>
-        <div style={{ marginBottom: 8 }}>{text}</div>
-        <div>x: {pos.x.toFixed(2)}</div>
-        <div>y: {pos.y.toFixed(2)}</div>
-        <div>z: {pos.z.toFixed(2)}</div>
-      </div>
-    </Html>
-  );
-}
-
 function ResetButton({ label, color, onReset }) {
   const { gl } = useThree();
 
@@ -537,11 +430,6 @@ function PartDraggable({ part, active, isPlaced = false, onPlaced, onReset }) {
   const [dragging, setDragging] = useState(false);
   const [detached, setDetached] = useState(isPlaced);
   const [snapped, setSnapped] = useState(isPlaced);
-  const [pos, setPos] = useState({
-    x: part.installedPosition.x,
-    y: part.installedPosition.y,
-    z: part.installedPosition.z,
-  });
 
   const mouse = useRef(new THREE.Vector2());
   const dragOffset = useRef(new THREE.Vector3());
@@ -729,10 +617,6 @@ function PartDraggable({ part, active, isPlaced = false, onPlaced, onReset }) {
         }
       }
     }
-
-    const worldPos = new THREE.Vector3();
-    partRef.current.getWorldPosition(worldPos);
-    setPos({ x: worldPos.x, y: worldPos.y, z: worldPos.z });
   });
 
   return (
@@ -740,17 +624,6 @@ function PartDraggable({ part, active, isPlaced = false, onPlaced, onReset }) {
       <group ref={partRef}>
         <primitive object={modelClone} />
       </group>
-
-      {active && (
-        <SideStatus
-          part={part}
-          active={active}
-          detached={detached}
-          dragging={dragging}
-          snapped={snapped}
-          pos={pos}
-        />
-      )}
 
       {snapped && <ResetButton label={part.label} color={part.color} onReset={onReset} />}
     </group>
@@ -769,11 +642,6 @@ function MotherboardDraggable({ part, active, isPlaced = false, onPlaced, onRese
   const [animatingExtract, setAnimatingExtract] = useState(false);
   const [animationProgress, setAnimationProgress] = useState(0);
   const [nearTarget, setNearTarget] = useState(false);
-  const [pos, setPos] = useState({
-    x: part.installedPosition.x,
-    y: part.installedPosition.y,
-    z: part.installedPosition.z,
-  });
 
   const mouse = useRef(new THREE.Vector2());
   const dragOffset = useRef(new THREE.Vector3());
@@ -1078,10 +946,6 @@ function MotherboardDraggable({ part, active, isPlaced = false, onPlaced, onRese
         }
       }
     }
-
-    const worldPos = new THREE.Vector3();
-    mbRef.current.getWorldPosition(worldPos);
-    setPos({ x: worldPos.x, y: worldPos.y, z: worldPos.z });
   });
 
   const statusText = animatingExtract
@@ -1138,58 +1002,6 @@ function MotherboardDraggable({ part, active, isPlaced = false, onPlaced, onRese
         </Html>
       )}
 
-      {active && (
-        <Html fullscreen style={{ pointerEvents: "none" }}>
-          <div
-            style={{
-              position: "absolute",
-              left: 24,
-              bottom: 24,
-              padding: "12px 16px",
-              minWidth: 250,
-              borderRadius: 16,
-              background: "rgba(10,14,22,.78)",
-              border: `1px solid ${part.color}66`,
-              backdropFilter: "blur(8px)",
-              color: "rgba(234,240,255,.95)",
-              fontSize: 12,
-              fontFamily: "monospace",
-              textAlign: "center",
-              boxShadow: "0 10px 30px rgba(0,0,0,.35)",
-            }}
-          >
-            <div style={{ fontWeight: "bold", marginBottom: 4 }}>{part.label}</div>
-            <div style={{ marginBottom: 8 }}>{statusText}</div>
-
-            {animatingExtract && (
-              <div
-                style={{
-                  height: 5,
-                  width: "100%",
-                  overflow: "hidden",
-                  borderRadius: 999,
-                  marginBottom: 10,
-                  background: "rgba(255,255,255,.12)",
-                }}
-              >
-                <div
-                  style={{
-                    height: "100%",
-                    width: `${Math.round(animationProgress * 100)}%`,
-                    background: part.color,
-                    transition: "width .12s linear",
-                  }}
-                />
-              </div>
-            )}
-
-            <div>x: {pos.x.toFixed(2)}</div>
-            <div>y: {pos.y.toFixed(2)}</div>
-            <div>z: {pos.z.toFixed(2)}</div>
-          </div>
-        </Html>
-      )}
-
       {snapped && <ResetButton label={part.label} color={part.color} onReset={onReset} />}
     </group>
   );
@@ -1202,10 +1014,12 @@ export default function FullDisassemblyPC({ placementApi, onComplete }) {
       style={{ width: "100%", height: "100%" }}
       camera={{ position: CAMERA_POSITION, fov: 50 }}
     >
-      <Scene
-        placementApi={placementApi}
-        onComplete={onComplete}
-      />
+      <Suspense fallback={null}>
+        <Scene
+          placementApi={placementApi}
+          onComplete={onComplete}
+        />
+      </Suspense>
     </Canvas>
   );
 }
