@@ -268,6 +268,20 @@ export default function Module3Disassembly({
 
   const [validationMessage, setValidationMessage] = useState("");
 
+  const [aiOpen, setAiOpen] = useState(false);
+
+const [aiMessages, setAiMessages] = useState([
+  {
+    role: "assistant",
+    content:
+      "Hello! I'm your PC Disassembly AI assistant.",
+  },
+]);
+
+const [aiInput, setAiInput] = useState("");
+
+const [aiLoading, setAiLoading] = useState(false);
+
   const [settings, setSettings] = useState({
     sound: true,
     animations: true,
@@ -317,6 +331,72 @@ export default function Module3Disassembly({
       [key]: value,
     }));
   };
+const askAI = async () => {
+  if (!aiInput.trim()) return;
+
+  const userMessage = {
+    role: "user",
+    content: aiInput,
+  };
+
+  setAiMessages((prev) => [...prev, userMessage]);
+
+  setAiLoading(true);
+
+  try {
+    const response = await fetch(
+      "http://127.0.0.1:5000/api/chat",
+      {
+        method: "POST",
+
+        headers: {
+          "Content-Type": "application/json",
+        },
+
+        body: JSON.stringify({
+          message: aiInput,
+
+          context: {
+            module: "disassembly",
+
+            currentStep:
+              module3Steps[step]?.name,
+
+            completedSteps:
+              localCompletedSteps,
+
+            currentStepCompleted,
+          },
+        }),
+      }
+    );
+
+    const data = await response.json();
+
+    setAiMessages((prev) => [
+      ...prev,
+      {
+        role: "assistant",
+        content: data.reply,
+      },
+    ]);
+  } catch (err) {
+    console.error(err);
+
+    setAiMessages((prev) => [
+      ...prev,
+      {
+        role: "assistant",
+        content:
+          "AI server error occurred.",
+      },
+    ]);
+  }
+
+  setAiInput("");
+
+  setAiLoading(false);
+};
 
   useEffect(() => {
     setValidationMessage("");
@@ -757,6 +837,84 @@ export default function Module3Disassembly({
                       left: sidebarOpen ? 280 : 64,
                     }}
                   >
+                    <div className="absolute right-5 top-5 z-[500] flex flex-col items-end">
+  {!aiOpen && (
+    <button
+      type="button"
+      onClick={() => setAiOpen(true)}
+      className="rounded-2xl border border-[#00ffb4]/25 bg-[#0b1220]/90 px-4 py-3 text-sm font-semibold text-[#00ffb4] shadow-[0_10px_40px_rgba(0,255,180,0.15)] backdrop-blur-xl transition hover:scale-[1.03]"
+    >
+      AI Assistant
+    </button>
+  )}
+
+  {aiOpen && (
+    <div className="flex h-[500px] w-[360px] flex-col overflow-hidden rounded-[24px] border border-[#1a2438] bg-[#0b1220]/95 shadow-[0_30px_80px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+      <div className="flex items-center justify-between border-b border-[#1a2438] px-4 py-3">
+        <div>
+          <div className="text-sm font-bold text-white">
+            Disassembly AI
+          </div>
+
+          <div className="text-[11px] text-[#7a8ba8]">
+            Step-aware assistant
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setAiOpen(false)}
+          className="rounded-lg px-2 py-1 text-sm text-[#7a8ba8] transition hover:bg-white/5 hover:text-white"
+        >
+          ✕
+        </button>
+      </div>
+
+      <div className="flex-1 space-y-3 overflow-y-auto p-4">
+        {aiMessages.map((msg, index) => (
+          <div
+            key={index}
+            className={`rounded-2xl px-4 py-3 text-sm leading-6 ${
+              msg.role === "assistant"
+                ? "bg-[#00ffb4]/10 text-[#dffef5]"
+                : "bg-white/5 text-white"
+            }`}
+          >
+            <div className="mb-1 text-[11px] font-bold uppercase tracking-[0.16em] text-[#7a8ba8]">
+              {msg.role === "assistant"
+                ? "AI"
+                : "You"}
+            </div>
+
+            {msg.content}
+          </div>
+        ))}
+      </div>
+
+      <div className="border-t border-[#1a2438] p-3">
+        <div className="flex gap-2">
+          <input
+            value={aiInput}
+            onChange={(e) =>
+              setAiInput(e.target.value)
+            }
+            placeholder="Ask about this step..."
+            className="flex-1 rounded-xl border border-[#1a2438] bg-[#111827] px-4 py-3 text-sm text-white outline-none transition focus:border-[#00ffb4]/35"
+          />
+
+          <button
+            type="button"
+            onClick={askAI}
+            disabled={aiLoading}
+            className="rounded-xl bg-[#00ffb4] px-4 py-3 text-sm font-bold text-[#0a0e17] transition hover:scale-[1.03]"
+          >
+            {aiLoading ? "..." : "Send"}
+          </button>
+        </div>
+      </div>
+    </div>
+  )}
+</div>
                     {step === 0 && <DisassemblyRAM {...sharedProps} />}
 
                     {step === 1 && <DisassemblyHDD {...sharedProps} />}
