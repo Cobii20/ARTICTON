@@ -82,8 +82,6 @@ const SSD_HIGHLIGHT_POSITION = new THREE.Vector3(24.39, -16.98, 11.26);
 const SSD_START_ROTATION = new THREE.Euler(0, Math.PI / 2, 0);
 const SSD_TARGET_ROTATION = new THREE.Euler(0, Math.PI / 2, 0);
 
-const CPU_COLOR = "#b56dff";
-const RAM_COLOR = "#00ffb4";
 const SSD_COLOR = "#ffcc00";
 
 function cloneScene(scene, transparent = false) {
@@ -122,10 +120,7 @@ function setObjectOpacity(root, opacity) {
   });
 }
 
-function Scene({
-  onNext,
-  onComplete,
-}) {
+function Scene({ onComplete }) {
   const { camera } = useThree();
   const [ssdPlaced, setSsdPlaced] = useState(false);
   const completedRef = useRef(false);
@@ -173,11 +168,6 @@ function Scene({
       <SSDDraggable
         placed={ssdPlaced}
         onPlaced={() => setSsdPlaced(true)}
-      />
-
-      <InstructionPanel
-        placed={ssdPlaced}
-        onNext={onNext}
       />
 
       <ContactShadows
@@ -363,11 +353,6 @@ function SSDDraggable({ placed, onPlaced }) {
 
   const [dragging, setDragging] = useState(false);
   const [snapped, setSnapped] = useState(placed);
-  const [pos, setPos] = useState({
-    x: SSD_START_POSITION.x,
-    y: SSD_START_POSITION.y,
-    z: SSD_START_POSITION.z,
-  });
 
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const hitPoint = useMemo(() => new THREE.Vector3(), []);
@@ -562,15 +547,6 @@ function SSDDraggable({ placed, onPlaced }) {
         }
       }
     }
-
-    const worldPos = new THREE.Vector3();
-    ssdRef.current.getWorldPosition(worldPos);
-
-    setPos({
-      x: worldPos.x,
-      y: worldPos.y,
-      z: worldPos.z,
-    });
   });
 
   return (
@@ -578,150 +554,11 @@ function SSDDraggable({ placed, onPlaced }) {
       <group ref={ssdRef}>
         <primitive object={ssdClone} />
       </group>
-
-      {!snapped && (
-        <Html fullscreen style={{ pointerEvents: "none" }}>
-          <div
-            style={{
-              position: "absolute",
-              left: 24,
-              bottom: 24,
-              padding: "12px 16px",
-              minWidth: 260,
-              borderRadius: 16,
-              background: "rgba(10,14,22,.78)",
-              border: `1px solid ${SSD_COLOR}66`,
-              backdropFilter: "blur(8px)",
-              color: "rgba(234,240,255,.95)",
-              fontSize: 12,
-              fontFamily: "monospace",
-              textAlign: "center",
-              boxShadow: "0 10px 30px rgba(0,0,0,.35)",
-            }}
-          >
-            <div style={{ fontWeight: "bold", marginBottom: 4 }}>SSD</div>
-            <div style={{ marginBottom: 8 }}>
-              {dragging ? "Dragging to SSD slot" : "Click SSD to grab"}
-            </div>
-            <div>x: {pos.x.toFixed(2)}</div>
-            <div>y: {pos.y.toFixed(2)}</div>
-            <div>z: {pos.z.toFixed(2)}</div>
-          </div>
-        </Html>
-      )}
     </group>
   );
 }
 
-function InstructionPanel({
-  placed,
-  onNext,
-}) {
-  return (
-    <Html fullscreen style={{ pointerEvents: "none" }}>
-      <div
-        style={{
-          position: "absolute",
-          top: 22,
-          left: 24,
-          padding: "12px 16px",
-          minWidth: 350,
-          borderRadius: 16,
-          background: "rgba(10,14,22,.78)",
-          border: "1px solid rgba(255,255,255,.14)",
-          backdropFilter: "blur(8px)",
-          color: "rgba(234,240,255,.95)",
-          fontSize: 12,
-          fontFamily: "monospace",
-          boxShadow: "0 10px 30px rgba(0,0,0,.35)",
-        }}
-      >
-        <div style={{ fontWeight: "bold", marginBottom: 8 }}>
-          Step 3: SSD to Motherboard
-        </div>
-
-        <div style={{ marginBottom: 10 }}>
-          {placed
-            ? "SSD seated on motherboard."
-            : "Drag the SSD onto the motherboard with the CPU and RAM already installed."}
-        </div>
-
-        <div style={{ display: "grid", gap: 5 }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              opacity: 1,
-            }}
-          >
-            <span
-              style={{
-                width: 9,
-                height: 9,
-                borderRadius: 999,
-                background: CPU_COLOR,
-                display: "inline-block",
-              }}
-            />
-            <span>1. CPU</span>
-            <span style={{ marginLeft: "auto" }}>done</span>
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              opacity: 1,
-            }}
-          >
-            <span
-              style={{
-                width: 9,
-                height: 9,
-                borderRadius: 999,
-                background: RAM_COLOR,
-                display: "inline-block",
-              }}
-            />
-            <span>2. RAM</span>
-            <span style={{ marginLeft: "auto" }}>done</span>
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              opacity: 1,
-            }}
-          >
-            <span
-              style={{
-                width: 9,
-                height: 9,
-                borderRadius: 999,
-                background: SSD_COLOR,
-                display: "inline-block",
-                boxShadow: placed ? "none" : `0 0 14px ${SSD_COLOR}`,
-              }}
-            />
-            <span>3. SSD</span>
-            <span style={{ marginLeft: "auto" }}>
-              {placed ? "done" : "active"}
-            </span>
-          </div>
-        </div>
-      </div>
-    </Html>
-  );
-}
-
-export default function SSDtoMB({
-  onNext,
-  onComplete,
-}) {
+export default function SSDtoMB({ onComplete }) {
   return (
     <Canvas
       shadows
@@ -729,7 +566,6 @@ export default function SSDtoMB({
       camera={{ position: CAMERA_POSITION, fov: 50 }}
     >
       <Scene
-        onNext={onNext}
         onComplete={onComplete}
       />
     </Canvas>

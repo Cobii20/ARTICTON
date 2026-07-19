@@ -120,9 +120,6 @@ const SSD_ROTATION = new THREE.Euler(0, Math.PI / 2, 0);
 const CASE_TARGET_HIGHLIGHT_POSITION = new THREE.Vector3(-2.49, -9.08, 21.59);
 
 const MB_COLOR = "#4aa3ff";
-const CPU_COLOR = "#b56dff";
-const RAM_COLOR = "#00ffb4";
-const SSD_COLOR = "#ffcc00";
 
 function cloneScene(scene, transparent = false) {
   const clone = scene.clone(true);
@@ -170,10 +167,7 @@ function easeOutCubic(t) {
   return 1 - Math.pow(1 - t, 3);
 }
 
-function Scene({
-  onNext,
-  onComplete,
-}) {
+function Scene({ onComplete }) {
   const { camera } = useThree();
   const [mbPlaced, setMbPlaced] = useState(false);
   const completedRef = useRef(false);
@@ -221,11 +215,6 @@ function Scene({
       <MotherboardAssemblyDraggable
         placed={mbPlaced}
         onPlaced={() => setMbPlaced(true)}
-      />
-
-      <InstructionPanel
-        placed={mbPlaced}
-        onNext={onNext}
       />
 
       <ContactShadows
@@ -464,11 +453,6 @@ function MotherboardAssemblyDraggable({ placed, onPlaced }) {
 
   const [phase, setPhase] = useState("idle");
   const [snapped, setSnapped] = useState(placed);
-  const [pos, setPos] = useState({
-    x: MB_ASSEMBLY_START_OFFSET.x,
-    y: MB_ASSEMBLY_START_OFFSET.y,
-    z: MB_ASSEMBLY_START_OFFSET.z,
-  });
 
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const hitPoint = useMemo(() => new THREE.Vector3(), []);
@@ -756,172 +740,18 @@ function MotherboardAssemblyDraggable({ placed, onPlaced }) {
         }
       }
     }
-
-    const worldPos = new THREE.Vector3();
-    assemblyRef.current.getWorldPosition(worldPos);
-
-    setPos({
-      x: worldPos.x,
-      y: worldPos.y,
-      z: worldPos.z,
-    });
   });
-
-  const statusText =
-    phase === "idle"
-      ? "Click motherboard to start floating transition"
-      : phase === "floatingToCaseFront"
-      ? "Floating motherboard to case height..."
-      : phase === "readyToDrag"
-      ? "Click motherboard again to grab and drag into case"
-      : phase === "dragging"
-      ? "Dragging motherboard into case"
-      : "Motherboard installed into case";
 
   return (
     <group>
       <group ref={assemblyRef} position={MB_ASSEMBLY_START_OFFSET}>
         <MotherboardAssembly />
       </group>
-
-      {!snapped && (
-        <Html fullscreen style={{ pointerEvents: "none" }}>
-          <div
-            style={{
-              position: "absolute",
-              left: 24,
-              bottom: 24,
-              padding: "12px 16px",
-              minWidth: 330,
-              borderRadius: 16,
-              background: "rgba(10,14,22,.78)",
-              border: `1px solid ${MB_COLOR}66`,
-              backdropFilter: "blur(8px)",
-              color: "rgba(234,240,255,.95)",
-              fontSize: 12,
-              fontFamily: "monospace",
-              textAlign: "center",
-              boxShadow: "0 10px 30px rgba(0,0,0,.35)",
-            }}
-          >
-            <div style={{ fontWeight: "bold", marginBottom: 4 }}>
-              Motherboard Assembly
-            </div>
-
-            <div style={{ marginBottom: 8 }}>{statusText}</div>
-
-            <div>x: {pos.x.toFixed(2)}</div>
-            <div>y: {pos.y.toFixed(2)}</div>
-            <div>z: {pos.z.toFixed(2)}</div>
-          </div>
-        </Html>
-      )}
     </group>
   );
 }
 
-function InstructionPanel({
-  placed,
-  onNext,
-}) {
-  return (
-    <Html fullscreen style={{ pointerEvents: "none" }}>
-      <div
-        style={{
-          position: "absolute",
-          top: 22,
-          left: 24,
-          padding: "12px 16px",
-          minWidth: 410,
-          borderRadius: 16,
-          background: "rgba(10,14,22,.78)",
-          border: "1px solid rgba(255,255,255,.14)",
-          backdropFilter: "blur(8px)",
-          color: "rgba(234,240,255,.95)",
-          fontSize: 12,
-          fontFamily: "monospace",
-          boxShadow: "0 10px 30px rgba(0,0,0,.35)",
-        }}
-      >
-        <div style={{ fontWeight: "bold", marginBottom: 8 }}>
-          Step 4: Motherboard to Case
-        </div>
-
-        <div style={{ marginBottom: 10 }}>
-          {placed
-            ? "Motherboard assembly seated inside the case."
-            : "Click the motherboard to float it to case height, then drag it near the seated position. The magnet will pull it into place."}
-        </div>
-
-        <div style={{ display: "grid", gap: 5 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span
-              style={{
-                width: 9,
-                height: 9,
-                borderRadius: 999,
-                background: CPU_COLOR,
-                display: "inline-block",
-              }}
-            />
-            <span>1. CPU</span>
-            <span style={{ marginLeft: "auto" }}>done</span>
-          </div>
-
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span
-              style={{
-                width: 9,
-                height: 9,
-                borderRadius: 999,
-                background: RAM_COLOR,
-                display: "inline-block",
-              }}
-            />
-            <span>2. RAM</span>
-            <span style={{ marginLeft: "auto" }}>done</span>
-          </div>
-
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span
-              style={{
-                width: 9,
-                height: 9,
-                borderRadius: 999,
-                background: SSD_COLOR,
-                display: "inline-block",
-              }}
-            />
-            <span>3. SSD</span>
-            <span style={{ marginLeft: "auto" }}>done</span>
-          </div>
-
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span
-              style={{
-                width: 9,
-                height: 9,
-                borderRadius: 999,
-                background: MB_COLOR,
-                display: "inline-block",
-                boxShadow: placed ? "none" : `0 0 14px ${MB_COLOR}`,
-              }}
-            />
-            <span>4. Motherboard to case</span>
-            <span style={{ marginLeft: "auto" }}>
-              {placed ? "done" : "active"}
-            </span>
-          </div>
-        </div>
-      </div>
-    </Html>
-  );
-}
-
-export default function MBtoCase({
-  onNext,
-  onComplete,
-}) {
+export default function MBtoCase({ onComplete }) {
   return (
     <Canvas
       shadows
@@ -929,7 +759,6 @@ export default function MBtoCase({
       camera={{ position: CAMERA_POSITION, fov: 50 }}
     >
       <Scene
-        onNext={onNext}
         onComplete={onComplete}
       />
     </Canvas>

@@ -17,9 +17,11 @@ const QUIZ_SETTINGS = {
   title: "Module 3 Quiz",
   desc: "PC Disassembly • Sequence and Component Removal",
   durationMin: 20,
-  passingPercent: 70,
+  passingPercent: 60,
+  practiceUnlockPercent: 60,
   instructions: [
     "Finish Module 3 first before taking this quiz.",
+    "Score 60% or higher to unlock the practice test.",
     "This quiz includes disassembly sequence, safe removal concepts, and 3D identification questions.",
     "For 3D questions, inspect the model and choose the correct component.",
     "The quiz auto-submits when time runs out.",
@@ -380,7 +382,7 @@ function DisassemblySequenceVisual() {
 /* QUIZ PAGE */
 /* ───────────────────────────────────────────────────────────── */
 
-export default function QuizModule3({ onBack }) {
+export default function QuizModule3({ onBack, onQuizComplete }) {
   const reduce = useReducedMotion();
 
   const questions = useMemo(() => buildQuizQuestions(), []);
@@ -431,7 +433,7 @@ export default function QuizModule3({ onBack }) {
         if (snap.exists()) {
           setProfile(snap.data());
         } else {
-          setProfile(null);
+          setProfile({});
         }
       } catch (err) {
         setAccessError(err.message || "Unable to check quiz access.");
@@ -502,39 +504,131 @@ export default function QuizModule3({ onBack }) {
     setStartWarning("");
   };
 
-  const saveQuizProgress = async ({ finalScore, finalPercent, finalPassed, autoSubmitted }) => {
-    if (!firebaseUser) return;
+  const saveQuizProgress = async ({
+    finalScore,
+    finalPercent,
+    finalPassed,
+    autoSubmitted,
+  }) => {
+    const currentUser = firebaseUser || auth.currentUser;
 
-    const userRef = doc(db, "users", firebaseUser.uid);
+    if (!currentUser) {
+      throw new Error("No logged-in user. Quiz progress was not saved.");
+    }
+
+    const userRef = doc(db, "users", currentUser.uid);
+
+    const alreadyUnlocked =
+      !!profile?.practiceTestAccess?.[QUIZ_SETTINGS.quizKey]?.unlocked;
+
+    const newlyUnlocked =
+      finalPercent >= QUIZ_SETTINGS.practiceUnlockPercent;
+
+    const practiceUnlocked = alreadyUnlocked || newlyUnlocked;
+
+    const quizPayload = {
+      completed: true,
+      finished: true,
+      passed: finalPassed,
+      score: finalScore,
+      total,
+      percent: finalPercent,
+      passingPercent: QUIZ_SETTINGS.passingPercent,
+      practiceUnlockPercent: QUIZ_SETTINGS.practiceUnlockPercent,
+      autoSubmitted,
+      updatedAt: serverTimestamp(),
+    };
+
+    const practiceAccessPayload = {
+      unlocked: practiceUnlocked,
+      requiredPercent: QUIZ_SETTINGS.practiceUnlockPercent,
+      latestScore: finalScore,
+      latestTotal: total,
+      latestPercent: finalPercent,
+      sourceQuizId: QUIZ_SETTINGS.id,
+      updatedAt: serverTimestamp(),
+    };
+
+    if (newlyUnlocked && !alreadyUnlocked) {
+      practiceAccessPayload.unlockedAt = serverTimestamp();
+    }
 
     await setDoc(
       userRef,
       {
         quizProgress: {
-          module3: {
-            completed: true,
-            passed: finalPassed,
-            score: finalScore,
-            total,
-            percent: finalPercent,
-            passingPercent: QUIZ_SETTINGS.passingPercent,
-            autoSubmitted,
-            updatedAt: serverTimestamp(),
-          },
+          [QUIZ_SETTINGS.quizKey]: quizPayload,
+        },
+        practiceTestAccess: {
+          [QUIZ_SETTINGS.quizKey]: practiceAccessPayload,
         },
       },
       { merge: true }
     );
+
+    const localUpdatedAt = new Date().toISOString();
+
+    setProfile((previous) => ({
+      ...(previous || {}),
+      quizProgress: {
+        ...(previous?.quizProgress || {}),
+        [QUIZ_SETTINGS.quizKey]: {
+          ...quizPayload,
+          updatedAt: localUpdatedAt,
+        },
+      },
+      practiceTestAccess: {
+        ...(previous?.practiceTestAccess || {}),
+        [QUIZ_SETTINGS.quizKey]: {
+          ...(previous?.practiceTestAccess?.[QUIZ_SETTINGS.quizKey] || {}),
+          ...practiceAccessPayload,
+          updatedAt: localUpdatedAt,
+          unlockedAt:
+            newlyUnlocked && !alreadyUnlocked
+              ? localUpdatedAt
+              : previous?.practiceTestAccess?.[QUIZ_SETTINGS.quizKey]?.unlockedAt,
+        },
+      },
+    }));
+
+    try {
+      localStorage.setItem("articton-last-progress-update", String(Date.now()));
+
+      window.dispatchEvent(
+        new CustomEvent("articton-progress-updated", {
+          detail: {
+            type: "practice-unlock",
+            module: QUIZ_SETTINGS.quizKey,
+            completed: true,
+            unlocked: practiceUnlocked,
+            percent: finalPercent,
+          },
+        })
+      );
+    } catch {
+      // Optional dashboard refresh signal only.
+    }
+
+    onQuizComplete?.(QUIZ_SETTINGS.quizKey, {
+      ...quizPayload,
+      updatedAt: localUpdatedAt,
+      practiceUnlocked,
+    });
+
+    return {
+      quizPayload,
+      practiceAccessPayload,
+    };
   };
 
-  const handleSubmit = async (auto = false) => {
+  const handleSubmit = async (auto = false, answerOverride = answers) => {
     if (finished || submitSaving) return;
 
     setConfirmSubmit(false);
     setSubmitSaving(true);
     setSaveError("");
 
-    const finalScore = calculateScore(answers);
+    const finalScore = calculateScore(answerOverride);
     const finalPercent = total === 0 ? 0 : Math.round((finalScore / total) * 100);
     const finalPassed = finalPercent >= QUIZ_SETTINGS.passingPercent;
 
@@ -545,14 +639,21 @@ export default function QuizModule3({ onBack }) {
         finalPassed,
         autoSubmitted: auto,
       });
-    } catch (err) {
-      setSaveError(err.message || "Quiz was submitted, but saving failed.");
-    } finally {
+
       setFinished(true);
       setStarted(false);
-      setSubmitSaving(false);
 
-      if (auto) alert("Time is up! Your quiz has been submitted automatically.");
+      if (auto) {
+        alert("Time is up! Your quiz has been submitted automatically.");
+      }
+    } catch (err) {
+      console.error(`${QUIZ_SETTINGS.title} save error:`, err);
+      setSaveError(
+        err.message ||
+          "Quiz was not saved. Please check Firebase rules or your internet connection, then submit again."
+      );
+    } finally {
+      setSubmitSaving(false);
     }
   };
 
@@ -571,7 +672,7 @@ export default function QuizModule3({ onBack }) {
   };
 
   const selectAnswer = (index) => {
-    if (isLocked || finished) return;
+    if (isLocked || finished || submitSaving) return;
 
     if (!started) {
       setStartWarning("Click Start to start the quiz before answering.");
@@ -586,20 +687,20 @@ export default function QuizModule3({ onBack }) {
 
     setStartWarning("");
 
-    setAnswers((previous) => ({
-      ...previous,
+    const nextAnswers = {
+      ...answers,
       [activeIndex]: index,
-    }));
+    };
+
+    setAnswers(nextAnswers);
 
     setTimeout(() => {
-      setActiveIndex((currentIndex) => {
-        if (currentIndex >= total - 1) {
-          setConfirmSubmit(true);
-          return currentIndex;
-        }
+      if (activeIndex >= total - 1) {
+        handleSubmit(false, nextAnswers);
+        return;
+      }
 
-        return clamp(currentIndex + 1, 0, total - 1);
-      });
+      setActiveIndex((currentIndex) => clamp(currentIndex + 1, 0, total - 1));
     }, 220);
   };
 
@@ -684,7 +785,11 @@ export default function QuizModule3({ onBack }) {
         <div className="grid h-full min-h-0 grid-cols-1 gap-3 overflow-hidden xl:grid-cols-[minmax(0,1fr)_310px] 2xl:grid-cols-[minmax(0,1fr)_340px]">
           <QuizStage current={current} activeIndex={activeIndex} total={total} answered={answers[activeIndex] !== undefined}>
             <div className="flex h-full min-h-0 overflow-hidden">
-              {current?.type === "model" ? <ModelQuestionViewer modelSrc={current.modelSrc} /> : <DisassemblySequenceVisual />}
+              {current?.type === "model" ? (
+                <ModelQuestionViewer modelSrc={current.modelSrc} />
+              ) : (
+                <DisassemblySequenceVisual />
+              )}
             </div>
 
             <AnswerGrid
@@ -737,7 +842,9 @@ function FullscreenShell({ children }) {
 
 function GlassPanel({ className = "", children }) {
   return (
-    <div className={["rounded-[28px] border border-white/10 bg-black/18 shadow-[0_28px_90px_rgba(0,0,0,0.38)] backdrop-blur-xl", className].join(" ")}>{children}</div>
+    <div className={["rounded-[28px] border border-white/10 bg-black/18 shadow-[0_28px_90px_rgba(0,0,0,0.38)] backdrop-blur-xl", className].join(" ")}>
+      {children}
+    </div>
   );
 }
 
@@ -918,10 +1025,11 @@ function AnswerGrid({ current, activeIndex, answers, finished, started, startWar
               <div className="pointer-events-none absolute -right-16 -top-20 h-32 w-32 rounded-full bg-[#00ffb4]/0 blur-2xl transition group-hover:bg-[#00ffb4]/10" />
 
               <div className="relative flex items-center gap-3">
-                <div className={[
-                  "flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border text-xs font-black transition",
-                  chosen ? "border-[#00ffb4]/35 bg-[#00ffb4] text-[#061E29]" : "border-white/10 bg-black/20 text-white/60 group-hover:border-[#5F9598]/35 group-hover:text-white",
-                ].join(" ")}
+                <div
+                  className={[
+                    "flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border text-xs font-black transition",
+                    chosen ? "border-[#00ffb4]/35 bg-[#00ffb4] text-[#061E29]" : "border-white/10 bg-black/20 text-white/60 group-hover:border-[#5F9598]/35 group-hover:text-white",
+                  ].join(" ")}
                 >
                   {String.fromCharCode(65 + index)}
                 </div>
@@ -940,11 +1048,39 @@ function AnswerGrid({ current, activeIndex, answers, finished, started, startWar
   );
 }
 
-function RightRail({ questions, answers, activeIndex, setActiveIndex, total, answeredCount, answerPercent, time, finished, score, scorePercent, passed }) {
+function RightRail({
+  questions,
+  answers,
+  activeIndex,
+  setActiveIndex,
+  total,
+  answeredCount,
+  answerPercent,
+  time,
+  finished,
+  score,
+  scorePercent,
+  passed,
+}) {
   return (
     <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-4 overflow-hidden">
-      <NavigatorCard questions={questions} answers={answers} activeIndex={activeIndex} setActiveIndex={setActiveIndex} total={total} />
-      <SummaryCard answeredCount={answeredCount} total={total} answerPercent={answerPercent} time={time} finished={finished} score={score} scorePercent={scorePercent} passed={passed} />
+      <NavigatorCard
+        questions={questions}
+        answers={answers}
+        activeIndex={activeIndex}
+        setActiveIndex={setActiveIndex}
+        total={total}
+      />
+      <SummaryCard
+        answeredCount={answeredCount}
+        total={total}
+        answerPercent={answerPercent}
+        time={time}
+        finished={finished}
+        score={score}
+        scorePercent={scorePercent}
+        passed={passed}
+      />
     </div>
   );
 }
@@ -968,7 +1104,11 @@ function NavigatorCard({ questions, answers, activeIndex, setActiveIndex, total 
               onClick={() => setActiveIndex(index)}
               className={[
                 "relative h-8 rounded-xl border text-xs font-black transition focus:outline-none focus:ring-2 focus:ring-[#00ffb4]/30",
-                isActive ? "border-[#00ffb4]/35 bg-[#00ffb4]/16 text-white shadow-[0_14px_35px_rgba(0,255,180,0.10)]" : isAnswered ? "border-[#5F9598]/28 bg-[#5F9598]/14 text-white/85 hover:bg-[#5F9598]/20" : "border-white/10 bg-white/5 text-white/65 hover:bg-white/10",
+                isActive
+                  ? "border-[#00ffb4]/35 bg-[#00ffb4]/16 text-white shadow-[0_14px_35px_rgba(0,255,180,0.10)]"
+                  : isAnswered
+                  ? "border-[#5F9598]/28 bg-[#5F9598]/14 text-white/85 hover:bg-[#5F9598]/20"
+                  : "border-white/10 bg-white/5 text-white/65 hover:bg-white/10",
               ].join(" ")}
               aria-label={`Go to question ${index + 1}`}
             >
@@ -982,7 +1122,16 @@ function NavigatorCard({ questions, answers, activeIndex, setActiveIndex, total 
   );
 }
 
-function SummaryCard({ answeredCount, total, answerPercent, time, finished, score, scorePercent, passed }) {
+function SummaryCard({
+  answeredCount,
+  total,
+  answerPercent,
+  time,
+  finished,
+  score,
+  scorePercent,
+  passed,
+}) {
   return (
     <GlassPanel className="min-h-0 p-3">
       <div className="text-lg font-black tracking-tight text-white">Summary</div>
@@ -997,9 +1146,18 @@ function SummaryCard({ answeredCount, total, answerPercent, time, finished, scor
       {finished ? (
         <div className="mt-4 rounded-[20px] border border-[#00ffb4]/25 bg-[#00ffb4]/10 p-4">
           <div className="text-sm font-black text-white">Results</div>
-          <div className="mt-2 text-sm text-white/60">Score: <span className="font-bold text-white">{score}</span> / {total}</div>
-          <div className="mt-1 text-sm text-white/60">Percent: <span className="font-bold text-white">{scorePercent}%</span></div>
-          <div className="mt-1 text-sm text-white/60">Result: <span className={passed ? "font-bold text-[#b7fff0]" : "font-bold text-red-200"}>{passed ? "Passed" : "Needs Retake"}</span></div>
+          <div className="mt-2 text-sm text-white/60">
+            Score: <span className="font-bold text-white">{score}</span> / {total}
+          </div>
+          <div className="mt-1 text-sm text-white/60">
+            Percent: <span className="font-bold text-white">{scorePercent}%</span>
+          </div>
+          <div className="mt-1 text-sm text-white/60">
+            Result:{" "}
+            <span className={passed ? "font-bold text-[#b7fff0]" : "font-bold text-red-200"}>
+              {passed ? "Passed" : "Needs Retake"}
+            </span>
+          </div>
         </div>
       ) : null}
     </GlassPanel>
@@ -1016,7 +1174,11 @@ function SummaryItem({ label, value }) {
 }
 
 function StatusPill({ label }) {
-  return <span className="rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-[#b7fff0]">{label}</span>;
+  return (
+    <span className="rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-[#b7fff0]">
+      {label}
+    </span>
+  );
 }
 
 function TimerCard({ time, status }) {
@@ -1031,10 +1193,11 @@ function TimerCard({ time, status }) {
 
 function MetricPill({ label, subtle = false }) {
   return (
-    <span className={[
-      "rounded-full border px-3 py-1.5 text-[10.5px] font-semibold",
-      subtle ? "border-white/10 bg-white/5 text-white/55" : "border-[#5F9598]/30 bg-[#5F9598]/16 text-white/75",
-    ].join(" ")}
+    <span
+      className={[
+        "rounded-full border px-3 py-1.5 text-[10.5px] font-semibold",
+        subtle ? "border-white/10 bg-white/5 text-white/55" : "border-[#5F9598]/30 bg-[#5F9598]/16 text-white/75",
+      ].join(" ")}
     >
       {label}
     </span>

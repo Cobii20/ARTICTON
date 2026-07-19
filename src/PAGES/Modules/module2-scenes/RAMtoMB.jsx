@@ -75,7 +75,6 @@ const RAM_START_ROTATION = new THREE.Euler(0, Math.PI / 2, 0);
 const RAM_TARGET_ROTATION = new THREE.Euler(0, Math.PI / 2, 0);
 
 const RAM_COLOR = "#00ffb4";
-const CPU_COLOR = "#b56dff";
 
 function cloneScene(scene, transparent = false) {
   const clone = scene.clone(true);
@@ -113,10 +112,7 @@ function setObjectOpacity(root, opacity) {
   });
 }
 
-function Scene({
-  onNext,
-  onComplete,
-}) {
+function Scene({ onComplete }) {
   const { camera } = useThree();
   const [ramPlaced, setRamPlaced] = useState(false);
   const completedRef = useRef(false);
@@ -163,11 +159,6 @@ function Scene({
       <RAMDraggable
         placed={ramPlaced}
         onPlaced={() => setRamPlaced(true)}
-      />
-
-      <InstructionPanel
-        placed={ramPlaced}
-        onNext={onNext}
       />
 
       <ContactShadows
@@ -333,11 +324,6 @@ function RAMDraggable({ placed, onPlaced }) {
 
   const [dragging, setDragging] = useState(false);
   const [snapped, setSnapped] = useState(placed);
-  const [pos, setPos] = useState({
-    x: RAM_START_POSITION.x,
-    y: RAM_START_POSITION.y,
-    z: RAM_START_POSITION.z,
-  });
 
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const hitPoint = useMemo(() => new THREE.Vector3(), []);
@@ -532,15 +518,6 @@ function RAMDraggable({ placed, onPlaced }) {
         }
       }
     }
-
-    const worldPos = new THREE.Vector3();
-    ramRef.current.getWorldPosition(worldPos);
-
-    setPos({
-      x: worldPos.x,
-      y: worldPos.y,
-      z: worldPos.z,
-    });
   });
 
   return (
@@ -548,129 +525,11 @@ function RAMDraggable({ placed, onPlaced }) {
       <group ref={ramRef}>
         <primitive object={ramClone} />
       </group>
-
-      {!snapped && (
-        <Html fullscreen style={{ pointerEvents: "none" }}>
-          <div
-            style={{
-              position: "absolute",
-              left: 24,
-              bottom: 24,
-              padding: "12px 16px",
-              minWidth: 260,
-              borderRadius: 16,
-              background: "rgba(10,14,22,.78)",
-              border: `1px solid ${RAM_COLOR}66`,
-              backdropFilter: "blur(8px)",
-              color: "rgba(234,240,255,.95)",
-              fontSize: 12,
-              fontFamily: "monospace",
-              textAlign: "center",
-              boxShadow: "0 10px 30px rgba(0,0,0,.35)",
-            }}
-          >
-            <div style={{ fontWeight: "bold", marginBottom: 4 }}>RAM</div>
-            <div style={{ marginBottom: 8 }}>
-              {dragging ? "Dragging to RAM slot" : "Click RAM to grab"}
-            </div>
-            <div>x: {pos.x.toFixed(2)}</div>
-            <div>y: {pos.y.toFixed(2)}</div>
-            <div>z: {pos.z.toFixed(2)}</div>
-          </div>
-        </Html>
-      )}
     </group>
   );
 }
 
-function InstructionPanel({
-  placed,
-  onNext,
-}) {
-  return (
-    <Html fullscreen style={{ pointerEvents: "none" }}>
-      <div
-        style={{
-          position: "absolute",
-          top: 22,
-          left: 24,
-          padding: "12px 16px",
-          minWidth: 330,
-          borderRadius: 16,
-          background: "rgba(10,14,22,.78)",
-          border: "1px solid rgba(255,255,255,.14)",
-          backdropFilter: "blur(8px)",
-          color: "rgba(234,240,255,.95)",
-          fontSize: 12,
-          fontFamily: "monospace",
-          boxShadow: "0 10px 30px rgba(0,0,0,.35)",
-        }}
-      >
-        <div style={{ fontWeight: "bold", marginBottom: 8 }}>
-          Step 2: RAM to Motherboard
-        </div>
-
-        <div style={{ marginBottom: 10 }}>
-          {placed
-            ? "RAM seated on motherboard."
-            : "Drag the RAM into the RAM slot with the CPU already installed."}
-        </div>
-
-        <div style={{ display: "grid", gap: 5 }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              opacity: 1,
-            }}
-          >
-            <span
-              style={{
-                width: 9,
-                height: 9,
-                borderRadius: 999,
-                background: CPU_COLOR,
-                display: "inline-block",
-              }}
-            />
-            <span>1. CPU</span>
-            <span style={{ marginLeft: "auto" }}>done</span>
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              opacity: 1,
-            }}
-          >
-            <span
-              style={{
-                width: 9,
-                height: 9,
-                borderRadius: 999,
-                background: RAM_COLOR,
-                display: "inline-block",
-                boxShadow: placed ? "none" : `0 0 14px ${RAM_COLOR}`,
-              }}
-            />
-            <span>2. RAM</span>
-            <span style={{ marginLeft: "auto" }}>
-              {placed ? "done" : "active"}
-            </span>
-          </div>
-        </div>
-      </div>
-    </Html>
-  );
-}
-
-export default function RAMtoMB({
-  onNext,
-  onComplete,
-}) {
+export default function RAMtoMB({ onComplete }) {
   return (
     <Canvas
       shadows
@@ -678,7 +537,6 @@ export default function RAMtoMB({
       camera={{ position: CAMERA_POSITION, fov: 50 }}
     >
       <Scene
-        onNext={onNext}
         onComplete={onComplete}
       />
     </Canvas>

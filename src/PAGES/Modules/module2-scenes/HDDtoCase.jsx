@@ -128,10 +128,6 @@ const HDD_SEATED_ROTATION = new THREE.Euler(0, Math.PI / 2, 0);
  */
 const HDD_INSERT_TRANSITION_SPEED = 0.24;
 
-const MB_COLOR = "#4aa3ff";
-const CPU_COLOR = "#b56dff";
-const RAM_COLOR = "#00ffb4";
-const SSD_COLOR = "#ffcc00";
 const HDD_COLOR = "#ff8a3d";
 
 function cloneScene(scene, transparent = false) {
@@ -177,7 +173,6 @@ function easeInOutCubic(t) {
 }
 
 function Scene({
-  onNext,
   onComplete,
 }) {
   const { camera } = useThree();
@@ -234,12 +229,6 @@ function Scene({
           setHddInserting(false);
           setHddPlaced(true);
         }}
-      />
-
-      <InstructionPanel
-        placed={hddPlaced}
-        inserting={hddInserting}
-        onNext={onNext}
       />
 
       <ContactShadows
@@ -481,11 +470,6 @@ function HDDDraggable({ placed, onInsertStart, onPlaced }) {
   const insertProgress = useRef(0);
 
   const [phase, setPhase] = useState(placed ? "snapped" : "readyToDrag");
-  const [pos, setPos] = useState({
-    x: HDD_START_POSITION.x,
-    y: HDD_START_POSITION.y,
-    z: HDD_START_POSITION.z,
-  });
 
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const hitPoint = useMemo(() => new THREE.Vector3(), []);
@@ -754,135 +738,14 @@ function HDDDraggable({ placed, onInsertStart, onPlaced }) {
       hddRef.current.position.lerp(HDD_SEATED_POSITION, 0.28);
       hddRef.current.quaternion.slerp(seatedQuat, 0.28);
     }
-
-    const worldPos = new THREE.Vector3();
-    hddRef.current.getWorldPosition(worldPos);
-
-    setPos({
-      x: worldPos.x,
-      y: worldPos.y,
-      z: worldPos.z,
-    });
   });
-
-  const statusText =
-    phase === "readyToDrag"
-      ? "Click HDD to grab"
-      : phase === "dragging"
-      ? "Drag HDD to insert point"
-      : phase === "inserting"
-      ? "Sliding HDD into seated position..."
-      : "HDD installed into case";
 
   return (
     <group>
       <group ref={hddRef}>
         <primitive object={hddClone} />
       </group>
-
-      {phase !== "snapped" && (
-        <Html fullscreen style={{ pointerEvents: "none" }}>
-          <div
-            style={{
-              position: "absolute",
-              left: 24,
-              bottom: 24,
-              padding: "12px 16px",
-              minWidth: 300,
-              borderRadius: 16,
-              background: "rgba(10,14,22,.78)",
-              border: `1px solid ${HDD_COLOR}66`,
-              backdropFilter: "blur(8px)",
-              color: "rgba(234,240,255,.95)",
-              fontSize: 12,
-              fontFamily: "monospace",
-              textAlign: "center",
-              boxShadow: "0 10px 30px rgba(0,0,0,.35)",
-            }}
-          >
-            <div style={{ fontWeight: "bold", marginBottom: 4 }}>HDD</div>
-
-            <div style={{ marginBottom: 8 }}>{statusText}</div>
-
-            <div>x: {pos.x.toFixed(2)}</div>
-            <div>y: {pos.y.toFixed(2)}</div>
-            <div>z: {pos.z.toFixed(2)}</div>
-          </div>
-        </Html>
-      )}
     </group>
-  );
-}
-
-function InstructionPanel({
-  placed,
-  inserting,
-  onNext,
-}) {
-  return (
-    <Html fullscreen style={{ pointerEvents: "none" }}>
-      <div
-        style={{
-          position: "absolute",
-          top: 22,
-          left: 24,
-          padding: "12px 16px",
-          minWidth: 430,
-          borderRadius: 16,
-          background: "rgba(10,14,22,.78)",
-          border: "1px solid rgba(255,255,255,.14)",
-          backdropFilter: "blur(8px)",
-          color: "rgba(234,240,255,.95)",
-          fontSize: 12,
-          fontFamily: "monospace",
-          boxShadow: "0 10px 30px rgba(0,0,0,.35)",
-        }}
-      >
-        <div style={{ fontWeight: "bold", marginBottom: 8 }}>
-          Step 5: HDD to Case
-        </div>
-
-        <div style={{ marginBottom: 10 }}>
-          {placed
-            ? "HDD seated inside the case."
-            : inserting
-            ? "HDD is smoothly sliding into its final seated position."
-            : "Click the HDD to grab it, move it to the insert point, then it will slide into the seated position."}
-        </div>
-
-        <div style={{ display: "grid", gap: 5 }}>
-          <StepDot color={CPU_COLOR} label="1. CPU" state="done" />
-          <StepDot color={RAM_COLOR} label="2. RAM" state="done" />
-          <StepDot color={SSD_COLOR} label="3. SSD" state="done" />
-          <StepDot color={MB_COLOR} label="4. Motherboard to case" state="done" />
-          <StepDot
-            color={HDD_COLOR}
-            label="5. HDD to case"
-            state={placed ? "done" : inserting ? "inserting" : "active"}
-            glow={!placed}
-          />
-        </div>
-      </div>
-    </Html>
-  );
-}
-
-function StepDot({ color, label, state, glow = false }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      <span
-        style={{
-          width: 9,
-          height: 9,
-          borderRadius: 999,
-          background: color,
-          display: "inline-block",
-          boxShadow: glow ? `0 0 14px ${color}` : "none",
-        }}
-      />
-      <span>{label}</span>
-      <span style={{ marginLeft: "auto" }}>{state}</span>
-    </div>
   );
 }
 
@@ -897,7 +760,6 @@ export default function HDDtoCase({
       camera={{ position: CAMERA_POSITION, fov: 50 }}
     >
       <Scene
-        onNext={onNext}
         onComplete={onComplete}
       />
     </Canvas>

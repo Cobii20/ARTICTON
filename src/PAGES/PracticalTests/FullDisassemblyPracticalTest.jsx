@@ -28,10 +28,18 @@ const TEST_SETTINGS = {
   id: "full-disassembly-practical",
   progressKey: "fullDisassembly",
   requiredQuizKey: "module3",
+  requiredQuizPercent: 60,
+  passingPercent: 60,
   title: "Full Disassembly Practical Test",
   desc: "Step-by-step PC disassembly validation",
   durationMin: 30,
 };
+
+const WRONG_CLICK_DEDUCTION = 5;
+
+function calculatePracticalScore(progressPercent, mistakes) {
+  return Math.max(0, progressPercent - mistakes * WRONG_CLICK_DEDUCTION);
+}
 
 /* ───────────────────────────────────────────────────────────── */
 /* MODEL URLS */
@@ -168,7 +176,9 @@ function setObjectOpacity(root, opacity) {
   root.traverse((object) => {
     if (!object.isMesh || !object.material) return;
 
-    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    const materials = Array.isArray(object.material)
+      ? object.material
+      : [object.material];
 
     materials.forEach((material) => {
       material.transparent = opacity < 1;
@@ -302,8 +312,6 @@ function Scene({
         onPlaced={() => onPlaced?.("mb")}
       />
 
-      <SceneInstructionPanel activePart={activePart} placements={placements} />
-
       <ContactShadows
         position={[BOARD_CENTER_X, BOARD_Y + 0.1, BOARD_CENTER_Z]}
         opacity={0.38}
@@ -334,7 +342,11 @@ function PCCase() {
   const caseClone = useMemo(() => cloneScene(scene), [scene]);
 
   return (
-    <group scale={CASE_SCALE} position={CASE_POSITION} rotation={CASE_ROTATION.toArray()}>
+    <group
+      scale={CASE_SCALE}
+      position={CASE_POSITION}
+      rotation={CASE_ROTATION.toArray()}
+    >
       <primitive object={caseClone} />
     </group>
   );
@@ -374,8 +386,16 @@ function CheckerTarget({ part, index, active, placed }) {
   const pulseRef = useRef();
   const fillRef = useRef();
 
-  const x = part.id === "mb" ? part.floorPosition.x + MB_RING_OFFSET.x : part.floorPosition.x;
-  const z = part.id === "mb" ? part.floorPosition.z + MB_RING_OFFSET.z : part.floorPosition.z;
+  const x =
+    part.id === "mb"
+      ? part.floorPosition.x + MB_RING_OFFSET.x
+      : part.floorPosition.x;
+
+  const z =
+    part.id === "mb"
+      ? part.floorPosition.z + MB_RING_OFFSET.z
+      : part.floorPosition.z;
+
   const size = part.id === "mb" ? CELL_SIZE * 1.35 : CELL_SIZE * 0.92;
 
   useFrame(({ clock }) => {
@@ -394,7 +414,10 @@ function CheckerTarget({ part, index, active, placed }) {
   });
 
   return (
-    <group position={[x, BOARD_Y + 0.04 + index * 0.003, z]} rotation={[-Math.PI / 2, 0, 0]}>
+    <group
+      position={[x, BOARD_Y + 0.04 + index * 0.003, z]}
+      rotation={[-Math.PI / 2, 0, 0]}
+    >
       <mesh ref={fillRef}>
         <planeGeometry args={[size, size]} />
         <meshBasicMaterial
@@ -440,114 +463,6 @@ function CheckerTarget({ part, index, active, placed }) {
   );
 }
 
-function SceneInstructionPanel({ activePart, placements }) {
-  const complete = PARTS.every((part) => placements[getPlacementKey(part.id)]);
-  const activeText = complete ? "Disassembly complete" : `Remove ${activePart?.label || "next part"}`;
-
-  return (
-    <Html fullscreen style={{ pointerEvents: "none" }}>
-      <div
-        style={{
-          position: "absolute",
-          top: 18,
-          left: 18,
-          padding: "10px 14px",
-          minWidth: 300,
-          borderRadius: 16,
-          background: "rgba(10,14,22,.72)",
-          border: "1px solid rgba(255,255,255,.14)",
-          backdropFilter: "blur(8px)",
-          color: "rgba(234,240,255,.95)",
-          fontSize: 11,
-          fontFamily: "monospace",
-          boxShadow: "0 10px 30px rgba(0,0,0,.35)",
-        }}
-      >
-        <div style={{ fontWeight: "bold", marginBottom: 6 }}>Full PC Disassembly</div>
-        <div style={{ marginBottom: 8 }}>{activeText}</div>
-
-        <div style={{ display: "grid", gap: 4 }}>
-          {PARTS.map((part, index) => {
-            const placed = placements[getPlacementKey(part.id)];
-            const active = activePart?.id === part.id;
-
-            return (
-              <StepDot
-                key={part.id}
-                color={part.color}
-                label={`${index + 1}. ${part.label}`}
-                state={placed ? "done" : active ? "active" : "locked"}
-                glow={active}
-                muted={!placed && !active}
-              />
-            );
-          })}
-        </div>
-      </div>
-    </Html>
-  );
-}
-
-function StepDot({ color, label, state, glow = false, muted = false }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, opacity: muted ? 0.45 : 1 }}>
-      <span
-        style={{
-          width: 9,
-          height: 9,
-          borderRadius: 999,
-          background: color,
-          display: "inline-block",
-          boxShadow: glow ? `0 0 14px ${color}` : "none",
-        }}
-      />
-      <span>{label}</span>
-      <span style={{ marginLeft: "auto" }}>{state}</span>
-    </div>
-  );
-}
-
-function SideStatus({ part, active, detached, dragging, snapped, pos }) {
-  const text = !active && !snapped
-    ? "Locked until previous part is removed"
-    : !detached
-    ? "Click component to detach"
-    : snapped
-    ? "Placed on checkerboard"
-    : dragging
-    ? "Dragging to colored target"
-    : "Click to grab / release";
-
-  return (
-    <Html fullscreen style={{ pointerEvents: "none" }}>
-      <div
-        style={{
-          position: "absolute",
-          left: 24,
-          bottom: 24,
-          padding: "12px 16px",
-          minWidth: 240,
-          borderRadius: 16,
-          background: "rgba(10,14,22,.78)",
-          border: `1px solid ${part.color}66`,
-          backdropFilter: "blur(8px)",
-          color: "rgba(234,240,255,.95)",
-          fontSize: 12,
-          fontFamily: "monospace",
-          textAlign: "center",
-          boxShadow: "0 10px 30px rgba(0,0,0,.35)",
-        }}
-      >
-        <div style={{ fontWeight: "bold", marginBottom: 4 }}>{part.label}</div>
-        <div style={{ marginBottom: 8 }}>{text}</div>
-        <div>x: {pos.x.toFixed(2)}</div>
-        <div>y: {pos.y.toFixed(2)}</div>
-        <div>z: {pos.z.toFixed(2)}</div>
-      </div>
-    </Html>
-  );
-}
-
 function PartDraggable({ part, active, isPlaced = false, guardPartClick, onPlaced }) {
   const { scene } = useGLTF(part.url);
   const { gl, camera } = useThree();
@@ -556,11 +471,6 @@ function PartDraggable({ part, active, isPlaced = false, guardPartClick, onPlace
   const [dragging, setDragging] = useState(false);
   const [detached, setDetached] = useState(isPlaced);
   const [snapped, setSnapped] = useState(isPlaced);
-  const [pos, setPos] = useState({
-    x: part.installedPosition.x,
-    y: part.installedPosition.y,
-    z: part.installedPosition.z,
-  });
 
   const mouse = useRef(new THREE.Vector2());
   const dragOffset = useRef(new THREE.Vector3());
@@ -575,15 +485,18 @@ function PartDraggable({ part, active, isPlaced = false, guardPartClick, onPlace
     () => new THREE.Quaternion().setFromEuler(part.installedRotation),
     [part.installedRotation]
   );
+
   const floorQuat = useMemo(
     () => new THREE.Quaternion().setFromEuler(part.floorRotation),
     [part.floorRotation]
   );
+
   const modelClone = useMemo(() => cloneScene(scene), [scene]);
 
   const updateMouse = useCallback(
     (event) => {
       const rect = gl.domElement.getBoundingClientRect();
+
       mouse.current.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
       mouse.current.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
     },
@@ -599,18 +512,21 @@ function PartDraggable({ part, active, isPlaced = false, guardPartClick, onPlace
 
   const moveToInstalled = useCallback(() => {
     if (!partRef.current) return;
+
     partRef.current.position.copy(part.installedPosition);
     partRef.current.quaternion.copy(installedQuat);
   }, [installedQuat, part.installedPosition]);
 
   const moveToFloor = useCallback(() => {
     if (!partRef.current) return;
+
     partRef.current.position.copy(part.floorPosition);
     partRef.current.quaternion.copy(floorQuat);
   }, [floorQuat, part.floorPosition]);
 
   useEffect(() => {
     if (!partRef.current) return;
+
     partRef.current.scale.setScalar(ASSEMBLY_SCALE);
 
     if (isPlaced) {
@@ -631,9 +547,14 @@ function PartDraggable({ part, active, isPlaced = false, guardPartClick, onPlace
       if (event.button !== 0 || !partRef.current || snapped) return;
 
       updateMouse(event);
+
       const hitPart = isPointerOverPart();
 
       if (!hitPart && !dragging) return;
+
+      event.stopImmediatePropagation?.();
+      event.preventDefault?.();
+
       if (!guardPartClick?.(part.id)) return;
       if (!active) return;
 
@@ -675,7 +596,10 @@ function PartDraggable({ part, active, isPlaced = false, guardPartClick, onPlace
     };
 
     gl.domElement.addEventListener("pointerdown", handlePointerDown);
-    return () => gl.domElement.removeEventListener("pointerdown", handlePointerDown);
+
+    return () => {
+      gl.domElement.removeEventListener("pointerdown", handlePointerDown);
+    };
   }, [
     active,
     camera,
@@ -731,6 +655,7 @@ function PartDraggable({ part, active, isPlaced = false, guardPartClick, onPlace
             part.floorPosition.y,
             hitPoint.z + dragOffset.current.z
           );
+
           partRef.current.position.lerp(target, 0.35);
         }
       }
@@ -742,8 +667,9 @@ function PartDraggable({ part, active, isPlaced = false, guardPartClick, onPlace
         partRef.current.position.z - part.floorPosition.z
       ).length();
 
-      if (active && dist < MAGNET_DISTANCE) {
+      if (dragging && active && dist < MAGNET_DISTANCE) {
         const pull = MAGNET_STRENGTH + (1 - dist / MAGNET_DISTANCE) * 0.22;
+
         partRef.current.position.lerp(part.floorPosition, pull);
         partRef.current.quaternion.slerp(floorQuat, pull);
 
@@ -756,10 +682,6 @@ function PartDraggable({ part, active, isPlaced = false, guardPartClick, onPlace
         }
       }
     }
-
-    const worldPos = new THREE.Vector3();
-    partRef.current.getWorldPosition(worldPos);
-    setPos({ x: worldPos.x, y: worldPos.y, z: worldPos.z });
   });
 
   return (
@@ -767,22 +689,17 @@ function PartDraggable({ part, active, isPlaced = false, guardPartClick, onPlace
       <group ref={partRef}>
         <primitive object={modelClone} />
       </group>
-
-      {active && (
-        <SideStatus
-          part={part}
-          active={active}
-          detached={detached}
-          dragging={dragging}
-          snapped={snapped}
-          pos={pos}
-        />
-      )}
     </group>
   );
 }
 
-function MotherboardDraggable({ part, active, isPlaced = false, guardPartClick, onPlaced }) {
+function MotherboardDraggable({
+  part,
+  active,
+  isPlaced = false,
+  guardPartClick,
+  onPlaced,
+}) {
   const { scene } = useGLTF(part.url);
   const { gl, camera } = useThree();
   const mbRef = useRef();
@@ -794,32 +711,34 @@ function MotherboardDraggable({ part, active, isPlaced = false, guardPartClick, 
   const [animatingExtract, setAnimatingExtract] = useState(false);
   const [animationProgress, setAnimationProgress] = useState(0);
   const [nearTarget, setNearTarget] = useState(false);
-  const [pos, setPos] = useState({
-    x: part.installedPosition.x,
-    y: part.installedPosition.y,
-    z: part.installedPosition.z,
-  });
 
   const mouse = useRef(new THREE.Vector2());
   const dragOffset = useRef(new THREE.Vector3());
   const extractProgress = useRef(0);
+
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const hitPoint = useMemo(() => new THREE.Vector3(), []);
-  const dragPlane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), -MB_HOVER_Y), []);
+  const dragPlane = useMemo(
+    () => new THREE.Plane(new THREE.Vector3(0, 1, 0), -MB_HOVER_Y),
+    []
+  );
 
   const installedQuat = useMemo(
     () => new THREE.Quaternion().setFromEuler(part.installedRotation),
     [part.installedRotation]
   );
+
   const floorQuat = useMemo(
     () => new THREE.Quaternion().setFromEuler(part.floorRotation),
     [part.floorRotation]
   );
+
   const mbClone = useMemo(() => cloneScene(scene, true), [scene]);
 
   const updateMouse = useCallback(
     (event) => {
       const rect = gl.domElement.getBoundingClientRect();
+
       mouse.current.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
       mouse.current.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
     },
@@ -828,12 +747,14 @@ function MotherboardDraggable({ part, active, isPlaced = false, guardPartClick, 
 
   const isPointerOverMotherboard = useCallback(() => {
     if (!mbRef.current) return false;
+
     raycaster.setFromCamera(mouse.current, camera);
     return raycaster.intersectObject(mbRef.current, true).length > 0;
   }, [camera, raycaster]);
 
   const getDistanceToTarget = useCallback(() => {
     if (!mbRef.current) return Infinity;
+
     return new THREE.Vector2(
       mbRef.current.position.x - part.floorPosition.x,
       mbRef.current.position.z - part.floorPosition.z
@@ -842,25 +763,31 @@ function MotherboardDraggable({ part, active, isPlaced = false, guardPartClick, 
 
   const placeInstalled = useCallback(() => {
     if (!mbRef.current) return;
+
     mbRef.current.visible = true;
     mbRef.current.position.copy(part.installedPosition);
     mbRef.current.quaternion.copy(installedQuat);
+
     setObjectOpacity(mbRef.current, 1);
   }, [installedQuat, part.installedPosition]);
 
   const placeHoverReady = useCallback(() => {
     if (!mbRef.current) return;
+
     mbRef.current.visible = true;
     mbRef.current.position.copy(MB_DETACHED_READY_POSITION);
     mbRef.current.quaternion.copy(floorQuat);
+
     setObjectOpacity(mbRef.current, 1);
   }, [floorQuat]);
 
   const placeOnBoard = useCallback(() => {
     if (!mbRef.current) return;
+
     mbRef.current.visible = true;
     mbRef.current.position.copy(part.floorPosition);
     mbRef.current.quaternion.copy(floorQuat);
+
     setObjectOpacity(mbRef.current, 1);
   }, [floorQuat, part.floorPosition]);
 
@@ -868,6 +795,7 @@ function MotherboardDraggable({ part, active, isPlaced = false, guardPartClick, 
     if (!mbRef.current) return;
 
     extractProgress.current = 0;
+
     setAnimationProgress(0);
     setDetached(true);
     setDragging(false);
@@ -875,11 +803,13 @@ function MotherboardDraggable({ part, active, isPlaced = false, guardPartClick, 
     setAnimatingExtract(true);
     setHovered(false);
     setNearTarget(false);
+
     document.body.style.cursor = "default";
   }, []);
 
   useEffect(() => {
     if (!mbRef.current) return;
+
     mbRef.current.scale.setScalar(ASSEMBLY_SCALE);
 
     if (isPlaced) {
@@ -901,12 +831,19 @@ function MotherboardDraggable({ part, active, isPlaced = false, guardPartClick, 
 
   useEffect(() => {
     const handlePointerDown = (event) => {
-      if (event.button !== 0 || !mbRef.current || animatingExtract || snapped) return;
+      if (event.button !== 0 || !mbRef.current || animatingExtract || snapped) {
+        return;
+      }
 
       updateMouse(event);
+
       const hitMotherboard = isPointerOverMotherboard();
 
       if (!hitMotherboard && !dragging && !nearTarget) return;
+
+      event.stopImmediatePropagation?.();
+      event.preventDefault?.();
+
       if (!guardPartClick?.("mb")) return;
       if (!active) return;
 
@@ -918,6 +855,7 @@ function MotherboardDraggable({ part, active, isPlaced = false, guardPartClick, 
       if (!dragging) {
         if (nearTarget) {
           const dist = getDistanceToTarget();
+
           if (dist < SNAP_DISTANCE * 1.25) {
             placeOnBoard();
             setSnapped(true);
@@ -930,6 +868,7 @@ function MotherboardDraggable({ part, active, isPlaced = false, guardPartClick, 
         }
 
         raycaster.setFromCamera(mouse.current, camera);
+
         if (raycaster.ray.intersectPlane(dragPlane, hitPoint)) {
           dragOffset.current.set(
             mbRef.current.position.x - hitPoint.x,
@@ -942,6 +881,7 @@ function MotherboardDraggable({ part, active, isPlaced = false, guardPartClick, 
         document.body.style.cursor = "grabbing";
       } else {
         setDragging(false);
+
         const dist = getDistanceToTarget();
 
         if (dist < SNAP_DISTANCE * 1.25) {
@@ -958,7 +898,10 @@ function MotherboardDraggable({ part, active, isPlaced = false, guardPartClick, 
     };
 
     gl.domElement.addEventListener("pointerdown", handlePointerDown);
-    return () => gl.domElement.removeEventListener("pointerdown", handlePointerDown);
+
+    return () => {
+      gl.domElement.removeEventListener("pointerdown", handlePointerDown);
+    };
   }, [
     active,
     animatingExtract,
@@ -991,6 +934,7 @@ function MotherboardDraggable({ part, active, isPlaced = false, guardPartClick, 
       }
 
       const hitMotherboard = isPointerOverMotherboard();
+
       setHovered(hitMotherboard || dragging);
 
       if (!active) {
@@ -1007,6 +951,7 @@ function MotherboardDraggable({ part, active, isPlaced = false, guardPartClick, 
     };
 
     const preventContextMenu = (event) => event.preventDefault();
+
     gl.domElement.addEventListener("pointermove", handlePointerMove);
     gl.domElement.addEventListener("contextmenu", preventContextMenu);
 
@@ -1015,36 +960,61 @@ function MotherboardDraggable({ part, active, isPlaced = false, guardPartClick, 
       gl.domElement.removeEventListener("contextmenu", preventContextMenu);
       document.body.style.cursor = "default";
     };
-  }, [active, animatingExtract, detached, dragging, gl, isPointerOverMotherboard, nearTarget, snapped, updateMouse]);
+  }, [
+    active,
+    animatingExtract,
+    detached,
+    dragging,
+    gl,
+    isPointerOverMotherboard,
+    nearTarget,
+    snapped,
+    updateMouse,
+  ]);
 
   useFrame((_, delta) => {
     if (!mbRef.current) return;
 
     if (animatingExtract) {
-      extractProgress.current = Math.min(extractProgress.current + delta * MB_EXTRACT_SPEED, 1);
+      extractProgress.current = Math.min(
+        extractProgress.current + delta * MB_EXTRACT_SPEED,
+        1
+      );
+
       const rawT = extractProgress.current;
 
       if (rawT < 0.32) {
         const t = easeInOutCubic(rawT / 0.32);
+
         mbRef.current.visible = true;
-        mbRef.current.position.lerpVectors(part.installedPosition, MB_PULL_OUT_POSITION, t);
+        mbRef.current.position.lerpVectors(
+          part.installedPosition,
+          MB_PULL_OUT_POSITION,
+          t
+        );
         mbRef.current.quaternion.copy(installedQuat);
+
         setObjectOpacity(mbRef.current, 1);
       } else if (rawT < 0.5) {
         const t = easeOutQuart((rawT - 0.32) / 0.18);
+
         mbRef.current.position.copy(MB_PULL_OUT_POSITION);
         mbRef.current.quaternion.copy(installedQuat);
+
         setObjectOpacity(mbRef.current, 1 - t);
       } else if (rawT < 0.58) {
         mbRef.current.visible = false;
         mbRef.current.position.copy(MB_DETACHED_READY_POSITION);
         mbRef.current.quaternion.copy(floorQuat);
+
         setObjectOpacity(mbRef.current, 0);
       } else {
         const t = easeOutQuart((rawT - 0.58) / 0.42);
+
         mbRef.current.visible = true;
         mbRef.current.position.copy(MB_DETACHED_READY_POSITION);
         mbRef.current.quaternion.copy(floorQuat);
+
         setObjectOpacity(mbRef.current, t);
       }
 
@@ -1070,6 +1040,7 @@ function MotherboardDraggable({ part, active, isPlaced = false, guardPartClick, 
     } else {
       const dist = getDistanceToTarget();
       const magnetT = THREE.MathUtils.clamp(1 - dist / MAGNET_DISTANCE, 0, 1);
+
       setNearTarget(active && dist < MAGNET_DISTANCE);
 
       mbRef.current.quaternion.slerp(floorQuat, 0.08 + magnetT * 0.22);
@@ -1077,19 +1048,26 @@ function MotherboardDraggable({ part, active, isPlaced = false, guardPartClick, 
 
       if (dragging && active) {
         raycaster.setFromCamera(mouse.current, camera);
+
         if (raycaster.ray.intersectPlane(dragPlane, hitPoint)) {
           const target = new THREE.Vector3(
             hitPoint.x + dragOffset.current.x,
             MB_HOVER_Y,
             hitPoint.z + dragOffset.current.z
           );
+
           mbRef.current.position.lerp(target, 0.35);
         }
       }
 
       if (active && dragging && dist < MAGNET_DISTANCE) {
         const pull = MAGNET_STRENGTH + magnetT * 0.18;
-        const snapTarget = new THREE.Vector3(part.floorPosition.x, MB_HOVER_Y, part.floorPosition.z);
+        const snapTarget = new THREE.Vector3(
+          part.floorPosition.x,
+          MB_HOVER_Y,
+          part.floorPosition.z
+        );
+
         mbRef.current.position.lerp(snapTarget, pull);
         mbRef.current.quaternion.slerp(floorQuat, 0.18 + magnetT * 0.18);
 
@@ -1102,117 +1080,13 @@ function MotherboardDraggable({ part, active, isPlaced = false, guardPartClick, 
         }
       }
     }
-
-    const worldPos = new THREE.Vector3();
-    mbRef.current.getWorldPosition(worldPos);
-    setPos({ x: worldPos.x, y: worldPos.y, z: worldPos.z });
   });
-
-  const statusText = animatingExtract
-    ? "Extracting motherboard"
-    : !active && !snapped
-    ? "Locked until other parts are removed"
-    : !detached && hovered
-    ? "Click to remove"
-    : !detached
-    ? "Hover and click motherboard"
-    : snapped
-    ? "Placed on checkerboard"
-    : dragging && nearTarget
-    ? "Release near target"
-    : dragging
-    ? "Guide to cyan target"
-    : nearTarget
-    ? "Click to place"
-    : hovered
-    ? "Click to grab"
-    : "Drag motherboard";
 
   return (
     <group>
       <group ref={mbRef}>
         <primitive object={mbClone} />
       </group>
-
-      {active && (
-        <Html
-          position={[
-            part.floorPosition.x + MB_RING_OFFSET.x,
-            part.floorPosition.y + 1.25,
-            part.floorPosition.z + MB_RING_OFFSET.z,
-          ]}
-          center
-          style={{ pointerEvents: "none" }}
-        >
-          <div
-            style={{
-              padding: "6px 10px",
-              borderRadius: 999,
-              background: "rgba(10,14,22,.76)",
-              border: `1px solid ${part.color}99`,
-              color: "rgba(234,240,255,.92)",
-              fontFamily: "monospace",
-              fontSize: 11,
-              whiteSpace: "nowrap",
-              boxShadow: "0 8px 22px rgba(0,0,0,.32)",
-            }}
-          >
-            {statusText}
-          </div>
-        </Html>
-      )}
-
-      {active && (
-        <Html fullscreen style={{ pointerEvents: "none" }}>
-          <div
-            style={{
-              position: "absolute",
-              left: 24,
-              bottom: 24,
-              padding: "12px 16px",
-              minWidth: 250,
-              borderRadius: 16,
-              background: "rgba(10,14,22,.78)",
-              border: `1px solid ${part.color}66`,
-              backdropFilter: "blur(8px)",
-              color: "rgba(234,240,255,.95)",
-              fontSize: 12,
-              fontFamily: "monospace",
-              textAlign: "center",
-              boxShadow: "0 10px 30px rgba(0,0,0,.35)",
-            }}
-          >
-            <div style={{ fontWeight: "bold", marginBottom: 4 }}>{part.label}</div>
-            <div style={{ marginBottom: 8 }}>{statusText}</div>
-
-            {animatingExtract && (
-              <div
-                style={{
-                  height: 5,
-                  width: "100%",
-                  overflow: "hidden",
-                  borderRadius: 999,
-                  marginBottom: 10,
-                  background: "rgba(255,255,255,.12)",
-                }}
-              >
-                <div
-                  style={{
-                    height: "100%",
-                    width: `${Math.round(animationProgress * 100)}%`,
-                    background: part.color,
-                    transition: "width .12s linear",
-                  }}
-                />
-              </div>
-            )}
-
-            <div>x: {pos.x.toFixed(2)}</div>
-            <div>y: {pos.y.toFixed(2)}</div>
-            <div>z: {pos.z.toFixed(2)}</div>
-          </div>
-        </Html>
-      )}
     </group>
   );
 }
@@ -1241,16 +1115,33 @@ export default function FullDisassemblyPracticalTest({ onBack }) {
   const [successMessage, setSuccessMessage] = useState("");
   const [mistakes, setMistakes] = useState(0);
 
-  const requiredQuizProgress = profile?.quizProgress?.[TEST_SETTINGS.requiredQuizKey];
-  const quizFinished = !!requiredQuizProgress?.completed;
-  const isLocked = !quizFinished;
+  const requiredQuizProgress =
+    profile?.quizProgress?.[TEST_SETTINGS.requiredQuizKey];
+
+  const requiredPracticeAccess =
+    profile?.practiceTestAccess?.[TEST_SETTINGS.requiredQuizKey];
+
+  const quizPercent = requiredQuizProgress?.percent || 0;
+
+  const practiceUnlocked =
+    requiredPracticeAccess?.unlocked === true ||
+    quizPercent >= TEST_SETTINGS.requiredQuizPercent;
+
+  const isLocked = !practiceUnlocked;
 
   const activePart = useMemo(() => getCurrentPart(placements), [placements]);
-  const completedCount = PARTS.filter((part) => placements[getPlacementKey(part.id)]).length;
+  const completedCount = PARTS.filter(
+    (part) => placements[getPlacementKey(part.id)]
+  ).length;
+
   const totalSteps = PARTS.length;
   const progressPercent = Math.round((completedCount / totalSteps) * 100);
+  const deductionPercent = mistakes * WRONG_CLICK_DEDUCTION;
+  const scorePercent = calculatePracticalScore(progressPercent, mistakes);
   const canFinish = completedCount === totalSteps;
-  const currentStepLabel = activePart ? `Remove ${activePart.label}` : "Full Disassembly Complete";
+  const currentStepLabel = activePart
+    ? `Remove ${activePart.label}`
+    : "Full Disassembly Complete";
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -1293,7 +1184,10 @@ export default function FullDisassemblyPracticalTest({ onBack }) {
       return;
     }
 
-    const timer = setInterval(() => setSecondsLeft((current) => current - 1), 1000);
+    const timer = setInterval(() => {
+      setSecondsLeft((current) => current - 1);
+    }, 1000);
+
     return () => clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [started, finished, secondsLeft]);
@@ -1301,11 +1195,13 @@ export default function FullDisassemblyPracticalTest({ onBack }) {
   const formatTime = (seconds) => {
     const minutesText = String(Math.floor(seconds / 60)).padStart(2, "0");
     const secondsText = String(seconds % 60).padStart(2, "0");
+
     return `${minutesText}:${secondsText}`;
   };
 
   const clearTemporaryMessages = () => {
     window.clearTimeout(clearTemporaryMessages.warningTimer);
+
     clearTemporaryMessages.warningTimer = window.setTimeout(() => {
       setWarning("");
       setSuccessMessage("");
@@ -1320,7 +1216,9 @@ export default function FullDisassemblyPracticalTest({ onBack }) {
     setConfirmSubmit(false);
     setSaveError("");
     setWarning("");
-    setSuccessMessage("Practical test started. Follow the Module 3 full disassembly order.");
+    setSuccessMessage(
+      `Practical test started. Follow the Module 3 full disassembly order. Each wrong component click deducts ${WRONG_CLICK_DEDUCTION}% from your score.`
+    );
     clearTemporaryMessages();
   };
 
@@ -1335,7 +1233,9 @@ export default function FullDisassemblyPracticalTest({ onBack }) {
     const expectedLabel = getStepLabel(expectedId);
 
     setMistakes((value) => value + 1);
-    setWarning(`Wrong part. Remove ${expectedLabel} next, not ${clickedLabel}.`);
+    setWarning(
+      `Wrong part. Remove ${expectedLabel} next, not ${clickedLabel}. -${WRONG_CLICK_DEDUCTION}% score.`
+    );
     setSuccessMessage("");
     clearTemporaryMessages();
   }, []);
@@ -1353,11 +1253,14 @@ export default function FullDisassemblyPracticalTest({ onBack }) {
         setSuccessMessage("Full disassembly complete. Submit your practical test.");
         setConfirmSubmit(true);
       } else {
-        setSuccessMessage(`${getStepLabel(id)} removed. Next: Remove ${nextPart.label}.`);
+        setSuccessMessage(
+          `${getStepLabel(id)} removed. Next: Remove ${nextPart.label}.`
+        );
       }
 
       setWarning("");
       clearTemporaryMessages();
+
       return next;
     });
   }, []);
@@ -1369,11 +1272,21 @@ export default function FullDisassemblyPracticalTest({ onBack }) {
   }, []);
 
   const savePracticalProgress = async ({ autoSubmitted = false }) => {
-    if (!firebaseUser) return;
+    const currentUser = firebaseUser || auth.currentUser;
 
-    const completed = PARTS.every((part) => placements[getPlacementKey(part.id)]);
-    const percent = Math.round((completedCount / totalSteps) * 100);
-    const userRef = doc(db, "users", firebaseUser.uid);
+    if (!currentUser) {
+      throw new Error("No logged-in user. Practical test progress was not saved.");
+    }
+
+    const completed = PARTS.every(
+      (part) => placements[getPlacementKey(part.id)]
+    );
+
+    const progressPercentValue = Math.round((completedCount / totalSteps) * 100);
+    const deductionPercentValue = mistakes * WRONG_CLICK_DEDUCTION;
+    const scorePercentValue = calculatePracticalScore(progressPercentValue, mistakes);
+    const passed = completed && scorePercentValue >= TEST_SETTINGS.passingPercent;
+    const userRef = doc(db, "users", currentUser.uid);
 
     await setDoc(
       userRef,
@@ -1381,10 +1294,19 @@ export default function FullDisassemblyPracticalTest({ onBack }) {
         practicalProgress: {
           [TEST_SETTINGS.progressKey]: {
             completed,
-            passed: completed,
-            percent,
+            passed,
+            percent: scorePercentValue,
+            scorePercent: scorePercentValue,
+            progressPercent: progressPercentValue,
+            deductionPercent: deductionPercentValue,
+            wrongClickDeduction: WRONG_CLICK_DEDUCTION,
+            passingPercent: TEST_SETTINGS.passingPercent,
             mistakes,
+            completedStepCount: completedCount,
+            totalSteps,
             completedSteps: placements,
+            requiredQuizKey: TEST_SETTINGS.requiredQuizKey,
+            requiredQuizPercent: TEST_SETTINGS.requiredQuizPercent,
             autoSubmitted,
             updatedAt: serverTimestamp(),
           },
@@ -1410,14 +1332,20 @@ export default function FullDisassemblyPracticalTest({ onBack }) {
 
     try {
       await savePracticalProgress({ autoSubmitted: auto });
-    } catch (err) {
-      setSaveError(err.message || "Practical test was submitted, but saving failed.");
-    } finally {
+
       setStarted(false);
       setFinished(true);
-      setSubmitSaving(false);
 
-      if (auto) alert("Time is up! Your practical test has been submitted automatically.");
+      if (auto) {
+        alert("Time is up! Your practical test has been submitted automatically.");
+      }
+    } catch (err) {
+      setSaveError(
+        err.message ||
+          "Practical test was not saved. Please check Firebase rules or your internet connection, then submit again."
+      );
+    } finally {
+      setSubmitSaving(false);
     }
   };
 
@@ -1435,7 +1363,13 @@ export default function FullDisassemblyPracticalTest({ onBack }) {
   };
 
   const motionPreset = useMemo(() => {
-    if (reduce) return { whileHover: {}, whileTap: {}, transition: { duration: 0.15 } };
+    if (reduce) {
+      return {
+        whileHover: {},
+        whileTap: {},
+        transition: { duration: 0.15 },
+      };
+    }
 
     return {
       whileHover: { y: -2, scale: 1.004 },
@@ -1450,7 +1384,9 @@ export default function FullDisassemblyPracticalTest({ onBack }) {
         <CenteredPanel>
           <div className="mx-auto mb-5 h-12 w-12 animate-pulse rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/10" />
           <div className="text-xl font-black text-white">Checking access...</div>
-          <div className="mt-2 text-sm text-white/50">Please wait while your quiz progress is loaded.</div>
+          <div className="mt-2 text-sm text-white/50">
+            Please wait while your quiz progress is loaded.
+          </div>
         </CenteredPanel>
       </FullscreenShell>
     );
@@ -1460,11 +1396,19 @@ export default function FullDisassemblyPracticalTest({ onBack }) {
     return (
       <FullscreenShell>
         <CenteredPanel>
-          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full border border-red-400/25 bg-red-500/10 text-2xl">🔒</div>
-          <div className="text-[12px] font-bold uppercase tracking-[0.28em] text-red-200/80">Locked Practical Test</div>
-          <h1 className="mt-3 text-4xl font-black tracking-tight text-white">{TEST_SETTINGS.title}</h1>
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full border border-red-400/25 bg-red-500/10 text-2xl">
+            🔒
+          </div>
+          <div className="text-[12px] font-bold uppercase tracking-[0.28em] text-red-200/80">
+            Locked Practical Test
+          </div>
+          <h1 className="mt-3 text-4xl font-black tracking-tight text-white">
+            {TEST_SETTINGS.title}
+          </h1>
           <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-white/60">
-            {accessError ? accessError : "Finish Module 3 Quiz first before taking the Full Disassembly Practical Test."}
+            {accessError
+              ? accessError
+              : `Score ${TEST_SETTINGS.requiredQuizPercent}% or higher in the Module 3 Quiz to unlock the Full Disassembly Practical Test.`}
           </p>
           <button
             type="button"
@@ -1488,6 +1432,8 @@ export default function FullDisassemblyPracticalTest({ onBack }) {
           completedCount={completedCount}
           totalSteps={totalSteps}
           progressPercent={progressPercent}
+          scorePercent={scorePercent}
+          deductionPercent={deductionPercent}
           mistakes={mistakes}
           started={started}
           finished={finished}
@@ -1515,7 +1461,11 @@ export default function FullDisassemblyPracticalTest({ onBack }) {
               />
 
               <div className="min-h-0 overflow-hidden rounded-[24px] border border-[#5F9598]/20 bg-[#061E29]">
-                <Canvas shadows style={{ width: "100%", height: "100%" }} camera={{ position: CAMERA_POSITION, fov: 50 }}>
+                <Canvas
+                  shadows
+                  style={{ width: "100%", height: "100%" }}
+                  camera={{ position: CAMERA_POSITION, fov: 50 }}
+                >
                   <Suspense fallback={null}>
                     <Scene
                       started={started}
@@ -1539,6 +1489,8 @@ export default function FullDisassemblyPracticalTest({ onBack }) {
             started={started}
             finished={finished}
             progressPercent={progressPercent}
+            scorePercent={scorePercent}
+            deductionPercent={deductionPercent}
             mistakes={mistakes}
           />
         </div>
@@ -1558,19 +1510,32 @@ function FullscreenShell({ children }) {
       <div className="pointer-events-none absolute -bottom-52 -right-44 h-[620px] w-[620px] rounded-full bg-[#1D546D]/26 blur-3xl" />
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,#061E29_0%,#061E29_42%,#0B2A3A_100%)]" />
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.018)_1px,transparent_1px)] bg-[size:58px_58px] opacity-35" />
-      <div className="relative h-full min-h-0 w-full overflow-hidden">{children}</div>
+      <div className="relative h-full min-h-0 w-full overflow-hidden">
+        {children}
+      </div>
     </div>
   );
 }
 
 function GlassPanel({ className = "", children }) {
-  return <div className={["rounded-[28px] border border-white/10 bg-black/18 shadow-[0_28px_90px_rgba(0,0,0,0.38)] backdrop-blur-xl", className].join(" ")}>{children}</div>;
+  return (
+    <div
+      className={[
+        "rounded-[28px] border border-white/10 bg-black/18 shadow-[0_28px_90px_rgba(0,0,0,0.38)] backdrop-blur-xl",
+        className,
+      ].join(" ")}
+    >
+      {children}
+    </div>
+  );
 }
 
 function CenteredPanel({ children }) {
   return (
     <div className="flex h-full min-h-0 items-center justify-center">
-      <GlassPanel className="w-full max-w-3xl p-9 text-center">{children}</GlassPanel>
+      <GlassPanel className="w-full max-w-3xl p-9 text-center">
+        {children}
+      </GlassPanel>
     </div>
   );
 }
@@ -1582,6 +1547,8 @@ function TopControlBar({
   completedCount,
   totalSteps,
   progressPercent,
+  scorePercent,
+  deductionPercent,
   mistakes,
   started,
   finished,
@@ -1598,7 +1565,11 @@ function TopControlBar({
   return (
     <GlassPanel className="shrink-0 overflow-hidden">
       <div className="grid min-h-[74px] items-center gap-3 px-4 py-2.5 lg:grid-cols-[auto_minmax(0,1fr)_auto]">
-        <button type="button" onClick={onBack} className="w-fit rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white/80 transition hover:border-[#00ffb4]/30 hover:bg-[#00ffb4]/10">
+        <button
+          type="button"
+          onClick={onBack}
+          className="w-fit rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white/80 transition hover:border-[#00ffb4]/30 hover:bg-[#00ffb4]/10"
+        >
           ← Back
         </button>
 
@@ -1607,16 +1578,25 @@ function TopControlBar({
             <StatusPill label="Disassembly Practical" />
             <MetricPill label={`${completedCount}/${totalSteps} steps`} />
             <MetricPill label={`${progressPercent}% progress`} />
+            <MetricPill label={`${scorePercent}% score`} />
+            <MetricPill label={`Deduction: -${deductionPercent}%`} subtle />
             <MetricPill label={`Mistakes: ${mistakes}`} subtle />
           </div>
 
           <div className="mt-1.5 min-w-0">
-            <h1 className="truncate text-[22px] font-black leading-none tracking-tight text-white lg:text-[28px]">{TEST_SETTINGS.title}</h1>
-            <div className="mt-1 truncate text-[12px] text-white/50">{TEST_SETTINGS.desc}</div>
+            <h1 className="truncate text-[22px] font-black leading-none tracking-tight text-white lg:text-[28px]">
+              {TEST_SETTINGS.title}
+            </h1>
+            <div className="mt-1 truncate text-[12px] text-white/50">
+              {TEST_SETTINGS.desc}
+            </div>
           </div>
 
           <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
-            <div className="h-full rounded-full bg-[linear-gradient(90deg,#5F9598,#00ffb4)] shadow-[0_0_24px_rgba(0,255,180,0.45)] transition-[width] duration-500" style={{ width: `${progressPercent}%` }} />
+            <div
+              className="h-full rounded-full bg-[linear-gradient(90deg,#5F9598,#00ffb4)] shadow-[0_0_24px_rgba(0,255,180,0.45)] transition-[width] duration-500"
+              style={{ width: `${progressPercent}%` }}
+            />
           </div>
         </div>
 
@@ -1625,21 +1605,38 @@ function TopControlBar({
 
           {!finished ? (
             !started ? (
-              <button type="button" onClick={onStart} className="rounded-2xl border border-[#5F9598]/35 bg-[#5F9598]/24 px-5 py-3 text-sm font-bold text-white transition hover:bg-[#5F9598]/32">
+              <button
+                type="button"
+                onClick={onStart}
+                className="rounded-2xl border border-[#5F9598]/35 bg-[#5F9598]/24 px-5 py-3 text-sm font-bold text-white transition hover:bg-[#5F9598]/32"
+              >
                 Start
               </button>
             ) : (
-              <button type="button" onClick={onSubmitPrompt} disabled={submitSaving || !canFinish} className="rounded-2xl border border-[#00ffb4]/25 bg-[#00ffb4]/12 px-5 py-3 text-sm font-bold text-[#b7fff0] transition hover:bg-[#00ffb4]/18 disabled:cursor-not-allowed disabled:opacity-45">
+              <button
+                type="button"
+                onClick={onSubmitPrompt}
+                disabled={submitSaving || !canFinish}
+                className="rounded-2xl border border-[#00ffb4]/25 bg-[#00ffb4]/12 px-5 py-3 text-sm font-bold text-[#b7fff0] transition hover:bg-[#00ffb4]/18 disabled:cursor-not-allowed disabled:opacity-45"
+              >
                 {submitSaving ? "Saving..." : "Submit"}
               </button>
             )
           ) : (
-            <button type="button" onClick={onReset} className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-bold text-white/85 transition hover:bg-white/10">
+            <button
+              type="button"
+              onClick={onReset}
+              className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-bold text-white/85 transition hover:bg-white/10"
+            >
               Retake
             </button>
           )}
 
-          <button type="button" onClick={onExit} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold text-white/75 transition hover:bg-white/10">
+          <button
+            type="button"
+            onClick={onExit}
+            className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold text-white/75 transition hover:bg-white/10"
+          >
             Exit
           </button>
         </div>
@@ -1649,15 +1646,29 @@ function TopControlBar({
         <div className="border-t border-white/10 bg-[#00ffb4]/8 px-5 py-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <div className="text-sm font-black text-white">Submit practical test?</div>
-              <div className="text-[12px] text-white/60">All required disassembly steps are complete.</div>
+              <div className="text-sm font-black text-white">
+                Submit practical test?
+              </div>
+              <div className="text-[12px] text-white/60">
+                All required disassembly steps are complete.
+              </div>
             </div>
 
             <div className="flex gap-3">
-              <button type="button" onClick={onSubmit} disabled={submitSaving} className="rounded-xl border border-[#00ffb4]/25 bg-[#00ffb4]/18 px-4 py-2 text-sm font-bold text-[#b7fff0] transition hover:bg-[#00ffb4]/24 disabled:opacity-60">
+              <button
+                type="button"
+                onClick={onSubmit}
+                disabled={submitSaving}
+                className="rounded-xl border border-[#00ffb4]/25 bg-[#00ffb4]/18 px-4 py-2 text-sm font-bold text-[#b7fff0] transition hover:bg-[#00ffb4]/24 disabled:opacity-60"
+              >
                 {submitSaving ? "Saving..." : "Yes, submit"}
               </button>
-              <button type="button" onClick={onCancelSubmit} disabled={submitSaving} className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-bold text-white/75 transition hover:bg-white/10 disabled:opacity-60">
+              <button
+                type="button"
+                onClick={onCancelSubmit}
+                disabled={submitSaving}
+                className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-bold text-white/75 transition hover:bg-white/10 disabled:opacity-60"
+              >
                 Cancel
               </button>
             </div>
@@ -1668,7 +1679,14 @@ function TopControlBar({
   );
 }
 
-function StageHeader({ currentStepLabel, completedCount, totalSteps, warning, successMessage, saveError }) {
+function StageHeader({
+  currentStepLabel,
+  completedCount,
+  totalSteps,
+  warning,
+  successMessage,
+  saveError,
+}) {
   return (
     <div className="shrink-0">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -1676,13 +1694,19 @@ function StageHeader({ currentStepLabel, completedCount, totalSteps, warning, su
           <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#b7fff0]/70">
             Step {Math.min(completedCount + 1, totalSteps)} of {totalSteps}
           </div>
-          <h2 className="mt-1 text-[20px] font-black leading-tight tracking-tight text-white lg:text-[25px]">{currentStepLabel}</h2>
-          <div className="mt-1 text-[13px] text-white/45">Follow the exact Module 3 full disassembly sequence.</div>
+          <h2 className="mt-1 text-[20px] font-black leading-tight tracking-tight text-white lg:text-[25px]">
+            {currentStepLabel}
+          </h2>
+          <div className="mt-1 text-[13px] text-white/45">
+            Follow the exact Module 3 full disassembly sequence.
+          </div>
         </div>
 
         <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-right">
           <div className="text-[10px] text-white/45">Expected Step</div>
-          <div className="mt-0.5 text-sm font-bold text-[#b7fff0]">{currentStepLabel}</div>
+          <div className="mt-0.5 text-sm font-bold text-[#b7fff0]">
+            {currentStepLabel}
+          </div>
         </div>
       </div>
 
@@ -1700,15 +1724,38 @@ function MessageBox({ type, text }) {
     error: "border-red-400/20 bg-red-500/10 text-red-100",
   };
 
-  return <div className={["mt-3 rounded-2xl border px-4 py-3 text-sm font-semibold shadow-[0_12px_35px_rgba(0,0,0,0.22)]", styles[type]].join(" ")}>{text}</div>;
+  return (
+    <div
+      className={[
+        "mt-3 rounded-2xl border px-4 py-3 text-sm font-semibold shadow-[0_12px_35px_rgba(0,0,0,0.22)]",
+        styles[type],
+      ].join(" ")}
+    >
+      {text}
+    </div>
+  );
 }
 
-function RightRail({ motionPreset, activePart, placements, started, finished, progressPercent, mistakes }) {
+function RightRail({
+  motionPreset,
+  activePart,
+  placements,
+  started,
+  finished,
+  progressPercent,
+  scorePercent,
+  deductionPercent,
+  mistakes,
+}) {
   return (
     <div className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-3 overflow-hidden">
       <GlassPanel className="min-h-0 overflow-hidden p-3">
-        <div className="text-lg font-black tracking-tight text-white">Required Order</div>
-        <div className="mt-1 text-[11px] text-white/50">This follows your Module 3 FullDisassembly scene.</div>
+        <div className="text-lg font-black tracking-tight text-white">
+          Required Order
+        </div>
+        <div className="mt-1 text-[11px] text-white/50">
+          This follows your Module 3 FullDisassembly scene.
+        </div>
 
         <div className="mt-3 space-y-2">
           {PARTS.map((part, index) => {
@@ -1744,9 +1791,17 @@ function RightRail({ motionPreset, activePart, placements, started, finished, pr
                   </div>
 
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-black text-white/85">Remove {part.label}</div>
+                    <div className="truncate text-sm font-black text-white/85">
+                      Remove {part.label}
+                    </div>
                     <div className="mt-0.5 truncate text-[11px] text-white/45">
-                      {done ? "Completed" : active ? "Current required step" : locked ? "Locked until previous step is done" : "Pending"}
+                      {done
+                        ? "Completed"
+                        : active
+                        ? "Current required step"
+                        : locked
+                        ? "Locked until previous step is done"
+                        : "Pending"}
                     </div>
                   </div>
                 </div>
@@ -1757,12 +1812,18 @@ function RightRail({ motionPreset, activePart, placements, started, finished, pr
       </GlassPanel>
 
       <GlassPanel className="p-3">
-        <div className="text-lg font-black tracking-tight text-white">Summary</div>
+        <div className="text-lg font-black tracking-tight text-white">
+          Summary
+        </div>
         <div className="mt-3 grid grid-cols-2 gap-2">
           <SummaryItem label="Progress" value={`${progressPercent}%`} />
+          <SummaryItem label="Score" value={`${scorePercent}%`} />
+          <SummaryItem label="Deduction" value={`-${deductionPercent}%`} />
           <SummaryItem label="Mistakes" value={`${mistakes}`} />
-          <SummaryItem label="Status" value={finished ? "Done" : started ? "Running" : "Paused"} />
-          <SummaryItem label="Score" value={progressPercent === 100 ? "100%" : "—"} />
+          <SummaryItem
+            label="Status"
+            value={finished ? "Done" : started ? "Running" : "Paused"}
+          />
         </div>
       </GlassPanel>
     </div>
@@ -1773,25 +1834,46 @@ function SummaryItem({ label, value }) {
   return (
     <div className="rounded-[16px] border border-white/10 bg-white/[0.045] p-3">
       <div className="text-[10px] text-white/45">{label}</div>
-      <div className="mt-1 text-sm font-black tracking-tight text-white">{value}</div>
+      <div className="mt-1 text-sm font-black tracking-tight text-white">
+        {value}
+      </div>
     </div>
   );
 }
 
 function StatusPill({ label }) {
-  return <span className="rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-[#b7fff0]">{label}</span>;
+  return (
+    <span className="rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-[#b7fff0]">
+      {label}
+    </span>
+  );
 }
 
 function MetricPill({ label, subtle = false }) {
-  return <span className={["rounded-full border px-3 py-1.5 text-[10.5px] font-semibold", subtle ? "border-white/10 bg-white/5 text-white/55" : "border-[#5F9598]/30 bg-[#5F9598]/16 text-white/75"].join(" ")}>{label}</span>;
+  return (
+    <span
+      className={[
+        "rounded-full border px-3 py-1.5 text-[10.5px] font-semibold",
+        subtle
+          ? "border-white/10 bg-white/5 text-white/55"
+          : "border-[#5F9598]/30 bg-[#5F9598]/16 text-white/75",
+      ].join(" ")}
+    >
+      {label}
+    </span>
+  );
 }
 
 function TimerCard({ time, status }) {
   return (
     <div className="rounded-[16px] border border-white/10 bg-white/7 px-4 py-2 text-center shadow-[0_18px_55px_rgba(0,0,0,0.25)] backdrop-blur-xl">
       <div className="text-[10px] text-white/55">Time left</div>
-      <div className="mt-0.5 text-[22px] font-black leading-none tracking-tight text-white">{time}</div>
-      <div className="mt-1 text-[8px] uppercase tracking-[0.18em] text-white/35">{status}</div>
+      <div className="mt-0.5 text-[22px] font-black leading-none tracking-tight text-white">
+        {time}
+      </div>
+      <div className="mt-1 text-[8px] uppercase tracking-[0.18em] text-white/35">
+        {status}
+      </div>
     </div>
   );
 }

@@ -17,9 +17,11 @@ const QUIZ_SETTINGS = {
   title: "Module 1 Quiz",
   desc: "Hardware Identification • Parts and Functions",
   durationMin: 20,
-  passingPercent: 70,
+  passingPercent: 60,
+  practiceUnlockPercent: 60,
   instructions: [
     "Finish Module 1 first before taking this quiz.",
+    "Score 60% or higher to unlock the practice test.",
     "This quiz includes hardware identification, part functions, and 3D pin-based questions.",
     "For 3D questions, inspect the model and choose the correct component or pinned part.",
     "The quiz auto-submits when time runs out.",
@@ -370,7 +372,7 @@ function PartsReviewVisual() {
 /* QUIZ PAGE */
 /* ───────────────────────────────────────────────────────────── */
 
-export default function QuizModule1({ onBack }) {
+export default function QuizModule1({ onBack, onQuizComplete }) {
   const reduce = useReducedMotion();
 
   const questions = useMemo(() => buildQuizQuestions(), []);
@@ -493,38 +495,120 @@ export default function QuizModule1({ onBack }) {
   };
 
   const saveQuizProgress = async ({ finalScore, finalPercent, finalPassed, autoSubmitted }) => {
-    if (!firebaseUser) return;
+    const currentUser = firebaseUser || auth.currentUser;
 
-    const userRef = doc(db, "users", firebaseUser.uid);
+    if (!currentUser) {
+      throw new Error("No logged-in user. Quiz progress was not saved.");
+    }
+
+    const userRef = doc(db, "users", currentUser.uid);
+
+    const alreadyUnlocked = !!profile?.practiceTestAccess?.[QUIZ_SETTINGS.quizKey]?.unlocked;
+    const newlyUnlocked = finalPercent >= QUIZ_SETTINGS.practiceUnlockPercent;
+    const practiceUnlocked = alreadyUnlocked || newlyUnlocked;
+
+    const quizPayload = {
+      completed: true,
+      finished: true,
+      passed: finalPassed,
+      score: finalScore,
+      total,
+      percent: finalPercent,
+      passingPercent: QUIZ_SETTINGS.passingPercent,
+      practiceUnlockPercent: QUIZ_SETTINGS.practiceUnlockPercent,
+      autoSubmitted,
+      updatedAt: serverTimestamp(),
+    };
+
+    const practiceAccessPayload = {
+      unlocked: practiceUnlocked,
+      requiredPercent: QUIZ_SETTINGS.practiceUnlockPercent,
+      latestScore: finalScore,
+      latestTotal: total,
+      latestPercent: finalPercent,
+      sourceQuizId: QUIZ_SETTINGS.id,
+      updatedAt: serverTimestamp(),
+    };
+
+    if (newlyUnlocked && !alreadyUnlocked) {
+      practiceAccessPayload.unlockedAt = serverTimestamp();
+    }
 
     await setDoc(
       userRef,
       {
         quizProgress: {
-          module1: {
-            completed: true,
-            passed: finalPassed,
-            score: finalScore,
-            total,
-            percent: finalPercent,
-            passingPercent: QUIZ_SETTINGS.passingPercent,
-            autoSubmitted,
-            updatedAt: serverTimestamp(),
-          },
+          [QUIZ_SETTINGS.quizKey]: quizPayload,
+        },
+        practiceTestAccess: {
+          [QUIZ_SETTINGS.quizKey]: practiceAccessPayload,
         },
       },
       { merge: true }
     );
+
+    const localUpdatedAt = new Date().toISOString();
+
+    setProfile((previous) => ({
+      ...(previous || {}),
+      quizProgress: {
+        ...(previous?.quizProgress || {}),
+        [QUIZ_SETTINGS.quizKey]: {
+          ...quizPayload,
+          updatedAt: localUpdatedAt,
+        },
+      },
+      practiceTestAccess: {
+        ...(previous?.practiceTestAccess || {}),
+        [QUIZ_SETTINGS.quizKey]: {
+          ...(previous?.practiceTestAccess?.[QUIZ_SETTINGS.quizKey] || {}),
+          ...practiceAccessPayload,
+          updatedAt: localUpdatedAt,
+          unlockedAt:
+            newlyUnlocked && !alreadyUnlocked
+              ? localUpdatedAt
+              : previous?.practiceTestAccess?.[QUIZ_SETTINGS.quizKey]?.unlockedAt,
+        },
+      },
+    }));
+
+    try {
+      localStorage.setItem("articton-last-progress-update", String(Date.now()));
+      window.dispatchEvent(
+        new CustomEvent("articton-progress-updated", {
+          detail: {
+            type: "practice-unlock",
+            module: QUIZ_SETTINGS.quizKey,
+            completed: true,
+            unlocked: practiceUnlocked,
+            percent: finalPercent,
+          },
+        })
+      );
+    } catch {
+      // Optional dashboard refresh signal only.
+    }
+
+    onQuizComplete?.(QUIZ_SETTINGS.quizKey, {
+      ...quizPayload,
+      updatedAt: localUpdatedAt,
+      practiceUnlocked,
+    });
+
+    return {
+      quizPayload,
+      practiceAccessPayload,
+    };
   };
 
-  const handleSubmit = async (auto = false) => {
+  const handleSubmit = async (auto = false, answerOverride = answers) => {
     if (finished || submitSaving) return;
 
     setConfirmSubmit(false);
     setSubmitSaving(true);
     setSaveError("");
 
-    const finalScore = calculateScore(answers);
+    const finalScore = calculateScore(answerOverride);
     const finalPercent = total === 0 ? 0 : Math.round((finalScore / total) * 100);
     const finalPassed = finalPercent >= QUIZ_SETTINGS.passingPercent;
 
@@ -535,14 +619,16 @@ export default function QuizModule1({ onBack }) {
         finalPassed,
         autoSubmitted: auto,
       });
-    } catch (err) {
-      setSaveError(err.message || "Quiz was submitted, but saving failed.");
-    } finally {
+
       setFinished(true);
       setStarted(false);
-      setSubmitSaving(false);
 
       if (auto) alert("Time is up! Your quiz has been submitted automatically.");
+    } catch (err) {
+      console.error(`${QUIZ_SETTINGS.title} save error:`, err);
+      setSaveError(err.message || "Quiz was not saved. Please check Firebase rules or your internet connection, then submit again.");
+    } finally {
+      setSubmitSaving(false);
     }
   };
 
@@ -561,7 +647,7 @@ export default function QuizModule1({ onBack }) {
   };
 
   const selectAnswer = (index) => {
-    if (isLocked || finished) return;
+    if (isLocked || finished || submitSaving) return;
 
     if (!started) {
       setStartWarning("Click Start to start the quiz before answering.");
@@ -576,20 +662,20 @@ export default function QuizModule1({ onBack }) {
 
     setStartWarning("");
 
-    setAnswers((previous) => ({
-      ...previous,
+    const nextAnswers = {
+      ...answers,
       [activeIndex]: index,
-    }));
+    };
+
+    setAnswers(nextAnswers);
 
     setTimeout(() => {
-      setActiveIndex((currentIndex) => {
-        if (currentIndex >= total - 1) {
-          setConfirmSubmit(true);
-          return currentIndex;
-        }
+      if (activeIndex >= total - 1) {
+        handleSubmit(false, nextAnswers);
+        return;
+      }
 
-        return clamp(currentIndex + 1, 0, total - 1);
-      });
+      setActiveIndex((currentIndex) => clamp(currentIndex + 1, 0, total - 1));
     }, 220);
   };
 

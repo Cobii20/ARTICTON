@@ -28,10 +28,18 @@ const TEST_SETTINGS = {
   id: "full-assembly-practical",
   progressKey: "fullAssembly",
   requiredQuizKey: "module2",
+  requiredQuizPercent: 60,
+  passingPercent: 60,
   title: "Full Assembly Practical Test",
   desc: "Step-by-step PC assembly validation",
   durationMin: 30,
 };
+
+const WRONG_CLICK_DEDUCTION = 5;
+
+function calculatePracticalScore(progressPercent, mistakes) {
+  return Math.max(0, progressPercent - mistakes * WRONG_CLICK_DEDUCTION);
+}
 
 /* ───────────────────────────────────────────────────────────── */
 /* MODEL URLS */
@@ -418,8 +426,6 @@ function Scene({ started, placed, currentStep, onPlaced, onWrongAttempt, onStart
         onPlaced={() => markPlaced("psu")}
       />
 
-      <SceneInstructionPanel currentStep={currentStep} placed={placed} complete={complete} />
-
       <ContactShadows position={[BOARD_CENTER_X, BOARD_Y + 0.1, BOARD_CENTER_Z]} opacity={0.38} scale={46} blur={2.8} far={35} />
 
       <OrbitControls
@@ -622,7 +628,6 @@ function PlaneSnapDraggable({
 
   const [dragging, setDragging] = useState(false);
   const [snapped, setSnapped] = useState(placed);
-  const [pos, setPos] = useState({ x: startPosition.x, y: startPosition.y, z: startPosition.z });
 
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const hitPoint = useMemo(() => new THREE.Vector3(), []);
@@ -749,7 +754,7 @@ function PlaneSnapDraggable({
         }
       }
 
-      if (active && unlocked) {
+      if (dragging && active && unlocked) {
         partRef.current.position.y = yLock;
 
         const dist = new THREE.Vector2(partRef.current.position.x - targetPosition.x, partRef.current.position.z - targetPosition.z).length();
@@ -771,10 +776,6 @@ function PlaneSnapDraggable({
         }
       }
     }
-
-    const worldPos = new THREE.Vector3();
-    partRef.current.getWorldPosition(worldPos);
-    setPos({ x: worldPos.x, y: worldPos.y, z: worldPos.z });
   });
 
   return (
@@ -782,8 +783,6 @@ function PlaneSnapDraggable({
       <group ref={partRef}>
         <primitive object={clone} />
       </group>
-
-      {active && !snapped && <SideStatus label={label} color={color} text={dragging ? `Dragging ${label}` : `Click ${label} to grab`} pos={pos} />}
     </group>
   );
 }
@@ -801,7 +800,6 @@ function MotherboardAssemblyToCase({ active, unlocked, placed, guardPartClick, o
 
   const [phase, setPhase] = useState(placed ? "snapped" : "idle");
   const [snapped, setSnapped] = useState(placed);
-  const [pos, setPos] = useState({ x: MB_ASSEMBLY_START_OFFSET.x, y: MB_ASSEMBLY_START_OFFSET.y, z: MB_ASSEMBLY_START_OFFSET.z });
 
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const hitPoint = useMemo(() => new THREE.Vector3(), []);
@@ -993,10 +991,6 @@ function MotherboardAssemblyToCase({ active, unlocked, placed, guardPartClick, o
       assemblyRef.current.position.lerp(MB_ASSEMBLY_CASE_TARGET_OFFSET, 0.28);
       assemblyRef.current.quaternion.slerp(caseQuat, 0.28);
     }
-
-    const worldPos = new THREE.Vector3();
-    assemblyRef.current.getWorldPosition(worldPos);
-    setPos({ x: worldPos.x, y: worldPos.y, z: worldPos.z });
   });
 
   const statusText =
@@ -1018,8 +1012,6 @@ function MotherboardAssemblyToCase({ active, unlocked, placed, guardPartClick, o
         <StaticRAM />
         <StaticSSD />
       </group>
-
-      {active && !snapped && <SideStatus label="Motherboard Assembly" color={MB_COLOR} text={statusText} pos={pos} />}
     </group>
   );
 }
@@ -1059,7 +1051,6 @@ function InsertTransitionDraggable({
   const insertProgress = useRef(0);
 
   const [phase, setPhase] = useState(placed ? "snapped" : "readyToDrag");
-  const [pos, setPos] = useState({ x: startPosition.x, y: startPosition.y, z: startPosition.z });
 
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const hitPoint = useMemo(() => new THREE.Vector3(), []);
@@ -1243,10 +1234,6 @@ function InsertTransitionDraggable({
       partRef.current.position.lerp(seatedPosition, 0.28);
       partRef.current.quaternion.slerp(seatedQuat, 0.28);
     }
-
-    const worldPos = new THREE.Vector3();
-    partRef.current.getWorldPosition(worldPos);
-    setPos({ x: worldPos.x, y: worldPos.y, z: worldPos.z });
   });
 
   const statusText =
@@ -1265,86 +1252,7 @@ function InsertTransitionDraggable({
       <group ref={partRef}>
         <primitive object={clone} />
       </group>
-
-      {active && phase !== "snapped" && <SideStatus label={label} color={color} text={statusText} pos={pos} />}
     </group>
-  );
-}
-
-function SideStatus({ label, color, text, pos }) {
-  return (
-    <Html fullscreen style={{ pointerEvents: "none" }}>
-      <div
-        style={{
-          position: "absolute",
-          left: 24,
-          bottom: 24,
-          padding: "12px 16px",
-          minWidth: 300,
-          borderRadius: 16,
-          background: "rgba(10,14,22,.78)",
-          border: `1px solid ${color}66`,
-          backdropFilter: "blur(8px)",
-          color: "rgba(234,240,255,.95)",
-          fontSize: 12,
-          fontFamily: "monospace",
-          textAlign: "center",
-          boxShadow: "0 10px 30px rgba(0,0,0,.35)",
-        }}
-      >
-        <div style={{ fontWeight: "bold", marginBottom: 4 }}>{label}</div>
-        <div style={{ marginBottom: 8 }}>{text}</div>
-        <div>x: {pos.x.toFixed(2)}</div>
-        <div>y: {pos.y.toFixed(2)}</div>
-        <div>z: {pos.z.toFixed(2)}</div>
-      </div>
-    </Html>
-  );
-}
-
-function SceneInstructionPanel({ currentStep, placed, complete }) {
-  return (
-    <Html fullscreen style={{ pointerEvents: "none" }}>
-      <div
-        style={{
-          position: "absolute",
-          top: 18,
-          left: 18,
-          padding: "10px 14px",
-          minWidth: 360,
-          borderRadius: 16,
-          background: "rgba(10,14,22,.72)",
-          border: "1px solid rgba(255,255,255,.14)",
-          backdropFilter: "blur(8px)",
-          color: "rgba(234,240,255,.95)",
-          fontSize: 11,
-          fontFamily: "monospace",
-          boxShadow: "0 10px 30px rgba(0,0,0,.35)",
-        }}
-      >
-        <div style={{ fontWeight: "bold", marginBottom: 6 }}>Full PC Assembly</div>
-        <div style={{ marginBottom: 8 }}>{complete ? "Assembly complete." : `Current step: ${getStepLabel(currentStep)}`}</div>
-
-        <div style={{ display: "grid", gap: 4 }}>
-          {STEPS.map((step, index) => {
-            const isDone = placed[step.id];
-            const isActive = currentStep === step.id && !isDone;
-
-            return <StepDot key={step.id} color={step.color} label={`${index + 1}. ${step.label}`} state={isDone ? "done" : isActive ? "active" : "locked"} glow={isActive} muted={!isDone && !isActive} />;
-          })}
-        </div>
-      </div>
-    </Html>
-  );
-}
-
-function StepDot({ color, label, state, glow = false, muted = false }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, opacity: muted ? 0.45 : 1 }}>
-      <span style={{ width: 9, height: 9, borderRadius: 999, background: color, display: "inline-block", boxShadow: glow ? `0 0 14px ${color}` : "none" }} />
-      <span>{label}</span>
-      <span style={{ marginLeft: "auto" }}>{state}</span>
-    </div>
   );
 }
 
@@ -1373,14 +1281,21 @@ export default function FullAssemblyPracticalTest({ onBack }) {
   const [mistakes, setMistakes] = useState(0);
 
   const requiredQuizProgress = profile?.quizProgress?.[TEST_SETTINGS.requiredQuizKey];
-  const quizFinished = !!requiredQuizProgress?.completed;
-  const isLocked = !quizFinished;
+  const requiredPracticeAccess = profile?.practiceTestAccess?.[TEST_SETTINGS.requiredQuizKey];
+
+  const quizPercent = requiredQuizProgress?.percent || 0;
+  const practiceUnlocked =
+    requiredPracticeAccess?.unlocked === true ||
+    quizPercent >= TEST_SETTINGS.requiredQuizPercent;
+
+  const isLocked = !practiceUnlocked;
 
   const currentStep = getCurrentStep(placed);
-  const currentStepIndex = currentStep === "complete" ? STEPS.length : getStepIndex(currentStep);
   const completedCount = Object.values(placed).filter(Boolean).length;
   const totalSteps = STEPS.length;
   const progressPercent = Math.round((completedCount / totalSteps) * 100);
+  const deductionPercent = mistakes * WRONG_CLICK_DEDUCTION;
+  const scorePercent = calculatePracticalScore(progressPercent, mistakes);
   const canFinish = completedCount === totalSteps;
 
   useEffect(() => {
@@ -1448,7 +1363,7 @@ export default function FullAssemblyPracticalTest({ onBack }) {
     setConfirmSubmit(false);
     setSaveError("");
     setWarning("");
-    setSuccessMessage("Practical test started. Follow the Module 2 full assembly order.");
+    setSuccessMessage(`Practical test started. Follow the Module 2 full assembly order. Each wrong component click deducts ${WRONG_CLICK_DEDUCTION}% from your score.`);
     clearTemporaryMessages();
   };
 
@@ -1460,7 +1375,7 @@ export default function FullAssemblyPracticalTest({ onBack }) {
 
   const handleWrongAttempt = useCallback((clickedId, expectedId) => {
     setMistakes((value) => value + 1);
-    setWarning(`Wrong part. Select ${getStepLabel(expectedId)} next, not ${getPartName(clickedId)}.`);
+    setWarning(`Wrong part. Select ${getStepLabel(expectedId)} next, not ${getPartName(clickedId)}. -${WRONG_CLICK_DEDUCTION}% score deduction.`);
     setSuccessMessage("");
     clearTemporaryMessages();
   }, []);
@@ -1490,11 +1405,19 @@ export default function FullAssemblyPracticalTest({ onBack }) {
   }, []);
 
   const savePracticalProgress = async ({ autoSubmitted = false }) => {
-    if (!firebaseUser) return;
+    const currentUser = firebaseUser || auth.currentUser;
 
-    const completed = Object.values(placed).filter(Boolean).length === STEPS.length;
-    const percent = Math.round((Object.values(placed).filter(Boolean).length / STEPS.length) * 100);
-    const userRef = doc(db, "users", firebaseUser.uid);
+    if (!currentUser) {
+      throw new Error("No logged-in user. Practical test progress was not saved.");
+    }
+
+    const completedStepCount = Object.values(placed).filter(Boolean).length;
+    const completed = completedStepCount === STEPS.length;
+    const progressPercentValue = Math.round((completedStepCount / STEPS.length) * 100);
+    const deductionPercentValue = mistakes * WRONG_CLICK_DEDUCTION;
+    const scorePercentValue = calculatePracticalScore(progressPercentValue, mistakes);
+    const passed = completed && scorePercentValue >= TEST_SETTINGS.passingPercent;
+    const userRef = doc(db, "users", currentUser.uid);
 
     await setDoc(
       userRef,
@@ -1502,10 +1425,19 @@ export default function FullAssemblyPracticalTest({ onBack }) {
         practicalProgress: {
           [TEST_SETTINGS.progressKey]: {
             completed,
-            passed: completed,
-            percent,
+            passed,
+            percent: scorePercentValue,
+            scorePercent: scorePercentValue,
+            progressPercent: progressPercentValue,
+            deductionPercent: deductionPercentValue,
+            wrongClickDeduction: WRONG_CLICK_DEDUCTION,
+            passingPercent: TEST_SETTINGS.passingPercent,
             mistakes,
+            completedStepCount,
+            totalSteps: STEPS.length,
             completedSteps: placed,
+            requiredQuizKey: TEST_SETTINGS.requiredQuizKey,
+            requiredQuizPercent: TEST_SETTINGS.requiredQuizPercent,
             autoSubmitted,
             updatedAt: serverTimestamp(),
           },
@@ -1531,14 +1463,15 @@ export default function FullAssemblyPracticalTest({ onBack }) {
 
     try {
       await savePracticalProgress({ autoSubmitted: auto });
-    } catch (err) {
-      setSaveError(err.message || "Practical test was submitted, but saving failed.");
-    } finally {
+
       setStarted(false);
       setFinished(true);
-      setSubmitSaving(false);
 
       if (auto) alert("Time is up! Your practical test has been submitted automatically.");
+    } catch (err) {
+      setSaveError(err.message || "Practical test was not saved. Please check Firebase rules or your internet connection, then submit again.");
+    } finally {
+      setSubmitSaving(false);
     }
   };
 
@@ -1585,7 +1518,9 @@ export default function FullAssemblyPracticalTest({ onBack }) {
           <div className="text-[12px] font-bold uppercase tracking-[0.28em] text-red-200/80">Locked Practical Test</div>
           <h1 className="mt-3 text-4xl font-black tracking-tight text-white">{TEST_SETTINGS.title}</h1>
           <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-white/60">
-            {accessError ? accessError : "Finish Module 2 Quiz first before taking the Full Assembly Practical Test."}
+            {accessError
+              ? accessError
+              : `Score ${TEST_SETTINGS.requiredQuizPercent}% or higher in the Module 2 Quiz to unlock the Full Assembly Practical Test.`}
           </p>
           <button type="button" onClick={onBack} className="mt-7 rounded-2xl border border-white/10 bg-white/5 px-6 py-3 text-sm font-semibold text-white/80 transition hover:bg-white/10">
             ← Back
@@ -1605,6 +1540,8 @@ export default function FullAssemblyPracticalTest({ onBack }) {
           completedCount={completedCount}
           totalSteps={totalSteps}
           progressPercent={progressPercent}
+          scorePercent={scorePercent}
+          deductionPercent={deductionPercent}
           mistakes={mistakes}
           started={started}
           finished={finished}
@@ -1677,7 +1614,7 @@ function CenteredPanel({ children }) {
   );
 }
 
-function TopControlBar({ onBack, time, status, completedCount, totalSteps, progressPercent, mistakes, started, finished, submitSaving, canFinish, confirmSubmit, onStart, onSubmitPrompt, onSubmit, onCancelSubmit, onReset, onExit }) {
+function TopControlBar({ onBack, time, status, completedCount, totalSteps, progressPercent, scorePercent, deductionPercent, mistakes, started, finished, submitSaving, canFinish, confirmSubmit, onStart, onSubmitPrompt, onSubmit, onCancelSubmit, onReset, onExit }) {
   return (
     <GlassPanel className="shrink-0 overflow-hidden">
       <div className="grid min-h-[74px] items-center gap-3 px-4 py-2.5 lg:grid-cols-[auto_minmax(0,1fr)_auto]">
@@ -1690,6 +1627,8 @@ function TopControlBar({ onBack, time, status, completedCount, totalSteps, progr
             <StatusPill label="Assembly Practical" />
             <MetricPill label={`${completedCount}/${totalSteps} steps`} />
             <MetricPill label={`${progressPercent}% progress`} />
+            <MetricPill label={`${scorePercent}% score`} />
+            <MetricPill label={`Deduction: -${deductionPercent}%`} subtle />
             <MetricPill label={`Mistakes: ${mistakes}`} subtle />
           </div>
 
@@ -1786,7 +1725,7 @@ function MessageBox({ type, text }) {
   return <div className={["mt-3 rounded-2xl border px-4 py-3 text-sm font-semibold shadow-[0_12px_35px_rgba(0,0,0,0.22)]", styles[type]].join(" ")}>{text}</div>;
 }
 
-function RightRail({ motionPreset, currentStep, placed, started, finished, progressPercent, mistakes }) {
+function RightRail({ motionPreset, currentStep, placed, started, finished, progressPercent, scorePercent, deductionPercent, mistakes }) {
   return (
     <div className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-3 overflow-hidden">
       <GlassPanel className="min-h-0 overflow-hidden p-3">
@@ -1819,9 +1758,10 @@ function RightRail({ motionPreset, currentStep, placed, started, finished, progr
         <div className="text-lg font-black tracking-tight text-white">Summary</div>
         <div className="mt-3 grid grid-cols-2 gap-2">
           <SummaryItem label="Progress" value={`${progressPercent}%`} />
+          <SummaryItem label="Score" value={`${scorePercent}%`} />
+          <SummaryItem label="Deduction" value={`-${deductionPercent}%`} />
           <SummaryItem label="Mistakes" value={`${mistakes}`} />
           <SummaryItem label="Status" value={finished ? "Done" : started ? "Running" : "Paused"} />
-          <SummaryItem label="Score" value={progressPercent === 100 ? "100%" : "—"} />
         </div>
       </GlassPanel>
     </div>

@@ -47,13 +47,27 @@ function getQuizProgressStatus(quizProgress, moduleKey) {
   const progress = quizProgress?.[moduleKey] || null;
   const completed = !!progress?.completed || !!progress?.finished;
 
+  const scorePercent =
+    progress?.percent !== null && progress?.percent !== undefined
+      ? progress.percent
+      : null;
+
+  const completionPercent = completed ? 100 : 0;
+
   return {
     moduleKey,
     completed,
     passed: !!progress?.passed,
     score: progress?.score ?? null,
     total: progress?.total ?? null,
-    percent: progress?.percent ?? null,
+
+    // This is the quiz score percentage. Use this for pass/unlock checks.
+    percent: scorePercent,
+    scorePercent,
+
+    // This is only for dashboard completion display.
+    completionPercent,
+
     updatedAt: progress?.updatedAt ?? null,
     raw: progress,
   };
@@ -386,13 +400,23 @@ const openModule = (id, platform)=>{
     ];
 
     const formatActivityQuiz = (quiz, moduleDone) => {
-      if (quiz.completed) return `Completed • ${quiz.percent ?? 0}%`;
+      if (quiz.completed) {
+        return `Completed • ${quiz.completionPercent}% Completed • ${quiz.scorePercent ?? 0}% Score`;
+      }
+
       if (moduleDone) return "Available";
       return "Locked";
     };
 
-    const assemblyPracticalUnlocked = quiz2.completed;
-    const disassemblyPracticalUnlocked = quiz3.completed;
+    const practiceTestAccess = profile?.practiceTestAccess || {};
+
+    const assemblyPracticalUnlocked =
+      practiceTestAccess?.module2?.unlocked === true ||
+      (quiz2.scorePercent || 0) >= 60;
+
+    const disassemblyPracticalUnlocked =
+      practiceTestAccess?.module3?.unlocked === true ||
+      (quiz3.scorePercent || 0) >= 60;
 
     const activity = [
       { id: "a1", t: "Module 1 • Quiz", d: formatActivityQuiz(quiz1, module1Done) },
@@ -468,8 +492,8 @@ const openModule = (id, platform)=>{
         desc: "Step-by-step PC assembly validation",
         status: assemblyPracticalUnlocked ? "Ready" : "Locked",
         locked: !assemblyPracticalUnlocked,
-        lockReason: "Finish Module 2 Quiz first.",
-        unlockHint: "Requires Module 2 Quiz completion.",
+        lockReason: "Score 60% or higher in Module 2 Quiz first.",
+        unlockHint: "Requires at least 60% in Module 2 Quiz.",
       },
       {
         id: "full-disassembly-practical",
@@ -477,8 +501,8 @@ const openModule = (id, platform)=>{
         desc: "Step-by-step PC disassembly validation",
         status: disassemblyPracticalUnlocked ? "Ready" : "Locked",
         locked: !disassemblyPracticalUnlocked,
-        lockReason: "Finish Module 3 Quiz first.",
-        unlockHint: "Requires Module 3 Quiz completion.",
+        lockReason: "Score 60% or higher in Module 3 Quiz first.",
+        unlockHint: "Requires at least 60% in Module 3 Quiz.",
       },
     ];
 
@@ -1234,7 +1258,7 @@ function PracticalTestsList({ tests, onOpen }) {
   return (
     <AssessmentList
       title="Practice Tests"
-      subtitle="Assembly unlocks after Module 2 Quiz. Disassembly unlocks after Module 3 Quiz."
+      subtitle="Assembly unlocks after scoring 60% or higher in Module 2 Quiz. Disassembly unlocks after scoring 60% or higher in Module 3 Quiz."
       items={tests}
       onOpen={onOpen}
       openLabel="Open Test"
@@ -1270,7 +1294,15 @@ function AssessmentList({ title, subtitle, items, onOpen, openLabel, retakeLabel
             item.progress.percent !== undefined;
 
           const scoreText = hasScore ? `${item.progress.score}/${item.progress.total}` : "—";
-          const percentText = hasPercent ? `${item.progress.percent}%` : "—";
+          const scorePercentText = hasPercent
+            ? `${item.progress.scorePercent ?? item.progress.percent}% Score`
+            : "—";
+          const completionText =
+            item.progress?.completionPercent !== undefined
+              ? `${item.progress.completionPercent}% Completed`
+              : completed
+              ? "100% Completed"
+              : "0% Completed";
 
           return (
             <motion.div
@@ -1294,7 +1326,9 @@ function AssessmentList({ title, subtitle, items, onOpen, openLabel, retakeLabel
                     <div className="mt-4 inline-flex flex-wrap items-center gap-2 rounded-2xl border border-[#00ffb4]/25 bg-[#00ffb4]/10 px-4 py-2 text-[12px] font-semibold text-[#b7fff0]">
                       <span>Previous Score: {scoreText}</span>
                       <span className="text-[#00ffb4]/65">•</span>
-                      <span>{percentText}</span>
+                      <span>{completionText}</span>
+                      <span className="text-[#00ffb4]/65">•</span>
+                      <span>{scorePercentText}</span>
                       <span className={item.progress?.passed ? "text-[#b7fff0]" : "text-yellow-100"}>
                         {item.progress?.passed ? "Passed" : "Completed"}
                       </span>
