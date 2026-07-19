@@ -1174,10 +1174,3 @@ function SummaryItem({ label, value }) {
   );
 }
 
-/* Optional preload */
-useGLTF.preload("/models/cpu.glb");
-useGLTF.preload("/models/ram.glb");
-useGLTF.preload("/models/psu.glb");
-useGLTF.preload("/models/motherboard.glb");
-useGLTF.preload("/models/hdd.glb");
-useGLTF.preload("/models/case.glb");

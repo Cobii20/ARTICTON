@@ -73,6 +73,7 @@ export default function Dashboard({
   const [isFaqOpen, setIsFaqOpen] = useState(false);
   const [isSupportOpen, setIsSupportOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [moduleDropdown, setModuleDropdown] = useState(null);
 
   const [settings, setSettings] = useState({
     sound: true,
@@ -179,10 +180,10 @@ export default function Dashboard({
     else console.log("Route to:", path);
   };
 
-  const openModule = (id) => {
-    if (onOpenModule) onOpenModule(id);
-    else go(`/modules/${id}`);
-  };
+const openModule = (id, platform)=>{
+ console.log(id, platform);
+ onOpenModule(id);
+}
 
   const openQuiz = (quiz) => {
     if (!quiz || quiz.locked) return;
@@ -301,7 +302,7 @@ export default function Dashboard({
         lessonsCompleted: module1CompletedCount,
         lessonsTotal: module1Progress?.totalPages || 6,
         lastOpenedAt: Date.now(),
-        selectionTitle: "Introduction To Hardware",
+        selectionTitle: "Introduction To PC Hardware",
         selectionModuleNo: "Module 1",
         selectionProgressText: module1Progress
           ? `${module1CompletedCount} of ${module1Progress.totalPages || 6} parts completed`
@@ -317,14 +318,14 @@ export default function Dashboard({
       {
         id: "module-2",
         title: "Module 2",
-        subtitle: module2Progress
-          ? `Step ${(module2Progress.currentStep ?? 0) + 1} • Assembly`
-          : "Assembly",
-        progress: module2Progress?.percent || 0,
-        lessonsCompleted: module2CompletedCount,
-        lessonsTotal: module2TotalSteps,
-        lastOpenedAt: Date.now() - 1000 * 60 * 60 * 20,
-        selectionTitle: "Assembly",
+        subtitle: module3Progress
+          ? `Step ${(module3Progress.currentStep ?? 0) + 1} • Disassembly`
+          : "Disassembly",
+        progress: module3Progress?.percent || 0,
+        lessonsCompleted: module3CompletedCount,
+        lessonsTotal: module3TotalSteps,
+        lastOpenedAt: Date.now() - 1000 * 60 * 60 * 36,
+        selectionTitle: "Disassembly",
         selectionModuleNo: "Module 2",
         selectionProgressText: module2Progress
           ? `${module2CompletedCount} of ${module2TotalSteps} steps completed`
@@ -341,13 +342,13 @@ export default function Dashboard({
         id: "module-3",
         title: "Module 3",
         subtitle: module3Progress
-          ? `Step ${(module3Progress.currentStep ?? 0) + 1} • Disassembly`
-          : "Disassembly",
+          ? `Step ${(module3Progress.currentStep ?? 0) + 1} • Assembly`
+          : "Assembly",
         progress: module3Progress?.percent || 0,
         lessonsCompleted: module3CompletedCount,
         lessonsTotal: module3TotalSteps,
-        lastOpenedAt: Date.now() - 1000 * 60 * 60 * 36,
-        selectionTitle: "Disassembly",
+        lastOpenedAt: Date.now() - 1000 * 60 * 60 * 20,
+        selectionTitle: "Assembly",
         selectionModuleNo: "Module 3",
         selectionProgressText: module3Progress
           ? `${module3CompletedCount} of ${module3TotalSteps} steps completed`
@@ -360,6 +361,7 @@ export default function Dashboard({
             : "Start",
         selectionImage: "/PNG/module3.png",
       },
+      
       {
         id: "module-4",
         title: "Module 4",
@@ -1113,6 +1115,7 @@ function HomeOverview({ setSection, overall, modules, nextUp, user, stats, achie
 
 function ModulesSelection({ modules, onBack, onOpenModule }) {
   const reduce = useReducedMotion();
+  const [moduleDropdown, setModuleDropdown] = useState(null);
   const [broken, setBroken] = useState({});
   const selectionModules = modules.filter((m) => m.selectionTitle && m.selectionImage);
 
@@ -1147,9 +1150,48 @@ function ModulesSelection({ modules, onBack, onOpenModule }) {
                     <span className="text-[12px] text-[#7a8ba8]">{m.selectionProgressText}</span>
                   </div>
 
-                  <button type="button" onClick={() => onOpenModule?.(m.id)} className="mt-4 inline-flex items-center gap-2 rounded-2xl border border-[#00ffb4]/30 bg-[#00ffb4]/12 px-7 py-2.5 text-sm font-semibold text-[#00ffb4] transition hover:bg-[#00ffb4]/18 focus:outline-none focus:ring-2 focus:ring-[#00ffb4]/25">
-                    {m.selectionCta} <span className="text-[#b7fff0]">→</span>
+                 <button
+                  type="button"
+                  onClick={() => {
+                    if (m.id === "module-2" || m.id === "module-3") {
+                      setModuleDropdown(
+                        moduleDropdown === m.id ? null : m.id
+                      );
+                    } else {
+                      onOpenModule?.(m.id);
+                    }
+                  }}
+                  className="mt-4 inline-flex items-center gap-2 rounded-2xl border border-[#00ffb4]/30 bg-[#00ffb4]/12 px-7 py-2.5 text-sm font-semibold text-[#00ffb4]"
+                >
+                  {m.selectionCta}
+                  <span className="text-[#b7fff0]">→</span>
+                </button>
+                {moduleDropdown === m.id && (
+                <div className="mt-3 flex gap-3">
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onOpenModule?.(`${m.id}-amd`)
+                    }
+                    className="rounded-xl border border-[#00ffb4]/30 bg-[#00ffb4]/10 px-5 py-2 text-sm text-[#00ffb4]"
+                  >
+                    AMD
                   </button>
+
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onOpenModule?.(`${m.id}-intel`)
+                    }
+                    className="rounded-xl border border-[#00ffb4]/30 bg-[#00ffb4]/10 px-5 py-2 text-sm text-[#00ffb4]"
+                  >
+                    Intel
+                  </button>
+
+                </div>
+              )}
                 </div>
 
                 <div className="relative h-[150px] overflow-hidden rounded-2xl border border-[#1a2438] bg-[#0a0e17] shadow-[inset_0_0_38px_rgba(0,0,0,0.52)] sm:h-[170px] lg:h-[180px]">

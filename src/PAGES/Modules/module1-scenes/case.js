@@ -1,13 +1,13 @@
 export const caseScene =  {
         key: "case",
         name: "Case",
-        url: "/models/case.glb",
+        url: "/models/Case(Base).glb",
         view: {
           cameraPos: [0, 1.25, 5.3],
           boundsMargin: 1.25,
           minDistance: 2.2,
           maxDistance: 10,
-          modelScale: 1,
+          modelScale: 0.04,
           modelRotation: [0, 0, 0],
           modelPosition: [0, 0, 0],
           pinStyle: { buttonPx: 36, glowRadius: 0.05, distanceFactor: 10 },

@@ -8,7 +8,11 @@ import { auth, db } from "../../firebase.js";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { useThree, useFrame } from "@react-three/fiber";
-import { module1Scenes } from "./module1-scenes";
+import {
+  module1ScenesBase,
+  module1ScenesAMD,
+  module1ScenesIntel,
+} from "./module1-scenes";
 
 const THEME = {
   bg: "#0a0e17",
@@ -25,14 +29,25 @@ function IntroDeck({ slides, onDone }) {
   const [index, setIndex] = useState(0);
   useEffect(() => setIndex(0), [slides]);
 
-  const slide = slides[index];
-  const isLast = index === slides.length - 1;
+  const safeSlides =
+    slides?.length > 0
+      ? slides
+      : [
+          {
+            id: "fallback-intro",
+            title: "Component Overview",
+            body: "Explore this component in the 3D hardware lab.",
+            points: ["Rotate the model.", "Zoom in for details.", "Select hotspots when available."],
+          },
+        ];
+  const slide = safeSlides[Math.min(index, safeSlides.length - 1)];
+  const isLast = index === safeSlides.length - 1;
 
   return (
-    <div className="absolute inset-0 z-50">
-      <div className="absolute inset-0 bg-black/60" />
+    <div className="pointer-events-none absolute inset-0 z-50">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,rgba(0,255,180,0.08),rgba(0,0,0,0.58)_58%,rgba(0,0,0,0.75))]" />
 
-      <div className="relative flex h-full w-full items-center justify-center p-6">
+      <div className="relative flex h-full w-full items-end justify-center p-4 pb-8 sm:items-center sm:p-6">
         <AnimatePresence mode="wait">
           <motion.div
             key={slide.id}
@@ -40,23 +55,25 @@ function IntroDeck({ slides, onDone }) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.99 }}
             transition={{ duration: 0.22 }}
-            className="w-[1120px] max-w-[calc(100vw-40px)] min-h-[520px] overflow-hidden rounded-[32px] border border-[#1a2438] bg-[#0d1220] shadow-[0_40px_120px_rgba(0,0,0,0.45)]"
+            className="pointer-events-auto w-[760px] max-w-[calc(100vw-32px)] overflow-hidden rounded-[18px] border border-[#00ffb4]/30 bg-[#06131b]/72 shadow-[0_0_45px_rgba(0,255,180,0.16),0_32px_100px_rgba(0,0,0,0.55)] backdrop-blur-xl"
           >
-            <div className="flex items-center justify-between gap-4 border-b border-[#1a2438] bg-[#111d33] px-10 py-7">
+            <div className="flex items-center justify-between gap-4 border-b border-[#00ffb4]/20 bg-[#00ffb4]/5 px-5 py-4 sm:px-7">
               <div className="min-w-0">
-                <div className="text-[14px] text-[#00ffb4]">Introduction</div>
-                <div className="truncate text-[26px] font-extrabold text-[#e8ecf4]">
+                <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#00ffb4]">
+                  Hologram Briefing
+                </div>
+                <div className="truncate text-[20px] font-extrabold text-[#e8ecf4] sm:text-[26px]">
                   {slide.title}
                 </div>
               </div>
 
-              <div className="text-[14px] font-medium text-[#7a8ba8]">
-                {index + 1}/{slides.length}
+              <div className="rounded-full border border-[#00ffb4]/20 bg-[#00ffb4]/10 px-3 py-1 text-[12px] font-bold text-[#baffee]">
+                {Math.min(index + 1, safeSlides.length)}/{safeSlides.length}
               </div>
             </div>
 
-            <div className="px-10 py-8">
-              <div className="whitespace-pre-line text-[18px] leading-relaxed text-[#dbe6f5]">
+            <div className="px-5 py-5 sm:px-7 sm:py-6">
+              <div className="whitespace-pre-line text-[15px] leading-7 text-[#dbe6f5] sm:text-[17px]">
                 {slide.body}
               </div>
 
@@ -95,7 +112,7 @@ function IntroDeck({ slides, onDone }) {
                     type="button"
                     onClick={() => {
                       if (isLast) onDone();
-                      else setIndex((i) => i + 1);
+                      else setIndex((i) => Math.min(i + 1, safeSlides.length - 1));
                     }}
                     className="h-12 rounded-2xl bg-[#00ffb4] px-7 text-[16px] font-semibold text-[#0a0e17] transition hover:scale-[1.02]"
                   >
@@ -201,6 +218,7 @@ function ModelScene({
   hotspots,
   activeId,
   setActiveId,
+  activeHotspot,
   debug,
   setLastCoords,
   modelScale = 1,
@@ -284,7 +302,399 @@ function ModelScene({
           onClick={() => setActiveId((prev) => (prev === h.id ? null : h.id))}
         />
       ))}
+
+      {activeHotspot ? (
+        <HotspotHologram
+          hotspot={activeHotspot}
+          onClose={() => setActiveId(null)}
+        />
+      ) : null}
     </group>
+  );
+}
+
+function HotspotHologram({ hotspot, onClose }) {
+  const position = useMemo(() => {
+    const base = hotspot.position || [0, 0, 0];
+    const side = base[0] >= 0 ? -0.85 : 0.85;
+    return [base[0] + side, base[1] + 0.42, base[2] + 0.2];
+  }, [hotspot]);
+
+  return (
+    <Html position={position} center distanceFactor={8} occlude={false}>
+      <motion.div
+        initial={{ opacity: 0, y: 10, scale: 0.94 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 8, scale: 0.96 }}
+        className="w-[300px] max-w-[72vw] overflow-hidden rounded-[14px] border border-[#00ffb4]/35 bg-[#06131b]/78 text-left shadow-[0_0_35px_rgba(0,255,180,0.20),0_20px_70px_rgba(0,0,0,0.62)] backdrop-blur-xl"
+      >
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(0,255,180,0.06)_1px,transparent_1px)] bg-[size:100%_16px]" />
+        <div className="relative flex items-start justify-between gap-3 border-b border-[#00ffb4]/20 px-4 py-3">
+          <div className="min-w-0">
+            <div className="text-[10px] font-black uppercase tracking-[0.22em] text-[#00ffb4]">
+              Hotspot {hotspot.number}
+            </div>
+            <div className="mt-1 text-[14px] font-black leading-5 text-white">
+              {hotspot.title}
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-7 w-7 flex-none items-center justify-center rounded-full border border-[#00ffb4]/20 bg-white/[0.04] text-[12px] text-white/80 transition hover:bg-white/[0.1]"
+            aria-label="Close hotspot"
+          >
+            x
+          </button>
+        </div>
+
+        <div className="relative px-4 py-3 text-[12px] leading-5 text-[#dbe6f5]">
+          {hotspot.en}
+        </div>
+      </motion.div>
+    </Html>
+  );
+}
+
+function LabEnvironment({ sceneName, completedCount, totalCount, showLabels = true }) {
+  const ringRef = useRef();
+  const scanRef = useRef();
+
+  useFrame((_, delta) => {
+    if (ringRef.current) ringRef.current.rotation.z += delta * 0.22;
+    if (scanRef.current) {
+      scanRef.current.position.y = 0.14 + Math.sin(Date.now() * 0.0016) * 0.035;
+    }
+  });
+
+  return (
+    <group>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.74, 0]}>
+        <circleGeometry args={[2.75, 96]} />
+        <meshBasicMaterial color="#00ffb4" transparent opacity={0.045} />
+      </mesh>
+
+      <mesh ref={ringRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.72, 0]}>
+        <ringGeometry args={[1.35, 1.38, 96]} />
+        <meshBasicMaterial color="#00ffb4" transparent opacity={0.34} />
+      </mesh>
+
+      <gridHelper args={[7, 36, "#00ffb4", "#1d4450"]} position={[0, -0.78, 0]} />
+
+      <mesh ref={scanRef} position={[0, 0.15, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[1.05, 1.08, 96]} />
+        <meshBasicMaterial color="#baffee" transparent opacity={0.18} />
+      </mesh>
+
+      {showLabels ? (
+        <>
+          <Html position={[-1.95, 1.12, -0.75]} center distanceFactor={8} occlude={false}>
+            <div className="w-[250px] rounded-[14px] border border-[#00ffb4]/25 bg-[#06131b]/68 px-4 py-3 text-left shadow-[0_0_30px_rgba(0,255,180,0.14)] backdrop-blur-xl">
+              <div className="text-[10px] font-black uppercase tracking-[0.24em] text-[#00ffb4]">
+                Articton Lab
+              </div>
+              <div className="mt-1 text-[18px] font-black text-white">{sceneName}</div>
+              <div className="mt-2 text-[11px] leading-5 text-[#9fb0ca]">
+                Select a glowing marker to inspect component details inside the 3D workspace.
+              </div>
+            </div>
+          </Html>
+
+          <Html position={[1.95, -0.02, -0.65]} center distanceFactor={8} occlude={false}>
+            <div className="rounded-full border border-[#00ffb4]/25 bg-[#06131b]/72 px-4 py-2 text-[11px] font-bold text-[#dbe6f5] shadow-[0_0_24px_rgba(0,255,180,0.16)] backdrop-blur-xl">
+              {completedCount}/{totalCount} parts complete
+            </div>
+          </Html>
+        </>
+      ) : null}
+    </group>
+  );
+}
+
+function ModuleIntroExperience({
+  step,
+  tutorialPage,
+  selectedPlatform,
+  onStart,
+  onOpenTutorial,
+  onTutorialPrev,
+  onTutorialNext,
+  onSelectPlatform,
+}) {
+  if (step === "components") return null;
+
+  return (
+    <group>
+      {step === "welcome" ? (
+        <WelcomeHologram onStart={onStart} onOpenTutorial={onOpenTutorial} />
+      ) : null}
+
+      {step === "tutorial" ? (
+        <NavigationTutorialHologram
+          page={tutorialPage}
+          onPrev={onTutorialPrev}
+          onNext={onTutorialNext}
+        />
+      ) : null}
+
+      {step === "platform" ? (
+        <PlatformChoiceHologram
+          selectedPlatform={selectedPlatform}
+          onSelectPlatform={onSelectPlatform}
+        />
+      ) : null}
+    </group>
+  );
+}
+
+function IntroStageVisual({ step }) {
+  const leftRef = useRef();
+  const rightRef = useRef();
+  const chipRef = useRef();
+
+  useFrame((_, delta) => {
+    if (leftRef.current) leftRef.current.rotation.y += delta * 0.35;
+    if (rightRef.current) rightRef.current.rotation.y -= delta * 0.32;
+    if (chipRef.current) {
+      chipRef.current.rotation.y += delta * 0.25;
+      chipRef.current.position.y = -0.06 + Math.sin(Date.now() * 0.0014) * 0.045;
+    }
+  });
+
+  return (
+    <group position={[0, -0.3, 0]}>
+      <mesh ref={chipRef} position={[0, -0.06, 0]} rotation={[0.18, 0.35, 0]}>
+        <boxGeometry args={[1.25, 0.16, 1.25]} />
+        <meshStandardMaterial color="#14212b" metalness={0.7} roughness={0.25} />
+      </mesh>
+
+      <mesh position={[0, 0.055, 0]} rotation={[0.18, 0.35, 0]}>
+        <boxGeometry args={[0.82, 0.18, 0.82]} />
+        <meshStandardMaterial color="#9fb0ca" metalness={0.85} roughness={0.18} />
+      </mesh>
+
+      {step === "platform" ? (
+        <>
+          <group ref={leftRef} position={[-1.45, 0.12, -0.2]}>
+            <mesh>
+              <boxGeometry args={[0.72, 0.12, 0.72]} />
+              <meshStandardMaterial color="#182330" metalness={0.7} roughness={0.25} />
+            </mesh>
+          </group>
+
+          <group ref={rightRef} position={[1.45, 0.12, -0.2]}>
+            <mesh>
+              <boxGeometry args={[0.72, 0.12, 0.72]} />
+              <meshStandardMaterial color="#1b2838" metalness={0.7} roughness={0.25} />
+            </mesh>
+          </group>
+        </>
+      ) : null}
+    </group>
+  );
+}
+
+function WelcomeHologram({ onStart, onOpenTutorial }) {
+  return (
+    <Html position={[0, 0.65, 0.15]} center distanceFactor={3} occlude={false}>
+      <motion.div
+        initial={{ opacity: 0, y: 18, scale: 0.94 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.45 }}
+        className="w-[min(720px,82vw)] rounded-[18px] border border-[#00ffb4]/35 bg-[#06131b]/72 px-6 py-6 text-center shadow-[0_0_55px_rgba(0,255,180,0.18),0_32px_110px_rgba(0,0,0,0.62)] backdrop-blur-xl"
+      >
+        <div className="text-[11px] font-black uppercase tracking-[0.32em] text-[#00ffb4]">
+          Welcome to Articton
+        </div>
+        <div className="mt-3 text-[34px] font-black leading-none text-white sm:text-[54px]">
+          WELCOME TO ARTICTON
+        </div>
+        <div className="mx-auto mt-4 max-w-xl text-[15px] leading-7 text-[#dbe6f5]">
+          A 3D interactive hardware learning experience
+        </div>
+
+        <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={onStart}
+            className="h-12 rounded-full bg-[#00ffb4] px-6 text-[14px] font-black text-[#06131b] shadow-[0_0_30px_rgba(0,255,180,0.28)] transition hover:scale-[1.03]"
+          >
+            Start Exploration
+          </button>
+          <button
+            type="button"
+            onClick={onOpenTutorial}
+            className="h-12 rounded-full border border-[#00ffb4]/25 bg-white/[0.04] px-6 text-[14px] font-bold text-[#dbe6f5] transition hover:bg-white/[0.09]"
+          >
+            How to Navigate
+          </button>
+        </div>
+      </motion.div>
+    </Html>
+  );
+}
+
+function NavigationTutorialHologram({ page, onPrev, onNext }) {
+  const isZoom = page === 1;
+  const isDragSnap = page === 2;
+
+  return (
+    <Html position={[0, 0.62, 0.12]} center distanceFactor={3} occlude={false}>
+      <motion.div
+        key={page}
+        initial={{ opacity: 0, y: 14, scale: 0.96 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: -10, scale: 0.98 }}
+        className="relative w-[min(640px,82vw)] overflow-hidden rounded-[18px] border border-[#00ffb4]/32 bg-[#06131b]/74 px-6 py-5 shadow-[0_0_48px_rgba(0,255,180,0.17),0_30px_100px_rgba(0,0,0,0.60)] backdrop-blur-xl"
+      >
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(0,255,180,0.055)_1px,transparent_1px)] bg-[size:100%_18px]" />
+        <div className="relative">
+          <div className="text-[11px] font-black uppercase tracking-[0.26em] text-[#00ffb4]">
+            Navigation Tutorial
+          </div>
+         <div className="mt-2 text-[28px] font-black text-white">
+          {isDragSnap
+            ? "Drag & Snap Guide"
+            : isZoom
+            ? "Zoom Tutorial"
+            : "Rotate Tutorial"}
+        </div>
+
+          <div className="relative my-6 h-36 rounded-[16px] border border-[#00ffb4]/20 bg-black/22">
+            <motion.div
+              className="absolute left-1/2 top-1/2 h-20 w-32 -translate-x-1/2 -translate-y-1/2 rounded-[18px] border border-[#00ffb4]/30 bg-[#00ffb4]/10 shadow-[0_0_40px_rgba(0,255,180,0.18)]"
+              animate={
+                isDragSnap
+                  ? { x: [-40, 40, -40] }
+                  : isZoom
+                  ? { scale: [0.86, 1.18, 0.92] }
+                  : { rotate: [-12, 12, -10] }
+              }
+              transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+            />
+
+            <motion.div
+              className="absolute left-1/2 top-1/2 h-9 w-9 rounded-full border border-white/30 bg-white/90 shadow-[0_12px_32px_rgba(0,0,0,0.35)]"
+             animate={
+                isDragSnap
+                  ? {
+                      x: [-70, 70, 0],
+                      y: [0, -20, 0],
+                    }
+                  : isZoom
+                  ? {
+                      x: [-10, -10, -10],
+                      y: [22, -24, 22],
+                      scale: [1, 0.72, 1],
+                    }
+                  : {
+                      x: [-90, 90, -80],
+                      y: [10, -12, 8],
+                    }
+              }
+              transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+            >
+              <div className="absolute left-3 top-3 h-3 w-3 rounded-full bg-[#06131b]" />
+            </motion.div>
+          </div>
+
+          <div className="text-[16px] leading-7 text-[#dbe6f5]">
+          {isDragSnap
+            ? "Drag the 3D object smoothly. Release to snap the view into the closest inspection angle."
+            : isZoom
+            ? "Scroll or pinch to move closer and inspect hardware details."
+            : "Drag to explore the hardware from different angles."}
+        </div>
+
+          <div className="mt-6 flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={onPrev}
+              disabled={page === 0}
+              className="h-11 rounded-full border border-[#00ffb4]/20 bg-white/[0.04] px-5 text-[13px] font-bold text-[#dbe6f5] transition hover:bg-white/[0.09] disabled:opacity-40"
+            >
+              Back
+            </button>
+
+           <div className="text-[11px] font-bold text-[#7a8ba8]">
+            {page + 1}/3
+          </div>
+
+            <button
+              type="button"
+              onClick={onNext}
+              className="h-11 rounded-full bg-[#00ffb4] px-6 text-[13px] font-black text-[#06131b] shadow-[0_0_28px_rgba(0,255,180,0.22)] transition hover:scale-[1.03]"
+            >
+             {isDragSnap
+            ? "Choose Platform"
+            : isZoom
+            ? "Next"
+            : "Next"}
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    </Html>
+  );
+}
+
+function PlatformChoiceHologram({ selectedPlatform, onSelectPlatform }) {
+  return (
+    <Html position={[0, 0.6, 0.15]} center distanceFactor={3} occlude={false}>
+      <motion.div
+        initial={{ opacity: 0, y: 18, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        className="w-[min(760px,86vw)] rounded-[18px] border border-[#00ffb4]/35 bg-[#06131b]/74 px-6 py-6 text-center shadow-[0_0_55px_rgba(0,255,180,0.18),0_32px_110px_rgba(0,0,0,0.62)] backdrop-blur-xl"
+      >
+        <div className="text-[11px] font-black uppercase tracking-[0.26em] text-[#00ffb4]">
+          Processor Platform
+        </div>
+        <div className="mt-2 text-[30px] font-black leading-tight text-white">
+          Every PC starts with a decision
+        </div>
+        <div className="mx-auto mt-3 max-w-xl text-[14px] leading-6 text-[#dbe6f5]">
+          What processor platform will power your system?
+        </div>
+
+        <div className="mt-7 grid gap-3 sm:grid-cols-2">
+          {[
+            {
+              id: "amd",
+              name: "AMD",
+              detail: "AM4 and AM5 platforms with socket, motherboard, and memory compatibility paths.",
+            },
+            {
+              id: "intel",
+              name: "Intel",
+              detail: "Intel Core platforms with matching sockets, chipsets, and supported memory generations.",
+            },
+          ].map((platform) => {
+            const active = selectedPlatform === platform.id;
+
+            return (
+              <button
+                key={platform.id}
+                type="button"
+                onClick={() => onSelectPlatform(platform.id)}
+                className={[
+                  "rounded-[16px] border px-5 py-5 text-left transition hover:scale-[1.02]",
+                  active
+                    ? "border-[#00ffb4]/55 bg-[#00ffb4]/16 shadow-[0_0_34px_rgba(0,255,180,0.18)]"
+                    : "border-white/12 bg-white/[0.04] hover:bg-white/[0.08]",
+                ].join(" ")}
+              >
+                <div className="text-[28px] font-black text-white">{platform.name}</div>
+                <div className="mt-3 text-[12px] leading-5 text-[#b7c6dd]">{platform.detail}</div>
+                <div className="mt-5 text-[11px] font-black uppercase tracking-[0.18em] text-[#00ffb4]">
+                  Select {platform.name}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </motion.div>
+    </Html>
   );
 }
 
@@ -402,10 +812,21 @@ export default function Module1Page({ onBack, onLogout }) {
   const [lastCoords, setLastCoords] = useState(null);
   const [firebaseUser, setFirebaseUser] = useState(null);
   const [profile, setProfile] = useState(null);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showCertificate, setShowCertificate] = useState(false);
   const [certificateWarning, setCertificateWarning] = useState("");
+  const [experienceStep, setExperienceStep] = useState(() => {
+    return localStorage.getItem("module1OnboardingDone") === "true"
+      ? "components"
+      : "welcome";
+  });
+  const [tutorialPage, setTutorialPage] = useState(0);
+  const [selectedPlatform, setSelectedPlatform] = useState(() => {
+    return localStorage.getItem("module1SelectedPlatform") || "";
+  });
+  const [afkAutoRotate, setAfkAutoRotate] = useState(false);
+  const afkTimerRef = useRef(null);
+  const controlsRef = useRef();
 
   const [settings, setSettings] = useState({
     sound: true,
@@ -421,8 +842,13 @@ export default function Module1Page({ onBack, onLogout }) {
   };
 
   const [localCompletedParts, setLocalCompletedParts] = useState(() => {
-    const saved = localStorage.getItem("module1CompletedParts");
-    return saved ? JSON.parse(saved) : {};
+    try {
+      const saved = localStorage.getItem("module1CompletedParts");
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      localStorage.removeItem("module1CompletedParts");
+      return {};
+    }
   });
 
   useEffect(() => {
@@ -430,14 +856,9 @@ export default function Module1Page({ onBack, onLogout }) {
 
     if (!saved) return;
 
-    const firebaseParts = {
-      cpu: !!saved.cpu,
-      motherboard: !!saved.motherboard,
-      ram: !!saved.ram,
-      hdd: !!saved.hdd,
-      psu: !!saved.psu,
-      case: !!saved.case,
-    };
+    const firebaseParts = Object.fromEntries(
+      Object.entries(saved).map(([key, value]) => [key, !!value])
+    );
 
     setLocalCompletedParts(firebaseParts);
     localStorage.setItem("module1CompletedParts", JSON.stringify(firebaseParts));
@@ -480,8 +901,46 @@ export default function Module1Page({ onBack, onLogout }) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  const modules = module1Scenes;
-  const current = modules[moduleIndex];
+  useEffect(() => {
+    if (afkTimerRef.current) {
+      window.clearTimeout(afkTimerRef.current);
+      afkTimerRef.current = null;
+    }
+
+    if (experienceStep !== "components" || showIntro) {
+      setAfkAutoRotate(false);
+      return undefined;
+    }
+
+    setAfkAutoRotate(false);
+    afkTimerRef.current = window.setTimeout(() => {
+      setActiveId(null);
+      setAfkAutoRotate(true);
+    }, 15000);
+
+    return () => {
+      if (afkTimerRef.current) {
+        window.clearTimeout(afkTimerRef.current);
+        afkTimerRef.current = null;
+      }
+    };
+  }, [experienceStep, showIntro, moduleIndex, activeId]);
+
+  const modules = useMemo(() => {
+    if (selectedPlatform === "amd") return module1ScenesAMD;
+    if (selectedPlatform === "intel") return module1ScenesIntel;
+    return module1ScenesBase;
+  }, [selectedPlatform]);
+
+  const safeModuleIndex = Math.min(Math.max(moduleIndex, 0), Math.max(modules.length - 1, 0));
+  const current = useMemo(
+    () => modules[safeModuleIndex] || module1ScenesBase[0],
+    [modules, safeModuleIndex]
+  );
+  const isComponentStage = experienceStep === "components";
+  const sceneCamera = isComponentStage
+    ? { position: current?.view?.cameraPos || [0, 1.2, 3.2], fov: 45 }
+    : { position: [0, 1.05, 3.8], fov: 42 };
 
   const completedParts = localCompletedParts;
 
@@ -490,10 +949,18 @@ export default function Module1Page({ onBack, onLogout }) {
   }, [modules, completedParts]);
 
   useEffect(() => {
+    if (moduleIndex >= 0 && moduleIndex < modules.length) return;
+
+    setModuleIndex(safeModuleIndex);
+    setActiveId(null);
+    setLastCoords(null);
+    setShowIntro(true);
+  }, [moduleIndex, modules.length, safeModuleIndex]);
+
+  useEffect(() => {
     if (!current) return;
 
     const isFinished = completedParts[current.key];
-
     setShowIntro(!isFinished);
   }, [current, completedParts]);
 
@@ -502,7 +969,7 @@ export default function Module1Page({ onBack, onLogout }) {
   }, [modules]);
 
   const activeHotspot = useMemo(
-    () => current.hotspots.find((h) => h.id === activeId) || null,
+    () => current?.hotspots?.find((h) => h.id === activeId) || null,
     [current, activeId]
   );
 
@@ -517,10 +984,11 @@ export default function Module1Page({ onBack, onLogout }) {
   );
 
   const saveModule1Progress = async ({
-    page = moduleIndex + 1,
+    page = safeModuleIndex + 1,
     introDone = !showIntro,
     moduleKey = current?.key,
     completedParts: partsPatch = {},
+    platform = selectedPlatform,
   } = {}) => {
     if (!firebaseUser) return;
 
@@ -553,6 +1021,7 @@ export default function Module1Page({ onBack, onLogout }) {
               introDone,
               completed,
               percent,
+              selectedPlatform: platform || null,
               lastVisitedModuleKey: moduleKey,
               completedParts: mergedParts,
               updatedAt: serverTimestamp(),
@@ -567,7 +1036,7 @@ export default function Module1Page({ onBack, onLogout }) {
   };
 
   const goNextModule = async () => {
-    const nextIndex = (moduleIndex + 1) % modules.length;
+    const nextIndex = (safeModuleIndex + 1) % modules.length;
     const nextPage = nextIndex + 1;
 
     setCertificateWarning("");
@@ -584,7 +1053,7 @@ export default function Module1Page({ onBack, onLogout }) {
   };
 
   const goPrevModule = async () => {
-    const prevIndex = (moduleIndex - 1 + modules.length) % modules.length;
+    const prevIndex = (safeModuleIndex - 1 + modules.length) % modules.length;
     const prevPage = prevIndex + 1;
 
     setCertificateWarning("");
@@ -651,10 +1120,79 @@ export default function Module1Page({ onBack, onLogout }) {
       setModuleIndex(saved.currentPage - 1);
     }
 
-    if (typeof saved.introDone === "boolean") {
-      setShowIntro(!saved.introDone);
+    setShowIntro(true);
+
+    if (typeof saved.selectedPlatform === "string" && saved.selectedPlatform) {
+      setSelectedPlatform(saved.selectedPlatform);
+      localStorage.setItem("module1SelectedPlatform", saved.selectedPlatform);
+      localStorage.setItem("module1OnboardingDone", "true");
+      setExperienceStep("components");
     }
   }, [profile, modules.length]);
+
+  const handleStartExploration = () => {
+    setTutorialPage(0);
+    setExperienceStep("platform");
+  };
+
+  const handleOpenTutorial = () => {
+    setTutorialPage(0);
+    setExperienceStep("tutorial");
+  };
+
+  const handleTutorialPrev = () => {
+    setTutorialPage((page) => Math.max(0, page - 1));
+  };
+
+  const handleTutorialNext = () => {
+  if (tutorialPage < 2) {
+    setTutorialPage((page) => page + 1);
+    return;
+  }
+
+  setExperienceStep("platform");
+};
+
+  const handleSelectPlatform = async (platform) => {
+    setSelectedPlatform(platform);
+    localStorage.setItem("module1SelectedPlatform", platform);
+    localStorage.setItem("module1OnboardingDone", "true");
+    setExperienceStep("components");
+    setShowIntro(true);
+    setActiveId(null);
+    setCertificateWarning("");
+
+    await saveModule1Progress({
+      page: safeModuleIndex + 1,
+      introDone: false,
+      moduleKey: current.key,
+      platform,
+    });
+  };
+
+  const handleReturnToWelcome = () => {
+    setExperienceStep("welcome");
+    setTutorialPage(0);
+    setActiveId(null);
+    setCertificateWarning("");
+    setAfkAutoRotate(false);
+  };
+
+  const handleSceneInteraction = () => {
+    if (experienceStep !== "components") return;
+
+    setActiveId(null);
+    setAfkAutoRotate(false);
+
+    if (afkTimerRef.current) {
+      window.clearTimeout(afkTimerRef.current);
+    }
+
+    afkTimerRef.current = window.setTimeout(() => {
+      setActiveId(null);
+      setAfkAutoRotate(true);
+    }, 15000);
+  };
 
   const handleSelectModule = async (index) => {
     const key = modules[index].key;
@@ -733,7 +1271,7 @@ export default function Module1Page({ onBack, onLogout }) {
             <div className="relative flex h-full w-full flex-col overflow-hidden">
               <div className="flex items-center justify-between px-6 pt-6 text-[12px] text-[#7a8ba8] md:px-10">
                 <div>
-                  Module 1 (Page {moduleIndex + 1}) —{" "}
+                  Module 1 (Page {safeModuleIndex + 1}) —{" "}
                   <span className="text-[#dbe6f5]">{current.name}</span>
                 </div>
 
@@ -792,170 +1330,300 @@ export default function Module1Page({ onBack, onLogout }) {
                 />
               </div>
 
-              <div className="min-h-0 flex-1 px-6 py-6 md:px-10">
-                <div className="relative h-full overflow-hidden rounded-[24px] border border-[#1a2438] bg-[#0d1220]/78 shadow-[0_28px_90px_rgba(0,0,0,0.45)] backdrop-blur-xl">
-                  <PartsSidebar
-                    open={sidebarOpen}
-                    onToggle={() => setSidebarOpen((v) => !v)}
-                    modules={modules}
-                    currentKey={current.key}
-                    completedParts={completedParts}
-                    onSelect={handleSelectModule}
-                    onViewCertificate={handleViewCertificate}
-                    moduleFinished={moduleFinished}
-                    certificateWarning={certificateWarning}
-                  />
+              <div className="min-h-0 flex-1 px-3 py-3 md:px-6 md:py-5">
+                <div className="relative h-full overflow-hidden rounded-[22px] border border-[#00ffb4]/18 bg-[#031018] shadow-[0_30px_100px_rgba(0,0,0,0.52)]">
+                  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_44%,rgba(0,255,180,0.12),transparent_36%),radial-gradient(circle_at_82%_18%,rgba(95,149,152,0.14),transparent_28%)]" />
+                  <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(0,255,180,0.032)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,180,0.032)_1px,transparent_1px)] bg-[size:48px_48px] opacity-75" />
+                  <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_150px_rgba(0,0,0,0.68)]" />
 
-                  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_22%_0%,rgba(255,255,255,0.08),transparent_40%)]" />
-                  <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_120px_rgba(0,0,0,0.55)]" />
-
-                  <div
-                    className="absolute inset-y-6 right-6 overflow-hidden rounded-[18px] border border-[#1a2438] bg-black/10 transition-all duration-300"
-                    style={{
-                      left: sidebarOpen ? 320 : 32,
-                    }}
+                  <motion.div
+                    key={`three-${current.key}`}
+                    className="absolute inset-0"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.3 }}
                   >
-                    <div className="pointer-events-none absolute inset-0 rounded-[18px] ring-1 ring-[#00ffb4]/15 shadow-[0_0_0_1px_rgba(0,255,180,0.08)]" />
-                    <div className="pointer-events-none absolute -left-24 -top-24 h-56 w-56 rounded-full bg-[#00ffb4]/10 blur-3xl" />
-                    <div className="pointer-events-none absolute left-[10%] top-[8%] h-[58%] w-[2px] animate-pulse bg-[linear-gradient(180deg,transparent,#00ffb4,transparent)] opacity-25" />
-                  </div>
+                    <Canvas
+                      key={`${isComponentStage ? current.url : "module1-onboarding"}-${experienceStep}`}
+                      camera={sceneCamera}
+                      dpr={[1, 1.8]}
+                    >
+                      <color attach="background" args={["#06131b"]} />
+                      <ambientLight intensity={0.78} />
+                      <directionalLight position={[6, 8, 6]} intensity={1.25} />
+                      <directionalLight position={[-6, -2, -6]} intensity={0.45} />
+                      <pointLight position={[0, 1.2, 2.2]} intensity={0.75} color="#00ffb4" />
 
-                  {!showIntro ? (
-                    <HotspotInfoCard
-                      hotspot={activeHotspot}
-                      onClose={() => setActiveId(null)}
+                      <Suspense fallback={null}>
+                        <LabEnvironment
+                          sceneName={isComponentStage ? current.name : "Processor Platform Lab"}
+                          completedCount={modules.filter((m) => completedParts[m.key]).length}
+                          totalCount={modules.length}
+                          showLabels={isComponentStage}
+                        />
+
+                        <ModuleIntroExperience
+                          step={experienceStep}
+                          tutorialPage={tutorialPage}
+                          selectedPlatform={selectedPlatform}
+                          onStart={handleStartExploration}
+                          onOpenTutorial={handleOpenTutorial}
+                          onTutorialPrev={handleTutorialPrev}
+                          onTutorialNext={handleTutorialNext}
+                          onSelectPlatform={handleSelectPlatform}
+                        />
+
+                        {isComponentStage ? (
+                        <Bounds
+                            fit
+                            clip
+                            observe
+                            margin={current?.view?.boundsMargin ?? 1.15}
+                            controls={controlsRef}
+                          >
+                            <ModelScene
+                              url={current.url}
+                              hotspots={current.hotspots || []}
+                              activeId={activeId}
+                              activeHotspot={activeHotspot}
+                              setActiveId={setActiveId}
+                              debug={debug}
+                              setLastCoords={setLastCoords}
+                              modelScale={current?.view?.modelScale}
+                              modelRotation={current?.view?.modelRotation}
+                              modelPosition={current?.view?.modelPosition}
+                              pinStyle={current?.view?.pinStyle}
+                              normalize={current?.view?.normalize}
+                            />
+                          </Bounds>
+                        ) : (
+                          <IntroStageVisual step={experienceStep} />
+                        )}
+
+                        <Environment preset="city" />
+                      </Suspense>
+
+                      <OrbitControls
+                        ref={controlsRef}
+                        makeDefault
+                        enablePan={false}
+                        enableZoom
+                        minDistance={isComponentStage ? current?.view?.minDistance ?? 1.2 : 2.8}
+                        maxDistance={isComponentStage ? current?.view?.maxDistance ?? 7 : 5.2}
+                        autoRotate={
+                          experienceStep === "components" &&
+                          !showIntro &&
+                          afkAutoRotate
+                        }
+                        autoRotateSpeed={0.85}
+                        enableDamping
+                        dampingFactor={0.08}
+                        onStart={handleSceneInteraction}
+                        onChange={() => {
+                          if (activeId && experienceStep === "components") {
+                            setActiveId(null);
+                          }
+                        }}
+                      />
+                    </Canvas>
+                  </motion.div>
+
+                  {isComponentStage && showIntro ? (
+                    <IntroDeck
+                      slides={current.slides || []}
+                      onDone={async () => {
+                        setShowIntro(false);
+                        setActiveId(null);
+                        setCertificateWarning("");
+
+                        await saveModule1Progress({
+                          page: safeModuleIndex + 1,
+                          introDone: true,
+                          moduleKey: current.key,
+                          completedParts: {
+                            [current.key]: true,
+                          },
+                        });
+                      }}
                     />
                   ) : null}
 
-                  <div
-                    className="absolute inset-y-6 right-6 overflow-hidden rounded-[18px] transition-all duration-300"
-                    style={{
-                      left: sidebarOpen ? 296 : 24,
-                    }}
-                  >
-                    <AnimatePresence mode="wait">
-                      {showIntro ? (
-                        <motion.div
-                          key={`intro-${current.key}`}
-                          className="absolute inset-0"
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          transition={{ duration: 0.28 }}
-                        >
-                          <IntroDeck
-                            slides={current.slides}
-                            onDone={async () => {
-                              setShowIntro(false);
-                              setActiveId(null);
-                              setCertificateWarning("");
+                  {isComponentStage ? (
+                    <>
+                      <PartsDock
+                        modules={modules}
+                        currentKey={current.key}
+                        completedParts={completedParts}
+                        onSelect={handleSelectModule}
+                        onViewCertificate={handleViewCertificate}
+                        moduleFinished={moduleFinished}
+                        certificateWarning={certificateWarning}
+                      />
 
-                              await saveModule1Progress({
-                                page: moduleIndex + 1,
-                                introDone: true,
-                                moduleKey: current.key,
-                                completedParts: {
-                                  [current.key]: true,
-                                },
-                              });
-                            }}
-                          />
-                        </motion.div>
-                      ) : (
-                        <motion.div
-                          key={`three-${current.key}`}
-                          className="absolute inset-0"
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          transition={{ duration: 0.28 }}
-                        >
-                          <Canvas
-                            key={current.url}
-                            camera={{ position: current.view.cameraPos, fov: 45 }}
-                            dpr={[1, 1.8]}
-                          >
-                            <color attach="background" args={["#071520"]} />
-                            <ambientLight intensity={0.75} />
-                            <directionalLight position={[6, 8, 6]} intensity={1.25} />
-                            <directionalLight position={[-6, -2, -6]} intensity={0.4} />
-
-                            <Suspense fallback={null}>
-                              <Bounds fit clip observe margin={current.view.boundsMargin}>
-                                <ModelScene
-                                  url={current.url}
-                                  hotspots={current.hotspots}
-                                  activeId={activeId}
-                                  setActiveId={setActiveId}
-                                  debug={debug}
-                                  setLastCoords={setLastCoords}
-                                  modelScale={current.view.modelScale}
-                                  modelRotation={current.view.modelRotation}
-                                  modelPosition={current.view.modelPosition}
-                                  pinStyle={current.view.pinStyle}
-                                  normalize={current.view.normalize}
-                                />
-                              </Bounds>
-
-                              <Environment preset="city" />
-                            </Suspense>
-
-                            <OrbitControls
-                              makeDefault
-                              enablePan={false}
-                              enableZoom
-                              minDistance={current.view.minDistance}
-                              maxDistance={current.view.maxDistance}
-                              autoRotate={!activeId}
-                              autoRotateSpeed={0.9}
-                              enableDamping
-                              dampingFactor={0.08}
-                            />
-                          </Canvas>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-
-                  {current.key !== "cpu" && (
-                    <button
-                      type="button"
-                      onClick={goPrevModule}
-                      aria-label="Previous module"
-                      className="absolute top-1/2 z-[200] flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-[#1a2438] bg-[#0d1220]/85 shadow-[0_18px_60px_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:bg-white/[0.06]"
-                      style={{
-                        left: sidebarOpen ? 320 : 80,
-                      }}
-                    >
-                      ←
-                    </button>
-                  )}
-
-                  {current.key !== "case" && (
-                    <button
-                      type="button"
-                      onClick={goNextModule}
-                      aria-label="Next module"
-                      className="absolute right-7 top-1/2 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-[#1a2438] bg-[#0d1220]/85 shadow-[0_18px_60px_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:bg-white/[0.06]"
-                    >
-                      <span className="text-lg text-white/80">→</span>
-                    </button>
-                  )}
-
-                  <div className="absolute top-8 right-9 text-[12px] text-[#7a8ba8]">
-                    {showIntro
-                      ? "Read the intro slides, then start the 3D"
-                      : "Click pins to learn parts"}
-                  </div>
+                      <SceneControls
+                        current={current}
+                        moduleIndex={safeModuleIndex}
+                        totalModules={modules.length}
+                        showIntro={showIntro}
+                        debug={debug}
+                        lastCoords={lastCoords}
+                        selectedPlatform={selectedPlatform}
+                        afkAutoRotate={afkAutoRotate}
+                        onWelcome={handleReturnToWelcome}
+                        onPrev={goPrevModule}
+                        onNext={goNextModule}
+                      />
+                    </>
+                  ) : null}
                 </div>
               </div>
-
               <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_120px_rgba(0,0,0,0.45)]" />
             </div>
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+function PartsDock({
+  modules,
+  currentKey,
+  completedParts,
+  onSelect,
+  onViewCertificate,
+  moduleFinished,
+  certificateWarning,
+}) {
+  return (
+    <div className="pointer-events-none absolute inset-x-3 bottom-3 z-[120] flex flex-col items-center gap-2 md:inset-x-6 md:bottom-5">
+      {certificateWarning ? (
+        <div className="pointer-events-auto max-w-[min(720px,calc(100vw-48px))] rounded-full border border-red-300/25 bg-red-500/12 px-4 py-2 text-center text-[11px] font-semibold text-red-100 shadow-[0_18px_50px_rgba(0,0,0,0.35)] backdrop-blur-xl">
+          {certificateWarning}
+        </div>
+      ) : null}
+
+      <div className="pointer-events-auto flex max-w-full items-center gap-2 overflow-x-auto rounded-full border border-[#00ffb4]/24 bg-[#06131b]/72 p-2 shadow-[0_0_35px_rgba(0,255,180,0.13),0_18px_70px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+        {modules.map((m, index) => {
+          const done = !!completedParts[m.key];
+          const active = currentKey === m.key;
+
+          return (
+            <button
+              key={m.key}
+              type="button"
+              onClick={() => onSelect(index)}
+              className={[
+                "flex h-11 items-center gap-2 whitespace-nowrap rounded-full border px-3 text-[12px] font-bold transition",
+                active
+                  ? "border-[#00ffb4]/45 bg-[#00ffb4]/16 text-white shadow-[0_0_22px_rgba(0,255,180,0.13)]"
+                  : "border-white/10 bg-white/[0.035] text-[#b7c6dd] hover:bg-white/[0.08]",
+              ].join(" ")}
+            >
+              <span
+                className={[
+                  "flex h-6 w-6 items-center justify-center rounded-full text-[11px]",
+                  done ? "bg-[#00ffb4] text-[#06131b]" : "border border-white/15 text-[#9fb0ca]",
+                ].join(" ")}
+              >
+                {done ? "OK" : index + 1}
+              </span>
+              <span className="hidden sm:inline">{m.name === "Motherboard" ? "MB" : m.name}</span>
+            </button>
+          );
+        })}
+
+        {moduleFinished ? (
+          <button
+            type="button"
+            onClick={onViewCertificate}
+            className="h-11 whitespace-nowrap rounded-full bg-[#00ffb4] px-4 text-[12px] font-black text-[#06131b] shadow-[0_0_28px_rgba(0,255,180,0.22)] transition hover:scale-[1.02]"
+          >
+            Certificate
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function SceneControls({
+  current,
+  moduleIndex,
+  totalModules,
+  showIntro,
+  debug,
+  lastCoords,
+  selectedPlatform,
+  afkAutoRotate,
+  onWelcome,
+  onPrev,
+  onNext,
+}) {
+  return (
+    <>
+      <div className="pointer-events-none absolute left-4 top-4 z-[110] max-w-[calc(100vw-48px)] rounded-[16px] border border-[#00ffb4]/22 bg-[#06131b]/66 px-4 py-3 shadow-[0_18px_60px_rgba(0,0,0,0.35)] backdrop-blur-xl md:left-6 md:top-6">
+        <div className="text-[10px] font-black uppercase tracking-[0.24em] text-[#00ffb4]">
+          Module 1
+        </div>
+        <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <div className="text-[20px] font-black leading-none text-white">{current.name}</div>
+          <div className="text-[11px] font-semibold text-[#9fb0ca]">
+            Page {moduleIndex + 1} of {totalModules}
+          </div>
+        </div>
+        <div className="mt-2 text-[11px] text-[#8fa3bf]">
+          {showIntro
+            ? "Hologram briefing active"
+            : `${selectedPlatform ? selectedPlatform.toUpperCase() : "PC"} platform / ${
+                afkAutoRotate ? "auto-rotate active" : "select glowing pins"
+              }`}
+        </div>
+      </div>
+
+      <div className="absolute right-4 top-4 z-[110] flex items-center gap-2 md:right-6 md:top-6">
+        <button
+          type="button"
+          onClick={onWelcome}
+          className="rounded-full border border-[#00ffb4]/22 bg-[#06131b]/70 px-4 py-2 text-[11px] font-black uppercase tracking-[0.14em] text-[#dbe6f5] shadow-[0_18px_60px_rgba(0,0,0,0.30)] backdrop-blur-xl transition hover:bg-white/[0.08]"
+        >
+          Welcome
+        </button>
+
+        <div className="pointer-events-none hidden rounded-full border border-[#00ffb4]/18 bg-[#06131b]/60 px-3 py-2 text-[11px] text-[#9fb0ca] backdrop-blur-xl md:block">
+          {debug
+            ? lastCoords
+              ? `Debug on / [${lastCoords.join(", ")}]`
+              : "Debug on / click model"
+            : afkAutoRotate
+            ? "AFK auto-rotate"
+            : "Drag / zoom / select"}
+        </div>
+      </div>
+
+      {current.key !== "cpu" ? (
+        <button
+          type="button"
+          onClick={onPrev}
+          aria-label="Previous module"
+          className="absolute left-4 top-1/2 z-[115] flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-[#00ffb4]/25 bg-[#06131b]/74 text-lg font-black text-[#dbe6f5] shadow-[0_18px_60px_rgba(0,0,0,0.36)] backdrop-blur-xl transition hover:bg-white/[0.08] md:left-6"
+        >
+          &lt;
+        </button>
+      ) : null}
+
+      {current.key !== "case" ? (
+        <button
+          type="button"
+          onClick={onNext}
+          aria-label="Next module"
+          className="absolute right-4 top-1/2 z-[115] flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-[#00ffb4]/25 bg-[#06131b]/74 text-lg font-black text-[#dbe6f5] shadow-[0_18px_60px_rgba(0,0,0,0.36)] backdrop-blur-xl transition hover:bg-white/[0.08] md:right-6"
+        >
+          &gt;
+        </button>
+      ) : null}
+    </>
   );
 }
 
@@ -1085,9 +1753,13 @@ function ModulePageBackground() {
   );
 }
 
-useGLTF.preload("/models/cpu.glb");
-useGLTF.preload("/models/motherboard.glb");
-useGLTF.preload("/models/ram.glb");
-useGLTF.preload("/models/hdd.glb");
-useGLTF.preload("/models/psu.glb");
-useGLTF.preload("/models/case.glb");
+useGLTF.preload("/models/Case(Base).glb");
+useGLTF.preload("/models/CpuAMD(Base).glb");
+useGLTF.preload("/models/CpuINTEL(Base).glb");
+useGLTF.preload("/models/Gpu(Base).glb");
+useGLTF.preload("/models/Hdd(Base).glb");
+useGLTF.preload("/models/MotherboardAMD(Base).glb");
+useGLTF.preload("/models/MotherboardINTEL(Base).glb");
+useGLTF.preload("/models/Psu(Base).glb");
+useGLTF.preload("/models/Ram(Base).glb");
+useGLTF.preload("/models/Ssd(Base).glb");
