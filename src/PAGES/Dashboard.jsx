@@ -1177,7 +1177,7 @@ function ModulesSelection({ modules, onBack, onOpenModule }) {
                  <button
                   type="button"
                   onClick={() => {
-                    if (m.id === "module-2" || m.id === "module-3") {
+                    if (m.id === "module-3") {
                       setModuleDropdown(
                         moduleDropdown === m.id ? null : m.id
                       );

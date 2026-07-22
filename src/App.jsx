@@ -90,6 +90,7 @@ const handleModuleBack = (target = "Dashboard") => {
       <Module2Page
         onBack={handleModuleBack}
         onLogout={handleLogout}
+        onSelectPlatform={(platform) => setPage(`module-2-${platform}`)}
         onFinish={() => {
           setDashboardSection("Dashboard");
           setPage("dashboard");
