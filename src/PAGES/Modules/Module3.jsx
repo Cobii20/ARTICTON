@@ -102,13 +102,13 @@ function Module3Background() {
 }
 
 const module3Steps = [
-  { key: "ram", name: "RAM Disassembly" },
-  { key: "hdd", name: "HDD Disassembly" },
-  { key: "ssd", name: "SSD Disassembly" },
-  { key: "psu", name: "PSU Disassembly" },
-  { key: "cpu", name: "CPU Disassembly" },
-  { key: "mb", name: "Motherboard Disassembly" },
-  { key: "final", name: "Full Disassembly" },
+  { key: "ram", name: "Remove RAM from motherboard" },
+  { key: "hdd", name: "Remove HDD from case" },
+  { key: "ssd", name: "Remove SSD from motherboard" },
+  { key: "psu", name: "Remove PSU from case" },
+  { key: "cpu", name: "Remove CPU from motherboard" },
+  { key: "mb", name: "Remove motherboard from case" },
+  { key: "final", name: "Full disassembly review" },
 ];
 
 const stepPlacementKeys = {
@@ -140,6 +140,7 @@ function Module3Sidebar({
   canSelectStep,
   currentStepCompleted,
   onViewCertificate,
+  onResetScene,
 }) {
   return (
     <div
@@ -244,6 +245,21 @@ function Module3Sidebar({
             </button>
           </div>
         )}
+
+        <div className="border-t border-[#1a2438] p-3">
+          <button
+            type="button"
+            onClick={onResetScene}
+            className={[
+              "flex items-center justify-center rounded-2xl border border-[#1a2438] bg-white/[0.03] font-semibold text-[#dbe6f5]",
+              "transition hover:bg-white/[0.07]",
+              open ? "w-full px-5 py-3 text-sm" : "h-10 w-10 text-sm",
+            ].join(" ")}
+            title="Restart Scene"
+          >
+            {open ? "Restart Scene" : "↺"}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -266,7 +282,9 @@ export default function Module3Disassembly({
 
   const [showCertificate, setShowCertificate] = useState(false);
 
-  const [validationMessage, setValidationMessage] = useState("");
+  const [validationMessage, setValidationMessage] = useState(
+    "Begin with RAM removal, then continue through HDD, SSD, PSU, CPU, and motherboard. Detach each installed component carefully and place it gently on the table."
+  );
 
   const [aiOpen, setAiOpen] = useState(false);
 
@@ -308,6 +326,22 @@ const [aiLoading, setAiLoading] = useState(false);
     !!localCompletedSteps[currentStepKey] || currentPlacementCompleted;
 
   const currentStepAlreadySaved = !!localCompletedSteps[currentStepKey];
+
+  const resetScene = React.useCallback(() => {
+    if (step < module3Steps.length - 1) {
+      const currentStepKey = module3Steps[step]?.key;
+      const placementKey = stepPlacementKeys[currentStepKey];
+      if (placementKey) {
+        setPlacements((prev) => ({ ...prev, [placementKey]: false }));
+      }
+    } else {
+      setFullPlacements(createEmptyPlacements());
+    }
+
+    setValidationMessage(
+      "Scene restarted. Begin with RAM removal, then continue through HDD, SSD, PSU, CPU, and motherboard. Detach each installed component carefully and place it gently on the table."
+    );
+  }, [step]);
 
   const canSelectStep = (index) => {
     if (index <= step) return true;
@@ -787,7 +821,7 @@ const askAI = async () => {
                     </div>
 
                     <div className="text-[11px] uppercase tracking-[0.18em] text-[#7a8ba8]">
-                      Click to detach • click to grab • snap to floor
+                      Click to detach the installed component • grab it and move it safely • place it on the table
                     </div>
                   </div>
 
@@ -819,17 +853,10 @@ const askAI = async () => {
                     canSelectStep={canSelectStep}
                     currentStepCompleted={currentStepCompleted}
                     onViewCertificate={() => setShowCertificate(true)}
+                    onResetScene={resetScene}
                   />
 
-                  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_22%_0%,rgba(255,255,255,0.08),transparent_40%)]" />
-
-                  <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_120px_rgba(0,0,0,0.55)]" />
-
-                  <div className="absolute inset-3 md:inset-4 overflow-hidden rounded-[18px] border border-[#1a2438] bg-black/10">
-                    <div className="pointer-events-none absolute inset-0 rounded-[18px] ring-1 ring-[#00ffb4]/15 shadow-[0_0_0_1px_rgba(0,255,180,0.08)]" />
-
-                    <div className="pointer-events-none absolute -left-24 -top-24 h-56 w-56 rounded-full bg-[#00ffb4]/10 blur-3xl" />
-                  </div>
+                  <div className="pointer-events-none absolute -left-24 -top-24 h-56 w-56 rounded-full bg-[#00ffb4]/10 blur-3xl" />
 
                   <div
                     className="absolute top-3 bottom-3 right-3 z-[40] overflow-hidden rounded-[18px] transition-all duration-300 md:top-4 md:bottom-4 md:right-4"
