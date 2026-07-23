@@ -1008,6 +1008,14 @@ export default function Module1Page({ onBack, onLogout }) {
     setLocalCompletedParts(mergedParts);
     localStorage.setItem("module1CompletedParts", JSON.stringify(mergedParts));
 
+    const currentPlatform = platform || selectedPlatform;
+    const otherPlatform = currentPlatform === "amd" ? "intel" : "amd";
+    const otherPlatformProgress =
+      profile?.moduleProgress?.module1?.platformProgress?.[otherPlatform] || {};
+    const otherPercent = otherPlatformProgress.percent ?? 0;
+    const overallPercent = Math.round((percent + otherPercent) / 2);
+    const overallCompleted = completed && otherPlatformProgress.completed === true;
+
     try {
       const userRef = doc(db, "users", firebaseUser.uid);
 
@@ -1021,9 +1029,23 @@ export default function Module1Page({ onBack, onLogout }) {
               introDone,
               completed,
               percent,
-              selectedPlatform: platform || null,
+              selectedPlatform: currentPlatform || null,
               lastVisitedModuleKey: moduleKey,
               completedParts: mergedParts,
+              overallPercent,
+              overallCompleted,
+              platformProgress: {
+                [currentPlatform]: {
+                  currentPage: page,
+                  totalPages,
+                  introDone,
+                  completed,
+                  percent,
+                  lastVisitedModuleKey: moduleKey,
+                  completedParts: mergedParts,
+                  updatedAt: serverTimestamp(),
+                },
+              },
               updatedAt: serverTimestamp(),
             },
           },
@@ -1092,6 +1114,20 @@ export default function Module1Page({ onBack, onLogout }) {
     });
 
     setShowCertificate(true);
+  };
+
+  const handleSwitchPlatform = async () => {
+    const nextPlatform = selectedPlatform === "amd" ? "intel" : "amd";
+    setSelectedPlatform(nextPlatform);
+    localStorage.setItem("module1SelectedPlatform", nextPlatform);
+    setCertificateWarning("");
+
+    await saveModule1Progress({
+      page: safeModuleIndex + 1,
+      introDone: !completedParts[current.key],
+      moduleKey: current.key,
+      platform: nextPlatform,
+    });
   };
 
   const handleBackToDashboard = async () => {
@@ -1242,13 +1278,23 @@ export default function Module1Page({ onBack, onLogout }) {
                 including CPU, motherboard, RAM, HDD, PSU, and PC case learning.
               </p>
 
-              <button
-                type="button"
-                onClick={handleBackToDashboard}
-                className="rounded-2xl bg-[#00ffb4] px-7 py-3 text-sm font-black text-[#0a0e17] shadow-[0_18px_50px_rgba(0,255,180,0.22)] transition hover:scale-[1.03]"
-              >
-                Back to Dashboard →
-              </button>
+              <div className="flex flex-col items-center justify-center gap-3 sm:flex-row sm:justify-center">
+                <button
+                  type="button"
+                  onClick={handleBackToDashboard}
+                  className="rounded-2xl bg-[#00ffb4] px-7 py-3 text-sm font-black text-[#0a0e17] shadow-[0_18px_50px_rgba(0,255,180,0.22)] transition hover:scale-[1.03]"
+                >
+                  Back to Dashboard →
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSwitchPlatform}
+                  className="rounded-2xl border border-[#00ffb4]/40 bg-[#0d1220] px-7 py-3 text-sm font-bold text-[#dbe6f5] shadow-[0_12px_32px_rgba(0,255,180,0.12)] transition hover:bg-white/5"
+                >
+                  Switch to {selectedPlatform === "amd" ? "Intel" : "AMD"}
+                </button>
+              </div>
             </div>
           </div>
         </div>

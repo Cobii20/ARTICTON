@@ -217,54 +217,6 @@ function buildStudentRecord(docSnap) {
   };
 }
 
-function ScoreCell({ result }) {
-  const statusClass = result.passed
-    ? "border-[#00ffb4]/30 bg-[#00ffb4]/12 text-[#b7fff0]"
-    : result.completed
-    ? "border-yellow-400/30 bg-yellow-400/10 text-yellow-100"
-    : result.exists
-    ? "border-sky-300/25 bg-sky-300/10 text-sky-100"
-    : "border-white/10 bg-white/5 text-white/55";
-
-  if (result.type === "quiz") {
-    const scoreText =
-      result.score !== null && result.total !== null
-        ? `${result.score}/${result.total}`
-        : "—";
-
-    const scorePercentText =
-      result.scorePercent !== null ? `${result.scorePercent}% Score` : "No score";
-
-    return (
-      <div className={`rounded-xl border px-3 py-2 text-xs ${statusClass}`}>
-        <div className="font-bold">{scoreText}</div>
-        <div className="mt-0.5 text-[11px] opacity-80">{scorePercentText}</div>
-        <div className="mt-1 text-[10px] uppercase tracking-wide opacity-70">
-          {result.status}
-        </div>
-      </div>
-    );
-  }
-
-  const scoreText =
-    result.scorePercent !== null ? `${result.scorePercent}% Score` : "No score";
-
-  return (
-    <div className={`rounded-xl border px-3 py-2 text-xs ${statusClass}`}>
-      <div className="font-bold">{scoreText}</div>
-      <div className="mt-0.5 text-[11px] opacity-80">
-        {result.progressPercent}% Progress
-      </div>
-      <div className="mt-0.5 text-[11px] opacity-80">
-        Mistakes: {result.mistakes} • -{result.deductionPercent}%
-      </div>
-      <div className="mt-1 text-[10px] uppercase tracking-wide opacity-70">
-        {result.status}
-      </div>
-    </div>
-  );
-}
-
 function MetricCard({ label, value, subtext }) {
   return (
     <div className="p-6 rounded-xl bg-[#13304a]/50 backdrop-blur-lg border border-white/10">
@@ -610,20 +562,16 @@ export default function AdminPage({ adminUser, onLogout }) {
 
                           <div className="text-sm break-all">{account.email}</div>
 
-                          <ScoreCell result={account.quiz1} />
-                          <ScoreCell result={account.quiz2} />
-                          <ScoreCell result={account.quiz3} />
-                          <ScoreCell result={account.assembly} />
-                          <ScoreCell result={account.disassembly} />
-
                           <div>
                             <div className="text-xl font-bold">
-                              {account.averageScore}%
+                              {account.progress}%
                             </div>
                             <div className="text-xs text-white/65">
                               {account.completedCount}/{account.totalActivities} done
                             </div>
                           </div>
+
+                          <div className="font-semibold text-white">{account.averageScore}%</div>
 
                           <div>
                             {editingId === account.id ? (

@@ -16,6 +16,7 @@ import Module2DisassemblyINTEL from "./PAGES/Modules/Module2/Module2DisassmblyIN
 
 import Module3AssemblyAMD from "./PAGES/Modules/Module3/Module3AssemblyAMD";
 import Module3AssemblyINTEL from "./PAGES/Modules/Module3/Module3AssemblyINTEL";
+import FacultyPage from "./PAGES/FacultyPage";
 
 export default function App() {
   const [page, setPage] = useState("landing");
@@ -30,6 +31,8 @@ export default function App() {
 
     if (profile?.role === "admin") {
       setPage("admin");
+    } else if (profile?.role === "faculty") {
+      setPage("faculty");
     } else {
       setDashboardSection("Dashboard");
       setPage("dashboard");
@@ -171,6 +174,10 @@ if (page === "module-3-intel") {
         onLogout={handleLogout}
       />
     );
+  }
+
+  if (page === "faculty") {
+    return <FacultyPage onLogout={handleLogout} />;
   }
 
   return (
