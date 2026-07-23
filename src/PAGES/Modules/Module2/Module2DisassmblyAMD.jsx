@@ -1939,6 +1939,7 @@ function Sidebar({
   canSelectStep,
   currentStepCompleted,
   onViewCertificate,
+  onResetScene,
 }) {
   const activeButtonRef = useRef(null);
 
@@ -2048,6 +2049,21 @@ function Sidebar({
             </button>
           </div>
         ) : null}
+
+        <div className="shrink-0 border-t border-[#1a2438] p-3">
+          <button
+            type="button"
+            onClick={onResetScene}
+            className={[
+              "flex items-center justify-center rounded-2xl border border-[#1a2438] bg-white/[0.03] font-semibold text-[#dbe6f5]",
+              "transition hover:bg-white/[0.07]",
+              open ? "w-full px-5 py-3 text-sm" : "h-10 w-10 text-sm",
+            ].join(" ")}
+            title="Restart Scene"
+          >
+            {open ? "Restart Scene" : "↺"}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -2663,14 +2679,6 @@ export default function Module2DisassemblyAMD({ onFinish, onBack, onLogout, onSw
                     </div>
                   )}
 
-                  <button
-                    type="button"
-                    onClick={resetScene}
-                    className="rounded-2xl border border-[#1a2438] bg-white/[0.03] px-4 py-2.5 text-sm font-semibold text-[#dbe6f5] transition hover:bg-white/[0.07]"
-                  >
-                    Restart Scene
-                  </button>
-
                   <HeaderDropdown
                     userName={user.name}
                     userEmail={user.email}
@@ -2727,6 +2735,7 @@ export default function Module2DisassemblyAMD({ onFinish, onBack, onLogout, onSw
                   canSelectStep={canSelectStep}
                   currentStepCompleted={currentStepCompleted}
                   onViewCertificate={() => setShowCertificate(true)}
+                  onResetScene={resetScene}
                 />
 
                 <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_22%_0%,rgba(255,255,255,0.08),transparent_40%)]" />

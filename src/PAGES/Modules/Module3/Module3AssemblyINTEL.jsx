@@ -1664,6 +1664,7 @@ function Sidebar({
   canSelectStep,
   currentStepCompleted,
   onViewCertificate,
+  onResetScene,
 }) {
   const activeButtonRef = useRef(null);
 
@@ -1773,6 +1774,21 @@ function Sidebar({
             </button>
           </div>
         ) : null}
+
+        <div className="shrink-0 border-t border-[#1a2438] p-3">
+          <button
+            type="button"
+            onClick={onResetScene}
+            className={[
+              "flex items-center justify-center rounded-2xl border border-[#1a2438] bg-white/[0.03] font-semibold text-[#dbe6f5]",
+              "transition hover:bg-white/[0.07]",
+              open ? "w-full px-5 py-3 text-sm" : "h-10 w-10 text-sm",
+            ].join(" ")}
+            title="Restart Scene"
+          >
+            {open ? "Restart Scene" : "↺"}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -1794,7 +1810,7 @@ function ModuleIntroCard({ platform, moduleType, onStart }) {
           </h2>
           <p className="mt-3 max-w-xl text-sm leading-7 text-[#9fb0ca]">
             {isAssembly
-              ? "Install each component in order using the bird’s-eye workspace, exact target-height assistance, and normal magnetic snap."
+              ? "Install the CPU, memory, and storage onto the motherboard first, then seat the motherboard in the case and finish with the PSU, HDD, and GPU. Use the top-down workspace, exact target-height assistance, and magnetic snap guidance to keep each component aligned and seated correctly."
               : "Remove each component in order. The camera first identifies the installed part, then opens to the table workspace after detachment."}
           </p>
 
@@ -1802,19 +1818,19 @@ function ModuleIntroCard({ platform, moduleType, onStart }) {
             <div className="rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4">
               <div className="text-xs font-black uppercase tracking-[0.16em] text-[#00ffb4]">1. Identify</div>
               <div className="mt-2 text-xs leading-5 text-[#9fb0ca]">
-                Follow the highlighted source and target labels.
+                Find the next component and its installation location in the workspace.
               </div>
             </div>
             <div className="rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4">
               <div className="text-xs font-black uppercase tracking-[0.16em] text-[#00ffb4]">2. Move</div>
               <div className="mt-2 text-xs leading-5 text-[#9fb0ca]">
-                Click to grab, move smoothly, then click again to release.
+                Click to grab, align the part carefully, and release when it snaps into place.
               </div>
             </div>
             <div className="rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4">
               <div className="text-xs font-black uppercase tracking-[0.16em] text-[#00ffb4]">3. Complete</div>
               <div className="mt-2 text-xs leading-5 text-[#9fb0ca]">
-                A sound and progress update confirm every correct placement.
+                Confirm each step and keep the sequence correct, including CPU seating, thermal-paste area awareness, and power connector positioning.
               </div>
             </div>
           </div>
@@ -2058,7 +2074,7 @@ export default function Module3AssemblyINTEL({
   const [showIntro, setShowIntro] = useState(true);
   const [pendingStepCompletion, setPendingStepCompletion] = useState(null);
   const [validationMessage, setValidationMessage] = useState(
-    "Begin with the CPU. Click it once to activate Y-level assist, then guide it across the green target plane. The normal magnet will assist only when it is close to the target."
+    "Begin with the CPU. Click it once to activate Y-level assist, then guide it across the green target plane. The normal magnet will assist only when it is close to the target. In a real build, this step also includes the CPU seating area, thermal paste preparation, and the CPU power cable connection."
   );
 
   const [aiOpen, setAiOpen] = useState(false);
@@ -2115,7 +2131,7 @@ export default function Module3AssemblyINTEL({
     setShowIntro(true);
     setPendingStepCompletion(null);
     setValidationMessage(
-      "Scene restarted. Click the CPU once; Y-level assist will align it with the target height and the normal magnet will assist near the target."
+      "Scene restarted. Click the CPU once; Y-level assist will align it with the target height and the normal magnet will assist near the target as you work through CPU, RAM, SSD, motherboard, PSU, HDD, and GPU placement."
     );
   }, []);
 
@@ -2415,14 +2431,6 @@ export default function Module3AssemblyINTEL({
                     </div>
                   ) : null}
 
-                  <button
-                    type="button"
-                    onClick={resetScene}
-                    className="rounded-2xl border border-[#1a2438] bg-white/[0.03] px-4 py-2.5 text-sm font-semibold text-[#dbe6f5] transition hover:bg-white/[0.07]"
-                  >
-                    Restart Scene
-                  </button>
-
                   <HeaderDropdown
                     userName={user.name}
                     userEmail={user.email}
@@ -2449,7 +2457,7 @@ export default function Module3AssemblyINTEL({
                   </div>
                   <div className="text-[11px] uppercase tracking-[0.14em] text-[#7a8ba8]">
                     {activePartLabel
-                      ? `Click ${activePartLabel} to grab • Y-level locks to the highlight • drag across the green plane • magnet assists near the target • click again to release`
+                      ? `Click ${activePartLabel} to grab • align it carefully with the target • use Y-level lock and magnet assist near the seating point • click again to release`
                       : "Assembly complete • review the PC or open the certificate"}
                   </div>
                 </div>
@@ -2481,6 +2489,7 @@ export default function Module3AssemblyINTEL({
                   canSelectStep={canSelectStep}
                   currentStepCompleted={currentStepCompleted}
                   onViewCertificate={() => setShowCertificate(true)}
+                  onResetScene={resetScene}
                 />
 
                 <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_22%_0%,rgba(255,255,255,0.08),transparent_40%)]" />
