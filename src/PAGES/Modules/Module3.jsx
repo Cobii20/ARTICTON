@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Settings from "../../Components/Settings";
 import DisassemblyRAM from "./module3-scenes/DisassemblyRAM";
 import DisassemblyHDD from "./module3-scenes/DisassemblyHDD";
@@ -100,6 +100,113 @@ function Module3Background() {
     </>
   );
 }
+
+function Module3PlatformChoice({
+  user,
+  onBack,
+  onLogout,
+  onSelectPlatform,
+  setIsSettingsOpen,
+}) {
+  const platforms = [
+    {
+      id: "amd",
+      name: "AMD",
+      detail:
+        "AM4 and AM5 platforms with socket, motherboard, and memory compatibility paths.",
+    },
+    {
+      id: "intel",
+      name: "Intel",
+      detail:
+        "Intel Core platforms with matching sockets, chipsets, and supported memory generations.",
+    },
+  ];
+
+  return (
+    <div className="min-h-screen w-full overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased">
+      <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden p-4 md:p-8">
+        <Module3Background />
+
+        <div className="relative z-10 flex min-h-[min(760px,calc(100vh-32px))] w-full max-w-6xl flex-col overflow-hidden rounded-[30px] border border-[#1a2438] bg-[linear-gradient(135deg,#0a0e17,#0d1220,#101a2d)] shadow-[0_70px_180px_rgba(0,0,0,0.70)]">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(0,255,180,0.08),transparent_35%)]" />
+
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(0,255,180,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,180,0.04)_1px,transparent_1px)] bg-[size:54px_54px] opacity-55" />
+
+          <div className="relative z-10 flex items-center justify-between gap-4 px-6 pt-6 md:px-8">
+            <div className="flex items-center gap-3">
+              <img
+                src="/PNG/Articton.png"
+                alt="Articton Logo"
+                className="ml-4 h-10 w-10 scale-300 object-contain"
+              />
+
+              <div>
+                <div className="text-base font-bold tracking-wide text-white">
+                  Articton
+                </div>
+
+                <div className="text-[11px] uppercase tracking-[0.24em] text-[#00ffb4]">
+                  Module 3
+                </div>
+              </div>
+            </div>
+
+            <HeaderDropdown
+              userName={user.name}
+              userEmail={user.email}
+              onBack={onBack}
+              onLogout={onLogout}
+              setIsSettingsOpen={setIsSettingsOpen}
+            />
+          </div>
+
+          <div className="relative z-10 flex flex-1 items-center justify-center px-6 py-10">
+            <div className="w-[min(760px,86vw)] rounded-[18px] border border-[#00ffb4]/35 bg-[#06131b]/74 px-6 py-6 text-center shadow-[0_0_55px_rgba(0,255,180,0.18),0_32px_110px_rgba(0,0,0,0.62)] backdrop-blur-xl">
+              <div className="text-[11px] font-black uppercase tracking-[0.26em] text-[#00ffb4]">
+                Processor Platform
+              </div>
+
+              <div className="mt-2 text-[30px] font-black leading-tight text-white">
+                Choose your disassembly platform
+              </div>
+
+              <div className="mx-auto mt-3 max-w-xl text-[14px] leading-6 text-[#dbe6f5]">
+                What processor platform would you like to disassemble?
+              </div>
+
+              <div className="mt-7 grid gap-3 sm:grid-cols-2">
+                {platforms.map((platform) => (
+                  <button
+                    key={platform.id}
+                    type="button"
+                    onClick={() => onSelectPlatform?.(platform.id)}
+                    className="rounded-[16px] border border-white/12 bg-white/[0.04] px-5 py-5 text-left transition hover:scale-[1.02] hover:border-[#00ffb4]/45 hover:bg-[#00ffb4]/12 focus:outline-none focus:ring-2 focus:ring-[#00ffb4]/25"
+                  >
+                    <div className="text-[28px] font-black text-white">
+                      {platform.name}
+                    </div>
+
+                    <div className="mt-3 text-[12px] leading-5 text-[#b7c6dd]">
+                      {platform.detail}
+                    </div>
+
+                    <div className="mt-5 text-[11px] font-black uppercase tracking-[0.18em] text-[#00ffb4]">
+                      Select {platform.name}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+  
+
 
 const module3Steps = [
   { key: "ram", name: "Remove RAM from motherboard" },
@@ -269,6 +376,7 @@ export default function Module3Disassembly({
   onFinish,
   onBack,
   onLogout,
+  onSelectPlatform,
 }) {
   const [step, setStep] = useState(0);
 
@@ -277,6 +385,30 @@ export default function Module3Disassembly({
   const [profile, setProfile] = useState(null);
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const activityLastRecordedAtRef = useRef(Date.now());
+
+  const recordModuleActivity = async () => {
+    if (!firebaseUser || !profile) return;
+
+    const now = Date.now();
+    const minutes = Math.floor((now - activityLastRecordedAtRef.current) / 60000);
+
+    if (minutes <= 0) return;
+
+    activityLastRecordedAtRef.current = now;
+
+    try {
+      await addUserActivity(firebaseUser.uid, profile, minutes);
+    } catch (err) {
+      console.error("Error recording module activity:", err);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      void recordModuleActivity();
+    };
+  }, [firebaseUser, profile]);
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
@@ -685,6 +817,27 @@ const askAI = async () => {
       window.location.href = "/dashboard";
     }
   };
+
+  if (onSelectPlatform) {
+    return (
+      <>
+        <Module3PlatformChoice
+          user={user}
+          onBack={onBack}
+          onLogout={onLogout}
+          onSelectPlatform={onSelectPlatform}
+          setIsSettingsOpen={setIsSettingsOpen}
+        />
+
+        <Settings
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+          settings={settings}
+          onChange={handleSettingChange}
+        />
+      </>
+    );
+  }
 
   if (showCertificate) {
     return (

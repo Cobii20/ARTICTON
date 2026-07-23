@@ -2,8 +2,15 @@ import React, { useEffect, useMemo, useState } from "react";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "../firebase";
+import { fetchMobileScoreDocs, mergeMobileScoresIntoProfile } from "../utils/mobileScores";
 
 const PASSING_PERCENT = 60;
+const MODULE_ACTIVITY_GROUPS = [
+  { key: "module1", label: "Module 1" },
+  { key: "module2", label: "Module 2" },
+  { key: "module3", label: "Module 3" },
+  { key: "module4", label: "Module 4" },
+];
 
 function clampPercent(value) {
   const number = Number(value);
@@ -86,6 +93,45 @@ function getPracticalStatus(practicalProgress, practicalKey) {
   };
 }
 
+function getScoreStatus(progress, passingPercent = PASSING_PERCENT) {
+  if (!progress) {
+    return {
+      completed: false,
+      passed: false,
+      scorePercent: null,
+      completionPercent: 0,
+      status: "Not started",
+    };
+  }
+
+  const score = progress.score ?? progress.latestScore ?? progress.finalScore ?? null;
+  const total = progress.total ?? progress.latestTotal ?? progress.maxScore ?? 100;
+  const calculatedPercent =
+    Number.isFinite(Number(score)) && Number.isFinite(Number(total)) && Number(total) > 0
+      ? Math.round((Number(score) / Number(total)) * 100)
+      : null;
+  const scorePercent =
+    clampPercent(progress.scorePercent ?? progress.percent ?? progress.percentage) ??
+    clampPercent(calculatedPercent);
+  const completed =
+    !!progress.completed ||
+    !!progress.finished ||
+    !!progress.completedAt ||
+    !!progress.timestamp ||
+    scorePercent !== null;
+  const passed =
+    progress.passed === true ||
+    (completed && scorePercent !== null && scorePercent >= passingPercent);
+
+  return {
+    completed,
+    passed,
+    scorePercent,
+    completionPercent: completed ? 100 : 0,
+    status: completed ? (passed ? "Passed" : "Completed") : "In progress",
+  };
+}
+
 function getFullName(data) {
   const firstName = data.firstName || "";
   const lastName = data.lastName || "";
@@ -93,17 +139,41 @@ function getFullName(data) {
   return fullName || data.name || data.displayName || "No Name";
 }
 
-function buildStudentRecord(docSnap) {
-  const data = docSnap.data();
+function buildStudentRecord(docSnap, mobileScoreDocs = []) {
+  const data = mergeMobileScoresIntoProfile(docSnap.data(), mobileScoreDocs);
   const quizProgress = data.quizProgress || {};
   const practicalProgress = data.practicalProgress || {};
+  const practicalTests = data.practicalTests || {};
+  const mobileModuleScores = data.mobileModuleScores || {};
+  const mobilePracticeScores = data.mobilePracticeScores || {};
   const quiz1 = getQuizStatus(quizProgress, "module1");
   const quiz2 = getQuizStatus(quizProgress, "module2");
   const quiz3 = getQuizStatus(quizProgress, "module3");
+  const quiz4 = getQuizStatus(quizProgress, "module4");
   const assembly = getPracticalStatus(practicalProgress, "fullAssembly");
   const disassembly = getPracticalStatus(practicalProgress, "fullDisassembly");
+  const mobileModules = MODULE_ACTIVITY_GROUPS.map((module) => ({
+    ...module,
+    content: getScoreStatus(mobileModuleScores[`${module.key}Content`]),
+    pre: getScoreStatus(mobileModuleScores[`${module.key}Pre`]),
+    post: getScoreStatus(mobileModuleScores[`${module.key}Post`]),
+  }));
+  const mobileExam1 = getScoreStatus(mobilePracticeScores.practiceExam1);
+  const mobileExam2 = getScoreStatus(mobilePracticeScores.practiceExam2);
+  const amdDisassembly = getScoreStatus(practicalTests.amdDisassembly, 75);
+  const intelDisassembly = getScoreStatus(practicalTests.intelDisassembly, 75);
+  const amdAssembly = getScoreStatus(practicalTests.amdAssembly, 75);
+  const intelAssembly = getScoreStatus(practicalTests.intelAssembly, 75);
 
-  const resultItems = [quiz1, quiz2, quiz3, assembly, disassembly];
+  const resultItems = [
+    ...mobileModules.flatMap((module) => [module.content, module.pre, module.post]),
+    mobileExam1,
+    mobileExam2,
+    amdDisassembly,
+    intelDisassembly,
+    amdAssembly,
+    intelAssembly,
+  ];
 
   const overallProgress =
     resultItems.length === 0
@@ -140,8 +210,16 @@ function buildStudentRecord(docSnap) {
     quiz1,
     quiz2,
     quiz3,
+    quiz4,
     assembly,
     disassembly,
+    mobileModules,
+    mobileExam1,
+    mobileExam2,
+    amdDisassembly,
+    intelDisassembly,
+    amdAssembly,
+    intelAssembly,
     progress: overallProgress,
     averageScore,
     completedCount,
@@ -198,13 +276,18 @@ export default function FacultyPage({ onLogout }) {
         where("role", "==", "student")
       );
       const querySnapshot = await getDocs(studentQuery);
-      const records = querySnapshot.docs
-        .map(buildStudentRecord)
+      const records = await Promise.all(
+        querySnapshot.docs.map(async (studentDoc) => {
+          const mobileScores = await fetchMobileScoreDocs(studentDoc.id);
+          return buildStudentRecord(studentDoc, mobileScores);
+        })
+      );
+      const sortedRecords = records
         .filter((record) => record.role === "student")
         .sort((a, b) => a.name.localeCompare(b.name));
 
-      setStudents(records);
-      setSelectedStudentId((prev) => prev || records[0]?.id || null);
+      setStudents(sortedRecords);
+      setSelectedStudentId((prev) => prev || sortedRecords[0]?.id || null);
     } catch (err) {
       console.error("Error fetching student records:", err);
       setError("Unable to load student progress. Please refresh the page.");
@@ -402,12 +485,19 @@ export default function FacultyPage({ onLogout }) {
 
                   <div className="rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4">
                     <div className="text-sm font-semibold text-white">Assessment status</div>
-                    <div className="mt-4 space-y-3">
-                      <AssessmentRow title="Module 1 Quiz" status={selectedStudent.quiz1.status} passed={selectedStudent.quiz1.passed} />
-                      <AssessmentRow title="Module 2 Quiz" status={selectedStudent.quiz2.status} passed={selectedStudent.quiz2.passed} />
-                      <AssessmentRow title="Module 3 Quiz" status={selectedStudent.quiz3.status} passed={selectedStudent.quiz3.passed} />
-                      <AssessmentRow title="Assembly Test" status={selectedStudent.assembly.status} passed={selectedStudent.assembly.passed} />
-                      <AssessmentRow title="Disassembly Test" status={selectedStudent.disassembly.status} passed={selectedStudent.disassembly.passed} />
+                    <div className="mt-4 space-y-4">
+                      {selectedStudent.mobileModules.map((module) => (
+                        <ModuleAssessmentCard key={module.key} module={module} />
+                      ))}
+
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <AssessmentRow title="Mobile Exam 1" item={selectedStudent.mobileExam1} />
+                        <AssessmentRow title="Mobile Exam 2" item={selectedStudent.mobileExam2} />
+                        <AssessmentRow title="3D AMD Disassembly" item={selectedStudent.amdDisassembly} />
+                        <AssessmentRow title="3D Intel Disassembly" item={selectedStudent.intelDisassembly} />
+                        <AssessmentRow title="3D AMD Assembly" item={selectedStudent.amdAssembly} />
+                        <AssessmentRow title="3D Intel Assembly" item={selectedStudent.intelAssembly} />
+                      </div>
                     </div>
                   </div>
 
@@ -450,11 +540,34 @@ function DetailCard({ label, value }) {
   );
 }
 
-function AssessmentRow({ title, status, passed }) {
+function ModuleAssessmentCard({ module }) {
   return (
-    <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-[#0d1220] px-4 py-3">
-      <div className="text-sm text-[#dbe6f5]">{title}</div>
-      <StatusPill status={status} passed={passed} />
+    <div className="rounded-2xl border border-white/10 bg-[#0d1220] p-4">
+      <div className="text-sm font-semibold text-white">{module.label}</div>
+      <div className="mt-3 grid gap-3 sm:grid-cols-3">
+        <AssessmentRow title="Content" item={module.content} />
+        <AssessmentRow title="Pre-test" item={module.pre} />
+        <AssessmentRow title="Post-test" item={module.post} />
+      </div>
+    </div>
+  );
+}
+
+function AssessmentRow({ title, item, status, passed }) {
+  const statusText = item?.status || status || "Not started";
+  const passedValue = item?.passed ?? passed;
+  const scoreText =
+    item?.scorePercent !== null && item?.scorePercent !== undefined
+      ? `${item.scorePercent}%`
+      : null;
+
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-[#0b1220] px-4 py-3">
+      <div>
+        <div className="text-sm text-[#dbe6f5]">{title}</div>
+        {scoreText ? <div className="mt-1 text-xs text-[#7a8ba8]">{scoreText}</div> : null}
+      </div>
+      <StatusPill status={statusText} passed={passedValue} />
     </div>
   );
 }

@@ -8,7 +8,7 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
 } from "firebase/auth";
-import { doc, setDoc, getDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 
 export default function ArtictonLandingPage({ onLogin }) {
@@ -433,6 +433,7 @@ function SignupPage({ onBack, onSwitchToLogin, onAfterSignup }) {
         birthday,
         program,
         contactNumber: contactNumber.trim(),
+        updatedAt: serverTimestamp(),
         createdAt: new Date().toISOString(),
       });
 

@@ -5,7 +5,7 @@ import MBtoCaseScene from "./module2-scenes/MBtoCase";
 import HDDtoCaseScene from "./module2-scenes/HDDtoCase";
 import PSUtoCaseScene from "./module2-scenes/PSUtoCase";
 import FullAssemblyScene from "./module2-scenes/FullAssembly";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Settings from "../../Components/Settings";
 import { auth, db } from "../../firebase.js";
 import { onAuthStateChanged } from "firebase/auth";

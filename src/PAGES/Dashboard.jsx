@@ -21,22 +21,11 @@ import {
   uploadBytes,
   getDownloadURL,
 } from "firebase/storage";
+import { fetchMobileScoreDocs, mergeMobileScoresIntoProfile } from "../utils/mobileScores";
 
 const storage = getStorage();
 
 export { auth, db, storage };
-
-function getCurrentWeekKey(date = new Date()) {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const dayNum = d.getUTCDay() || 7;
-
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const weekNo = Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
-
-  return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
-}
 
 function isCompletedProgress(progress) {
   return !!progress?.completed || !!progress?.finished || (progress?.percent || 0) >= 100;
@@ -55,7 +44,7 @@ export default function Dashboard({
   const [isFaqOpen, setIsFaqOpen] = useState(false);
   const [isSupportOpen, setIsSupportOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [moduleDropdown, setModuleDropdown] = useState(null);
+
 
   const [settings, setSettings] = useState({
     sound: true,
@@ -76,7 +65,8 @@ export default function Dashboard({
       const userSnap = await getDoc(userRef);
 
       if (userSnap.exists()) {
-        setProfile(userSnap.data());
+        const mobileScores = await fetchMobileScoreDocs(user.uid);
+        setProfile(mergeMobileScoresIntoProfile(userSnap.data(), mobileScores));
       } else {
         setProfile(null);
       }
@@ -179,7 +169,14 @@ const openModule = (id, platform)=>{
   };
 
   const data = useMemo(() => {
-    const currentWeekKey = getCurrentWeekKey();
+    const getTimestampValue = (value) => {
+      if (!value) return 0;
+      if (typeof value === "number") return value;
+      if (typeof value === "string") return Date.parse(value) || 0;
+      if (typeof value.toMillis === "function") return value.toMillis();
+      if (typeof value.seconds === "number") return value.seconds * 1000;
+      return 0;
+    };
 
     const user = {
       name: profile
@@ -190,8 +187,6 @@ const openModule = (id, platform)=>{
       email: firebaseUser?.email || "No email",
       avatarUrl: profile?.avatarUrl || "",
       middleInitial: profile?.middleInitial || "",
-      streakDays: profile?.streakDays || 0,
-      minutesThisWeek: profile?.weeklyMinutes?.[currentWeekKey] || 0,
     };
 
     const module1Progress = profile?.moduleProgress?.module1;
@@ -199,21 +194,71 @@ const openModule = (id, platform)=>{
     const module1CompletedCount = Object.values(module1CompletedParts).filter(Boolean).length;
 
     const module2Progress = profile?.moduleProgress?.module2;
+    const module2AMDProgress = profile?.moduleProgress?.module2AMD;
+    const module2INTELProgress = profile?.moduleProgress?.module2INTEL;
     const module2CompletedSteps = module2Progress?.completedSteps || {};
     const module2CompletedCount = Object.values(module2CompletedSteps).filter(Boolean).length;
+    const module2AmdCompletedCount = Object.values(module2AMDProgress?.completedSteps || {}).filter(Boolean).length;
+    const module2IntelCompletedCount = Object.values(module2INTELProgress?.completedSteps || {}).filter(Boolean).length;
+    const module2PlatformCompletedCount = module2AmdCompletedCount + module2IntelCompletedCount;
     const module2TotalSteps = 7;
 
     const module3Progress = profile?.moduleProgress?.module3;
+    const module3AMDProgress = profile?.moduleProgress?.module3AMD;
+    const module3INTELProgress = profile?.moduleProgress?.module3INTEL;
     const module3CompletedSteps = module3Progress?.completedSteps || {};
     const module3CompletedCount = Object.values(module3CompletedSteps).filter(Boolean).length;
+    const module3AmdCompletedCount = Object.values(module3AMDProgress?.completedSteps || {}).filter(Boolean).length;
+    const module3IntelCompletedCount = Object.values(module3INTELProgress?.completedSteps || {}).filter(Boolean).length;
+    const module3PlatformCompletedCount = module3AmdCompletedCount + module3IntelCompletedCount;
     const module3TotalSteps = 7;
 
     const module4Progress = profile?.moduleProgress?.module4;
     const module4CompletedCount = Object.values(module4Progress?.completedSteps || {}).filter(Boolean).length;
 
-    const module1Done = isCompletedProgress(module1Progress);
-    const module2Done = isCompletedProgress(module2Progress);
-    const module3Done = isCompletedProgress(module3Progress);
+    const module1LastOpenedAt = getTimestampValue(module1Progress?.updatedAt);
+    const module2LastOpenedAt = getTimestampValue(module2Progress?.updatedAt);
+    const module3LastOpenedAt = getTimestampValue(module3Progress?.updatedAt);
+
+    const getPlatformCombinedProgress = (progressA, progressB) => {
+      const percentA = Math.min(100, Math.max(0, progressA?.percent ?? 0));
+      const percentB = Math.min(100, Math.max(0, progressB?.percent ?? 0));
+
+      return {
+        percent: Math.round((percentA + percentB) / 2),
+        completed: !!progressA?.completed && !!progressB?.completed,
+      };
+    };
+
+    const module1OverallProgress = module1Progress
+      ? {
+          percent:
+            module1Progress.overallPercent ??
+            module1Progress?.platformProgress
+              ? getPlatformCombinedProgress(
+                  module1Progress.platformProgress?.amd,
+                  module1Progress.platformProgress?.intel
+                ).percent
+              : module1Progress.percent || 0,
+          completed:
+            module1Progress.overallCompleted ||
+            (!!module1Progress.completed &&
+              module1Progress?.platformProgress?.amd?.completed &&
+              module1Progress?.platformProgress?.intel?.completed),
+        }
+      : { percent: 0, completed: false };
+
+    const module2CombinedProgress = module2AMDProgress || module2INTELProgress
+      ? getPlatformCombinedProgress(module2AMDProgress, module2INTELProgress)
+      : { percent: module2Progress?.percent || 0, completed: module2Progress?.completed || false };
+
+    const module3CombinedProgress = module3AMDProgress || module3INTELProgress
+      ? getPlatformCombinedProgress(module3AMDProgress, module3INTELProgress)
+      : { percent: module3Progress?.percent || 0, completed: module3Progress?.completed || false };
+
+    const module1Done = module1OverallProgress.completed;
+    const module2Done = module2CombinedProgress.completed;
+    const module3Done = module3CombinedProgress.completed;
     const module4Done = isCompletedProgress(module4Progress);
 
     const moduleNames = {
@@ -234,19 +279,19 @@ const openModule = (id, platform)=>{
               moduleNames[module1Progress.lastVisitedModuleKey] || "Unknown"
             }`
           : "Name of the parts and what use",
-        progress: module1Progress?.percent || 0,
+        progress: module1OverallProgress.percent,
         lessonsCompleted: module1CompletedCount,
         lessonsTotal: module1Progress?.totalPages || 6,
-        lastOpenedAt: Date.now(),
+        lastOpenedAt: module1LastOpenedAt,
         selectionTitle: "Introduction To PC Hardware",
         selectionModuleNo: "Module 1",
         selectionProgressText: module1Progress
           ? `${module1CompletedCount} of ${module1Progress.totalPages || 6} parts completed`
           : "Start Module",
         selectionCta:
-          (module1Progress?.percent || 0) >= 100
+          module1OverallProgress.percent >= 100
             ? "Review"
-            : (module1Progress?.percent || 0) > 0
+            : module1OverallProgress.percent > 0
             ? "Continue"
             : "Start",
         selectionImage: "/PNG/module1.png",
@@ -254,22 +299,23 @@ const openModule = (id, platform)=>{
       {
         id: "module-2",
         title: "Module 2",
-        subtitle: module3Progress
-          ? `Step ${(module3Progress.currentStep ?? 0) + 1} • Disassembly`
-          : "Disassembly",
-        progress: module3Progress?.percent || 0,
-        lessonsCompleted: module3CompletedCount,
-        lessonsTotal: module3TotalSteps,
-        lastOpenedAt: Date.now() - 1000 * 60 * 60 * 36,
+        subtitle:
+          module2AMDProgress || module2INTELProgress
+            ? `Step ${(module2CombinedProgress.percent || 0) >= 100 ? module2Progress?.currentStep ?? 0 : (module2Progress?.currentStep ?? 0) + 1} • Disassembly`
+            : "Disassembly",
+        progress: module2CombinedProgress.percent,
+        lessonsCompleted: module2CompletedCount,
+        lessonsTotal: module2TotalSteps,
+        lastOpenedAt: module2LastOpenedAt,
         selectionTitle: "Disassembly",
         selectionModuleNo: "Module 2",
         selectionProgressText: module2Progress
           ? `${module2CompletedCount} of ${module2TotalSteps} steps completed`
           : "Start Module",
         selectionCta:
-          (module2Progress?.percent || 0) >= 100
+          module2CombinedProgress.percent >= 100
             ? "Review"
-            : (module2Progress?.percent || 0) > 0
+            : module2CombinedProgress.percent > 0
             ? "Continue"
             : "Start",
         selectionImage: "/PNG/module2.png",
@@ -277,58 +323,127 @@ const openModule = (id, platform)=>{
       {
         id: "module-3",
         title: "Module 3",
-        subtitle: module3Progress
-          ? `Step ${(module3Progress.currentStep ?? 0) + 1} • Assembly`
-          : "Assembly",
-        progress: module3Progress?.percent || 0,
+        subtitle:
+          module3AMDProgress || module3INTELProgress
+            ? `Step ${(module3CombinedProgress.percent || 0) >= 100 ? module3Progress?.currentStep ?? 0 : (module3Progress?.currentStep ?? 0) + 1} • Assembly`
+            : "Assembly",
+        progress: module3CombinedProgress.percent,
         lessonsCompleted: module3CompletedCount,
         lessonsTotal: module3TotalSteps,
-        lastOpenedAt: Date.now() - 1000 * 60 * 60 * 20,
+        lastOpenedAt: module3LastOpenedAt,
         selectionTitle: "Assembly",
         selectionModuleNo: "Module 3",
         selectionProgressText: module3Progress
           ? `${module3CompletedCount} of ${module3TotalSteps} steps completed`
           : "Start Module",
         selectionCta:
-          (module3Progress?.percent || 0) >= 100
+          module3CombinedProgress.percent >= 100
             ? "Review"
-            : (module3Progress?.percent || 0) > 0
+            : module3CombinedProgress.percent > 0
             ? "Continue"
             : "Start",
         selectionImage: "/PNG/module3.png",
       },
       
-      {
-        id: "module-4",
-        title: "Module 4",
-        subtitle: "Configuring Software (Windows / BIOS)",
-        progress: module4Progress?.percent || 0,
-        lessonsCompleted: module4CompletedCount,
-        lessonsTotal: 6,
-        lastOpenedAt: Date.now() - 1000 * 60 * 60 * 12,
-        selectionTitle: "Configuring Software",
-        selectionModuleNo: "Module 4",
-        selectionProgressText: module4Progress
-          ? `${module4CompletedCount} of 6 lessons completed`
-          : "Module Progress 0/6 Lessons",
-        selectionCta:
-          (module4Progress?.percent || 0) >= 100
-            ? "Review"
-            : (module4Progress?.percent || 0) > 0
-            ? "Continue"
-            : "Start",
-        selectionImage: "/PNG/module4.png",
-      },
+
     ];
+const practicalTests = profile?.practicalTests || {};
+const mobileModuleScores = profile?.mobileModuleScores || {};
+const mobilePracticeScores = profile?.mobilePracticeScores || {};
 
-    const practiceTestAccess = profile?.practiceTestAccess || {};
+const getScorePercent = (result) => {
+  if (!result) return null;
+  const direct = Number(result.scorePercent ?? result.percent ?? result.percentage);
+  if (Number.isFinite(direct)) return Math.max(0, Math.min(100, Math.round(direct)));
 
-    const assemblyPracticalUnlocked =
-      practiceTestAccess?.module2?.unlocked === true || module2Done;
+  const score = Number(result.score ?? result.latestScore ?? result.finalScore);
+  const total = Number(result.total ?? result.latestTotal ?? result.maxScore);
+  if (Number.isFinite(score) && Number.isFinite(total) && total > 0) {
+    return Math.max(0, Math.min(100, Math.round((score / total) * 100)));
+  }
+  return null;
+};
 
-    const disassemblyPracticalUnlocked =
-      practiceTestAccess?.module3?.unlocked === true || module3Done;
+const createMobileStatus = (result, passingPercent = 60) => {
+  const scorePercent = getScorePercent(result);
+  const completed =
+    !!result?.completed ||
+    !!result?.finished ||
+    !!result?.completedAt ||
+    !!result?.timestamp ||
+    scorePercent !== null;
+  const passed =
+    result?.passed === true ||
+    (completed && scorePercent !== null && scorePercent >= passingPercent);
 
+  return {
+    completed,
+    passed,
+    scorePercent,
+    status: completed ? (passed ? "Passed" : "Completed") : "Not started",
+  };
+};
+
+const mobileLearning = {
+  modules: ["module1", "module2", "module3", "module4"].map((moduleKey, index) => ({
+    key: moduleKey,
+    label: `Module ${index + 1}`,
+    content: createMobileStatus(mobileModuleScores[`${moduleKey}Content`]),
+    pre: createMobileStatus(mobileModuleScores[`${moduleKey}Pre`]),
+    post: createMobileStatus(mobileModuleScores[`${moduleKey}Post`]),
+  })),
+  exams: [
+    {
+      key: "practiceExam1",
+      label: "Mobile Exam 1",
+      ...createMobileStatus(mobilePracticeScores.practiceExam1),
+    },
+    {
+      key: "practiceExam2",
+      label: "Mobile Exam 2",
+      ...createMobileStatus(mobilePracticeScores.practiceExam2),
+    },
+  ],
+};
+
+const createTestProgress = (result) => {
+  if (!result) return null;
+
+  const score = Number(result.score ?? 0);
+
+  return {
+    score,
+    total: 100,
+    percent: score,
+    scorePercent: score,
+    completionPercent: 100,
+    passed: score >= 75,
+    grade: result.grade || "-",
+    elapsedSeconds: Number(result.elapsedSeconds ?? 0),
+    wrongOrderCount: Number(result.wrongOrderCount ?? 0),
+    fumbleCount: Number(result.fumbleCount ?? 0),
+  };
+};
+
+const getTestStatus = (result, unlocked) => {
+  if (result) {
+    return Number(result.score ?? 0) >= 75
+      ? "Passed"
+      : "Completed";
+  }
+
+  return unlocked ? "Ready" : "Locked";
+};
+ const practiceTestAccess = profile?.practiceTestAccess || {};
+
+const disassemblyPracticalUnlocked =
+  practiceTestAccess?.module2?.unlocked === true ||
+  module2Done;
+
+const assemblyPracticalUnlocked =
+  practiceTestAccess?.module3?.unlocked === true ||
+  module3Done;
+  
     const activity = [
       {
         id: "a1",
@@ -346,41 +461,104 @@ const openModule = (id, platform)=>{
     ];
 
     const tests = [
-      {
-        id: "amd-full-assembly-practical",
-        title: "AMD Full Assembly Practical Test",
-        desc: "AMD PC assembly validation",
-        status: assemblyPracticalUnlocked ? "Ready" : "Locked",
-        locked: !assemblyPracticalUnlocked,
-        lockReason: "Complete Module 2 before accessing this practical test.",
-      },
-      {
-        id: "amd-full-disassembly-practical",
-        title: "AMD Full Disassembly Practical Test",
-        desc: "AMD PC disassembly validation",
-        status: disassemblyPracticalUnlocked ? "Ready" : "Locked",
-        locked: !disassemblyPracticalUnlocked,
-        lockReason: "Complete Module 3 before accessing this practical test.",
-      },
-      {
-        id: "intel-full-assembly-practical",
-        title: "Intel Full Assembly Practical Test",
-        desc: "Intel PC assembly validation",
-        status: assemblyPracticalUnlocked ? "Ready" : "Locked",
-        locked: !assemblyPracticalUnlocked,
-        lockReason: "Complete Module 2 before accessing this practical test.",
-      },
-      {
-        id: "intel-full-disassembly-practical",
-        title: "Intel Full Disassembly Practical Test",
-        desc: "Intel PC disassembly validation",
-        status: disassemblyPracticalUnlocked ? "Ready" : "Locked",
-        locked: !disassemblyPracticalUnlocked,
-        lockReason: "Complete Module 3 before accessing this practical test.",
-      },
-    ];    ;
+  {
+    id: "amd-full-disassembly-practical",
+    title: "AMD Full Disassembly Practical Test",
+    desc: "AMD PC disassembly validation",
 
-    return { user, modules, activity, achievements, tests };
+    completed: !!practicalTests.amdDisassembly,
+
+    progress: createTestProgress(
+      practicalTests.amdDisassembly
+    ),
+
+    status: getTestStatus(
+      practicalTests.amdDisassembly,
+      disassemblyPracticalUnlocked
+    ),
+
+    locked:
+      !disassemblyPracticalUnlocked &&
+      !practicalTests.amdDisassembly,
+
+    lockReason:
+      "Complete Module 2 before accessing this practical test.",
+  },
+
+  {
+    id: "intel-full-disassembly-practical",
+    title: "Intel Full Disassembly Practical Test",
+    desc: "Intel PC disassembly validation",
+
+    completed: !!practicalTests.intelDisassembly,
+
+    progress: createTestProgress(
+      practicalTests.intelDisassembly
+    ),
+
+    status: getTestStatus(
+      practicalTests.intelDisassembly,
+      disassemblyPracticalUnlocked
+    ),
+
+    locked:
+      !disassemblyPracticalUnlocked &&
+      !practicalTests.intelDisassembly,
+
+    lockReason:
+      "Complete Module 2 before accessing this practical test.",
+  },
+
+  {
+    id: "amd-full-assembly-practical",
+    title: "AMD Full Assembly Practical Test",
+    desc: "AMD PC assembly validation",
+
+    completed: !!practicalTests.amdAssembly,
+
+    progress: createTestProgress(
+      practicalTests.amdAssembly
+    ),
+
+    status: getTestStatus(
+      practicalTests.amdAssembly,
+      assemblyPracticalUnlocked
+    ),
+
+    locked:
+      !assemblyPracticalUnlocked &&
+      !practicalTests.amdAssembly,
+
+    lockReason:
+      "Complete Module 3 before accessing this practical test.",
+  },
+
+  {
+    id: "intel-full-assembly-practical",
+    title: "INTEL Full Assembly Practical Test",
+    desc: "INTEL PC assembly validation",
+
+    completed: !!practicalTests.intelAssembly,
+
+    progress: createTestProgress(
+      practicalTests.intelAssembly
+    ),
+
+    status: getTestStatus(
+      practicalTests.intelAssembly,
+      assemblyPracticalUnlocked
+    ),
+
+    locked:
+      !assemblyPracticalUnlocked &&
+      !practicalTests.intelAssembly,
+
+    lockReason:
+      "Complete Module 3 before accessing this practical test.",
+  },
+];
+
+    return { user, modules, activity, achievements, tests, mobileLearning };
   }, [profile, firebaseUser]);
 
   useEffect(() => {
@@ -416,7 +594,7 @@ const openModule = (id, platform)=>{
     const nextUp =
       allModules
         .filter((m) => m.progress > 0 && m.progress < 100)
-        .sort((a, b) => a.progress - b.progress)[0] ||
+        .sort((a, b) => b.lastOpenedAt - a.lastOpenedAt)[0] ||
       allModules.find((m) => m.progress === 0) ||
       allModules[0];
 
@@ -472,7 +650,7 @@ const openModule = (id, platform)=>{
 
                   <div className="space-y-2">
                     <SideItem label="Dashboard" active={sectionLabel} onClick={() => setSection("Dashboard")} icon="home" />
-                    <SideItem label="Modules" active={sectionLabel} onClick={() => setSection("Modules")} icon="modules" />
+                    <SideItem label="3D Modules" active={sectionLabel} onClick={() => setSection("Modules")} icon="modules" />
                     <SideItem label="Practice Tests" active={sectionLabel} onClick={() => setSection("Practice Tests")} icon="tests" />
                     <SideItem label="Profile" active={sectionLabel} onClick={() => setSection("Profile")} icon="profile" />
                   </div>
@@ -511,7 +689,7 @@ const openModule = (id, platform)=>{
                       <AnimatePresence mode="wait">
                         {section === "Dashboard" ? (
                           <PageMotion keyName="dashboard" reduce={reduce}>
-                            <HomeOverview
+                           <HomeOverview
                               openModule={openModule}
                               setSection={setSection}
                               overall={stats.overall}
@@ -521,6 +699,8 @@ const openModule = (id, platform)=>{
                               stats={stats}
                               achievements={data.achievements}
                               activity={data.activity}
+                              tests={data.tests}
+                              mobileLearning={data.mobileLearning}
                             />
                           </PageMotion>
                         ) : null}
@@ -571,6 +751,8 @@ const openModule = (id, platform)=>{
                               user={user}
                               stats={stats}
                               achievements={data.achievements}
+                              tests={data.tests}
+                              mobileLearning={data.mobileLearning}
                               firebaseUser={firebaseUser}
                               setProfile={setProfile}
                             />
@@ -962,9 +1144,21 @@ function FormField({ label, value, onChange, placeholder }) {
   );
 }
 
-function HomeOverview({ setSection, overall, modules, nextUp, user, stats, achievements, activity, openModule }) {
+function HomeOverview({
+  setSection,
+  overall,
+  modules,
+  nextUp,
+  user,
+  stats,
+  achievements,
+  activity,
+  openModule,
+  tests = [],
+  mobileLearning,
+}) {
   return (
-    <div className="grid h-full min-h-0 grid-rows-[auto_auto_1fr] gap-6 overflow-hidden">
+   <div className="grid h-full min-h-0 grid-rows-[auto_auto_auto_auto_auto] gap-6 overflow-auto">
       <div className="grid grid-cols-1 gap-6">
         <TopCardHero
           title="Continue Module"
@@ -977,24 +1171,245 @@ function HomeOverview({ setSection, overall, modules, nextUp, user, stats, achie
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-        <StatCard title="Streak" value={`${user.streakDays} days`} hint="Keep it going" />
-        <StatCard title="This week" value={`${user.minutesThisWeek} min`} hint="Time spent learning" />
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <StatCard title="Completed" value={`${stats.completed}`} hint="Modules finished" />
         <StatCard title="Overall" value={`${overall}%`} hint="Across all modules" />
+        <StatCard title="Next up" value={nextUp?.title || "None"} hint="Last visited module" />
       </div>
 
       <div className="grid min-h-0 grid-cols-1 gap-6 xl:grid-cols-[1.6fr_0.9fr]">
         <ProgressCardFillHeight overall={overall} modules={modules} onModuleClick={(id) => openModule(id)} />
         <RightColumnFill achievements={achievements} activity={activity} />
       </div>
+
+      <MobileLearningSummaryCard mobileLearning={mobileLearning} />
+
+      <PracticalScoresCard
+        tests={tests}
+        onViewAll={() => setSection("Practice Tests")}
+      />
+    </div>
+  );
+}
+function PracticalScoresCard({ tests = [], onViewAll }) {
+  const completedTests = tests.filter((test) => test.completed);
+
+  return (
+    <div className="rounded-[28px] border border-[#1a2438] bg-[#0d1220] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.42)]">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <div className="text-lg font-bold tracking-tight text-white">
+            Practical Exam Scores
+          </div>
+
+          <div className="mt-1 text-sm text-[#7a8ba8]">
+            Your latest results from Firebase Firestore
+          </div>
+        </div>
+
+        {onViewAll ? (
+        <button
+          type="button"
+          onClick={onViewAll}
+          className="rounded-xl border border-[#00ffb4]/30 bg-[#00ffb4]/10 px-4 py-2 text-sm font-semibold text-[#00ffb4] transition hover:bg-[#00ffb4]/20"
+        >
+          View Tests →
+        </button>
+        ) : null}
+      </div>
+
+      {completedTests.length === 0 ? (
+        <div className="mt-5 rounded-2xl border border-[#1a2438] bg-white/[0.03] px-5 py-4 text-sm text-[#7a8ba8]">
+          No practical-test result has been recorded yet.
+        </div>
+      ) : (
+        <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {completedTests.map((test) => {
+            const score = Number(test.progress?.score ?? 0);
+            const passed = score >= 75;
+
+            return (
+              <div
+                key={test.id}
+                className="rounded-2xl border border-[#1a2438] bg-white/[0.03] p-5"
+              >
+                <div className="text-sm font-semibold leading-5 text-white">
+                  {test.title}
+                </div>
+
+                <div className="mt-4 flex items-end gap-1">
+                  <span className="text-3xl font-black text-[#00ffb4]">
+                    {score}
+                  </span>
+
+                  <span className="pb-1 text-sm text-[#7a8ba8]">
+                    /100
+                  </span>
+                </div>
+
+                <div className="mt-3 flex items-center justify-between text-xs">
+                  <span className="text-[#9fb0c9]">
+                    Grade: {test.progress?.grade || "—"}
+                  </span>
+
+                  <span
+                    className={
+                      passed
+                        ? "text-[#00ffb4]"
+                        : "text-yellow-300"
+                    }
+                  >
+                    {passed ? "Passed" : "Needs Retry"}
+                  </span>
+                </div>
+
+                <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
+                  <div
+                    className="h-full rounded-full bg-[#00ffb4]"
+                    style={{
+                      width: `${Math.min(100, Math.max(0, score))}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MobileLearningSummaryCard({ mobileLearning }) {
+  const modules = mobileLearning?.modules || [];
+  const exams = mobileLearning?.exams || [];
+  const moduleSummaries = modules.map((module) => {
+    const passed = !!module.content?.completed && !!module.pre?.passed && !!module.post?.passed;
+    const completed = !!module.content?.completed && !!module.pre?.completed && !!module.post?.completed;
+    return {
+      key: module.key,
+      label: module.label,
+      passed,
+      status: passed ? "Passed" : completed ? "Completed" : "In progress",
+    };
+  });
+  const passedModules = moduleSummaries.filter((module) => module.passed).length;
+  const passedExams = exams.filter((exam) => exam.passed).length;
+
+  return (
+    <div className="rounded-[28px] border border-[#1a2438] bg-[#0d1220] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.42)]">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <div className="text-lg font-bold tracking-tight text-white">Mobile Learning Summary</div>
+          <div className="mt-1 text-sm text-[#7a8ba8]">
+            {passedModules}/{modules.length} modules passed · {passedExams}/{exams.length} exams passed
+          </div>
+        </div>
+
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
+          {moduleSummaries.map((module) => (
+            <SummaryPill key={module.key} label={module.label.replace("Module ", "M")} status={module.status} passed={module.passed} />
+          ))}
+          {exams.map((exam, index) => (
+            <SummaryPill key={exam.key} label={`Exam ${index + 1}`} status={exam.passed ? "Passed" : exam.completed ? "Completed" : "Not started"} passed={exam.passed} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SummaryPill({ label, status, passed }) {
+  return (
+    <div
+      className={[
+        "min-w-[92px] rounded-2xl border px-3 py-2 text-center",
+        passed
+          ? "border-[#00ffb4]/25 bg-[#00ffb4]/10"
+          : "border-white/10 bg-white/[0.03]",
+      ].join(" ")}
+    >
+      <div className="text-xs font-semibold text-white">{label}</div>
+      <div className={passed ? "mt-1 text-[11px] text-[#00ffb4]" : "mt-1 text-[11px] text-[#7a8ba8]"}>
+        {status}
+      </div>
+    </div>
+  );
+}
+
+function MobileLearningCard({ mobileLearning }) {
+  const modules = mobileLearning?.modules || [];
+  const exams = mobileLearning?.exams || [];
+
+  return (
+    <div className="rounded-[28px] border border-[#1a2438] bg-[#0d1220] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.42)]">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="text-lg font-bold tracking-tight text-white">
+            Mobile Learning Progress
+          </div>
+          <div className="mt-1 text-sm text-[#7a8ba8]">
+            Module content, pre-tests, post-tests, and mobile exam results from Firestore
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-3 xl:grid-cols-2">
+        {modules.map((module) => (
+          <div
+            key={module.key}
+            className="rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4"
+          >
+            <div className="text-sm font-semibold text-white">{module.label}</div>
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              <MobileStatusChip label="Content" item={module.content} />
+              <MobileStatusChip label="Pre-test" item={module.pre} />
+              <MobileStatusChip label="Post-test" item={module.post} />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        {exams.map((exam) => (
+          <MobileStatusChip key={exam.key} label={exam.label} item={exam} large />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MobileStatusChip({ label, item, large = false }) {
+  const completed = !!item?.completed;
+  const passed = !!item?.passed;
+  const scoreText =
+    item?.scorePercent !== null && item?.scorePercent !== undefined
+      ? `${item.scorePercent}%`
+      : "No score";
+
+  return (
+    <div
+      className={[
+        "rounded-2xl border px-3 py-3",
+        large ? "bg-white/[0.03]" : "bg-[#0b1220]",
+        completed
+          ? passed
+            ? "border-[#00ffb4]/25 text-[#b7fff0]"
+            : "border-yellow-300/25 text-yellow-200"
+          : "border-white/10 text-[#9fb0c9]",
+      ].join(" ")}
+    >
+      <div className="text-xs font-semibold uppercase tracking-[0.16em]">{label}</div>
+      <div className="mt-2 text-sm font-bold text-white">
+        {completed ? item.status : "Not started"}
+      </div>
+      <div className="mt-1 text-xs text-[#7a8ba8]">{scoreText}</div>
     </div>
   );
 }
 
 function ModulesSelection({ modules, onBack, onOpenModule }) {
   const reduce = useReducedMotion();
-  const [moduleDropdown, setModuleDropdown] = useState(null);
   const [broken, setBroken] = useState({});
   const selectionModules = modules.filter((m) => m.selectionTitle && m.selectionImage);
 
@@ -1031,46 +1446,13 @@ function ModulesSelection({ modules, onBack, onOpenModule }) {
 
                  <button
                   type="button"
-                  onClick={() => {
-                    if (m.id === "module-3") {
-                      setModuleDropdown(
-                        moduleDropdown === m.id ? null : m.id
-                      );
-                    } else {
-                      onOpenModule?.(m.id);
-                    }
-                  }}
+                  onClick={() => onOpenModule?.(m.id)}
                   className="mt-4 inline-flex items-center gap-2 rounded-2xl border border-[#00ffb4]/30 bg-[#00ffb4]/12 px-7 py-2.5 text-sm font-semibold text-[#00ffb4]"
                 >
                   {m.selectionCta}
                   <span className="text-[#b7fff0]">→</span>
                 </button>
-                {moduleDropdown === m.id && (
-                <div className="mt-3 flex gap-3">
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onOpenModule?.(`${m.id}-amd`)
-                    }
-                    className="rounded-xl border border-[#00ffb4]/30 bg-[#00ffb4]/10 px-5 py-2 text-sm text-[#00ffb4]"
-                  >
-                    AMD
-                  </button>
-
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onOpenModule?.(`${m.id}-intel`)
-                    }
-                    className="rounded-xl border border-[#00ffb4]/30 bg-[#00ffb4]/10 px-5 py-2 text-sm text-[#00ffb4]"
-                  >
-                    Intel
-                  </button>
-
-                </div>
-              )}
+               
                 </div>
 
                 <div className="relative h-[150px] overflow-hidden rounded-2xl border border-[#1a2438] bg-[#0a0e17] shadow-[inset_0_0_38px_rgba(0,0,0,0.52)] sm:h-[170px] lg:h-[180px]">
@@ -1116,9 +1498,6 @@ function AssessmentList({ title, subtitle, items, onOpen, openLabel, retakeLabel
       <div>
         <div className="text-xl font-black tracking-tight text-white">{title}</div>
         <div className="mt-1 text-sm text-[#7a8ba8]">{subtitle}</div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 overflow-hidden lg:grid-cols-2">
         {items.map((item) => {
           const locked = !!item.locked;
           const completed = !!item.completed;
@@ -1248,7 +1627,7 @@ function ComingSoonAssessment({ title, onBack }) {
   );
 }
 
-function ProfilePage({ user, stats, achievements, firebaseUser, setProfile }) {
+function ProfilePage({ user, stats, achievements, tests = [], mobileLearning, firebaseUser, setProfile }) {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -1322,9 +1701,9 @@ function ProfilePage({ user, stats, achievements, firebaseUser, setProfile }) {
             </div>
 
             <div className="mt-7 grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <MiniStat title="Streak" value={`${user.streakDays} days`} />
-              <MiniStat title="This week" value={`${user.minutesThisWeek} min`} />
               <MiniStat title="Completed" value={`${stats.completed}`} />
+              <MiniStat title="Overall" value={`${stats.overall}%`} />
+              <MiniStat title="Focus" value={stats.nextUp?.title || "No module yet"} />
             </div>
 
             <div className="mt-7 rounded-2xl border border-[#1a2438] bg-white/[0.03] p-6">
@@ -1353,6 +1732,11 @@ function ProfilePage({ user, stats, achievements, firebaseUser, setProfile }) {
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="mt-6 space-y-6">
+        <MobileLearningCard mobileLearning={mobileLearning} />
+        <PracticalScoresCard tests={tests} />
       </div>
 
       <AnimatePresence>

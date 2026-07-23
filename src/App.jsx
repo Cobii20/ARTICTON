@@ -10,7 +10,7 @@ import AdminPage from "./PAGES/Adminpage";
 import Module1Page from "./PAGES/Modules/Module1";
 import Module2Page from "./PAGES/Modules/Module2";
 import Module3Page from "./PAGES/Modules/Module3";
-import Module4Page from "./PAGES/Modules/Module4";
+
 
 // Module 2 platform pages
 import Module2DisassemblyAMD from "./PAGES/Modules/Module2/Module2DisassmblyAMD";
@@ -29,18 +29,16 @@ export default function App() {
 
   const handleLogin = (profile) => {
     setUserProfile(profile || null);
+    const role = String(profile?.role || "").trim().toLowerCase();
 
-    if (profile?.role === "admin") {
+    if (role === "admin") {
       setPage("admin");
-    } else if (profile?.role === "faculty") {
+    } else if (role === "faculty") {
       setPage("faculty");
     } else {
       setDashboardSection("Dashboard");
       setPage("dashboard");
     }
-
-    setDashboardSection("Dashboard");
-    setPage("dashboard");
   };
 
   const handleLogout = () => {
@@ -153,14 +151,7 @@ export default function App() {
     );
   }
 
-  if (page === "module-4") {
-    return (
-      <Module4Page
-        onBack={handleModuleBack}
-        onLogout={handleLogout}
-      />
-    );
-  }
+ 
 
   if (page === "practical-test") {
     return (

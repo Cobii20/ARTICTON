@@ -815,11 +815,7 @@ export default function Module1Page({ onBack, onLogout }) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showCertificate, setShowCertificate] = useState(false);
   const [certificateWarning, setCertificateWarning] = useState("");
-  const [experienceStep, setExperienceStep] = useState(() => {
-    return localStorage.getItem("module1OnboardingDone") === "true"
-      ? "components"
-      : "welcome";
-  });
+  const [experienceStep, setExperienceStep] = useState("welcome");
   const [tutorialPage, setTutorialPage] = useState(0);
   const [selectedPlatform, setSelectedPlatform] = useState(() => {
     return localStorage.getItem("module1SelectedPlatform") || "";
@@ -968,10 +964,7 @@ export default function Module1Page({ onBack, onLogout }) {
     modules.forEach((m) => useGLTF.preload(m.url));
   }, [modules]);
 
-  const activeHotspot = useMemo(
-    () => current?.hotspots?.find((h) => h.id === activeId) || null,
-    [current, activeId]
-  );
+  const activeHotspot = null;
 
   const user = useMemo(
     () => ({
@@ -983,21 +976,43 @@ export default function Module1Page({ onBack, onLogout }) {
     [profile, firebaseUser]
   );
 
+  const getModule1PlatformProgress = (platform) => {
+    return (
+      profile?.moduleProgress?.module1?.platformProgress?.[platform] ||
+      null
+    );
+  };
+
+  const getModule1CompletedParts = (platform) => {
+    const platformProgress = getModule1PlatformProgress(platform);
+    const parts =
+      platformProgress?.completedParts ||
+      profile?.moduleProgress?.module1?.completedParts ||
+      {};
+
+    return Object.fromEntries(
+      Object.entries(parts).map(([key, value]) => [key, !!value])
+    );
+  };
+
   const saveModule1Progress = async ({
     page = safeModuleIndex + 1,
     introDone = !showIntro,
     moduleKey = current?.key,
     completedParts: partsPatch = {},
+    replaceCompletedParts = false,
     platform = selectedPlatform,
   } = {}) => {
     if (!firebaseUser) return;
 
     const totalPages = modules.length;
 
-    const mergedParts = {
-      ...localCompletedParts,
-      ...partsPatch,
-    };
+    const mergedParts = replaceCompletedParts
+      ? partsPatch
+      : {
+          ...localCompletedParts,
+          ...partsPatch,
+        };
 
     const completedCount = modules.filter((m) => mergedParts[m.key]).length;
     const allCompleted = completedCount === totalPages;
@@ -1118,14 +1133,31 @@ export default function Module1Page({ onBack, onLogout }) {
 
   const handleSwitchPlatform = async () => {
     const nextPlatform = selectedPlatform === "amd" ? "intel" : "amd";
+    const nextPlatformParts = getModule1CompletedParts(nextPlatform);
+    const nextPlatformProgress = getModule1PlatformProgress(nextPlatform);
+
     setSelectedPlatform(nextPlatform);
+    setLocalCompletedParts(nextPlatformParts);
     localStorage.setItem("module1SelectedPlatform", nextPlatform);
+    localStorage.setItem("module1CompletedParts", JSON.stringify(nextPlatformParts));
     setCertificateWarning("");
+    setShowCertificate(false);
+    setExperienceStep("components");
+    setActiveId(null);
+    setLastCoords(null);
+    setModuleIndex(
+      typeof nextPlatformProgress?.currentPage === "number"
+        ? Math.max(0, Math.min(nextPlatformProgress.currentPage - 1, modules.length - 1))
+        : safeModuleIndex
+    );
+    setShowIntro(!nextPlatformParts[current?.key]);
 
     await saveModule1Progress({
       page: safeModuleIndex + 1,
-      introDone: !completedParts[current.key],
-      moduleKey: current.key,
+      introDone: !nextPlatformParts[current?.key],
+      moduleKey: current?.key,
+      completedParts: nextPlatformParts,
+      replaceCompletedParts: true,
       platform: nextPlatform,
     });
   };
@@ -1147,22 +1179,34 @@ export default function Module1Page({ onBack, onLogout }) {
     if (!profile?.moduleProgress?.module1) return;
 
     const saved = profile.moduleProgress.module1;
+    const selected =
+      typeof saved.selectedPlatform === "string" && saved.selectedPlatform
+        ? saved.selectedPlatform
+        : localStorage.getItem("module1SelectedPlatform") || "amd";
+
+    setSelectedPlatform(selected);
+    localStorage.setItem("module1SelectedPlatform", selected);
+    localStorage.setItem("module1OnboardingDone", "true");
+    setExperienceStep("welcome");
+    setShowIntro(true);
+
+    const platformProgress = getModule1PlatformProgress(selected);
+    const platformParts = getModule1CompletedParts(selected);
+    setLocalCompletedParts(platformParts);
+    localStorage.setItem("module1CompletedParts", JSON.stringify(platformParts));
 
     if (
+      typeof platformProgress?.currentPage === "number" &&
+      platformProgress.currentPage >= 1 &&
+      platformProgress.currentPage <= modules.length
+    ) {
+      setModuleIndex(platformProgress.currentPage - 1);
+    } else if (
       typeof saved.currentPage === "number" &&
       saved.currentPage >= 1 &&
       saved.currentPage <= modules.length
     ) {
       setModuleIndex(saved.currentPage - 1);
-    }
-
-    setShowIntro(true);
-
-    if (typeof saved.selectedPlatform === "string" && saved.selectedPlatform) {
-      setSelectedPlatform(saved.selectedPlatform);
-      localStorage.setItem("module1SelectedPlatform", saved.selectedPlatform);
-      localStorage.setItem("module1OnboardingDone", "true");
-      setExperienceStep("components");
     }
   }, [profile, modules.length]);
 
@@ -1190,9 +1234,13 @@ export default function Module1Page({ onBack, onLogout }) {
 };
 
   const handleSelectPlatform = async (platform) => {
+    const platformParts = getModule1CompletedParts(platform);
+
     setSelectedPlatform(platform);
+    setLocalCompletedParts(platformParts);
     localStorage.setItem("module1SelectedPlatform", platform);
     localStorage.setItem("module1OnboardingDone", "true");
+    localStorage.setItem("module1CompletedParts", JSON.stringify(platformParts));
     setExperienceStep("components");
     setShowIntro(true);
     setActiveId(null);
@@ -1202,6 +1250,8 @@ export default function Module1Page({ onBack, onLogout }) {
       page: safeModuleIndex + 1,
       introDone: false,
       moduleKey: current.key,
+      completedParts: platformParts,
+      replaceCompletedParts: true,
       platform,
     });
   };
@@ -1430,7 +1480,7 @@ export default function Module1Page({ onBack, onLogout }) {
                           >
                             <ModelScene
                               url={current.url}
-                              hotspots={current.hotspots || []}
+                              hotspots={[]}
                               activeId={activeId}
                               activeHotspot={activeHotspot}
                               setActiveId={setActiveId}
@@ -1516,6 +1566,7 @@ export default function Module1Page({ onBack, onLogout }) {
                         lastCoords={lastCoords}
                         selectedPlatform={selectedPlatform}
                         afkAutoRotate={afkAutoRotate}
+                        completedParts={completedParts}
                         onWelcome={handleReturnToWelcome}
                         onPrev={goPrevModule}
                         onNext={goNextModule}
@@ -1603,6 +1654,7 @@ function SceneControls({
   lastCoords,
   selectedPlatform,
   afkAutoRotate,
+  completedParts,
   onWelcome,
   onPrev,
   onNext,
@@ -1636,6 +1688,10 @@ function SceneControls({
         >
           Welcome
         </button>
+
+        <div className="pointer-events-none rounded-full border border-[#00ffb4]/18 bg-[#06131b]/60 px-3 py-2 text-[11px] text-[#9fb0ca] backdrop-blur-xl">
+          {`${Object.values(completedParts).filter(Boolean).length}/${totalModules} parts complete`}
+        </div>
 
         <div className="pointer-events-none hidden rounded-full border border-[#00ffb4]/18 bg-[#06131b]/60 px-3 py-2 text-[11px] text-[#9fb0ca] backdrop-blur-xl md:block">
           {debug

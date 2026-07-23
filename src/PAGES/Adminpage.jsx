@@ -1,17 +1,28 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { db } from "../firebase";
 import {
+  BarChart3,
+  ChevronDown,
+  LogOut,
+  RefreshCw,
+  Settings,
+  ShieldCheck,
+  UserCog,
+} from "lucide-react";
+import {
   collection,
   getDocs,
   deleteDoc,
   doc,
   updateDoc,
 } from "firebase/firestore";
+import { fetchMobileScoreDocs, mergeMobileScoresIntoProfile } from "../utils/mobileScores";
 
 const QUIZ_KEYS = [
   { key: "module1", label: "Module 1" },
   { key: "module2", label: "Module 2" },
   { key: "module3", label: "Module 3" },
+  { key: "module4", label: "Module 4" },
 ];
 
 const PRACTICAL_KEYS = [
@@ -20,11 +31,24 @@ const PRACTICAL_KEYS = [
 ];
 
 const SCORE_ITEMS = [
-  { key: "module1", label: "M1", field: "quiz1" },
-  { key: "module2", label: "M2", field: "quiz2" },
-  { key: "module3", label: "M3", field: "quiz3" },
-  { key: "fullAssembly", label: "Asm", field: "assembly" },
-  { key: "fullDisassembly", label: "Disasm", field: "disassembly" },
+  { key: "module1Content", label: "M1 Content", field: "module1Content" },
+  { key: "module1Pre", label: "M1 Pre", field: "module1Pre" },
+  { key: "module1Post", label: "M1 Post", field: "module1Post" },
+  { key: "module2Content", label: "M2 Content", field: "module2Content" },
+  { key: "module2Pre", label: "M2 Pre", field: "module2Pre" },
+  { key: "module2Post", label: "M2 Post", field: "module2Post" },
+  { key: "module3Content", label: "M3 Content", field: "module3Content" },
+  { key: "module3Pre", label: "M3 Pre", field: "module3Pre" },
+  { key: "module3Post", label: "M3 Post", field: "module3Post" },
+  { key: "module4Content", label: "M4 Content", field: "module4Content" },
+  { key: "module4Pre", label: "M4 Pre", field: "module4Pre" },
+  { key: "module4Post", label: "M4 Post", field: "module4Post" },
+  { key: "mobileExam1", label: "Mobile Exam 1", field: "mobileExam1" },
+  { key: "mobileExam2", label: "Mobile Exam 2", field: "mobileExam2" },
+  { key: "amdDisassembly", label: "AMD Disasm", field: "amdDisassembly" },
+  { key: "intelDisassembly", label: "Intel Disasm", field: "intelDisassembly" },
+  { key: "amdAssembly", label: "AMD Asm", field: "amdAssembly" },
+  { key: "intelAssembly", label: "Intel Asm", field: "intelAssembly" },
 ];
 
 const PASSING_PERCENT = 60;
@@ -56,6 +80,25 @@ function getFullName(data) {
     data.fullName ||
     "No Name"
   );
+}
+
+function formatCreatedAt(value) {
+  if (!value) return "Not set";
+
+  const date =
+    typeof value?.toDate === "function"
+      ? value.toDate()
+      : typeof value?.seconds === "number"
+      ? new Date(value.seconds * 1000)
+      : new Date(value);
+
+  if (Number.isNaN(date.getTime())) return "Not set";
+
+  return date.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 }
 
 function getQuizStatus(quizProgress, moduleKey) {
@@ -160,19 +203,102 @@ function getPracticalStatus(practicalProgress, practicalKey) {
   };
 }
 
-function buildStudentRecord(docSnap) {
-  const data = docSnap.data();
+function getScoreStatus(progress, passingPercent = PASSING_PERCENT) {
+  if (!progress) {
+    return {
+      exists: false,
+      completed: false,
+      passed: false,
+      scorePercent: null,
+      completionPercent: 0,
+      status: "Not started",
+    };
+  }
+
+  const score = progress.score ?? progress.latestScore ?? progress.finalScore ?? null;
+  const total = progress.total ?? progress.latestTotal ?? progress.maxScore ?? 100;
+  const calculatedPercent =
+    Number.isFinite(Number(score)) && Number.isFinite(Number(total)) && Number(total) > 0
+      ? Math.round((Number(score) / Number(total)) * 100)
+      : null;
+  const scorePercent =
+    clampPercent(progress.scorePercent ?? progress.percent ?? progress.percentage) ??
+    clampPercent(calculatedPercent);
+  const completed =
+    !!progress.completed ||
+    !!progress.finished ||
+    !!progress.completedAt ||
+    !!progress.timestamp ||
+    scorePercent !== null;
+  const passed =
+    progress.passed === true ||
+    (completed && scorePercent !== null && scorePercent >= passingPercent);
+
+  return {
+    exists: true,
+    completed,
+    passed,
+    scorePercent,
+    completionPercent: completed ? 100 : 0,
+    status: completed ? (passed ? "Passed" : "Completed") : "In progress",
+    raw: progress,
+  };
+}
+
+function buildStudentRecord(docSnap, mobileScoreDocs = []) {
+  const data = mergeMobileScoresIntoProfile(docSnap.data(), mobileScoreDocs);
 
   const quizProgress = data.quizProgress || {};
   const practicalProgress = data.practicalProgress || {};
+  const practicalTests = data.practicalTests || {};
+  const mobileModuleScores = data.mobileModuleScores || {};
+  const mobilePracticeScores = data.mobilePracticeScores || {};
 
   const quiz1 = getQuizStatus(quizProgress, "module1");
   const quiz2 = getQuizStatus(quizProgress, "module2");
   const quiz3 = getQuizStatus(quizProgress, "module3");
+  const quiz4 = getQuizStatus(quizProgress, "module4");
   const assembly = getPracticalStatus(practicalProgress, "fullAssembly");
   const disassembly = getPracticalStatus(practicalProgress, "fullDisassembly");
+  const module1Post = getScoreStatus(mobileModuleScores.module1Post);
+  const module1Pre = getScoreStatus(mobileModuleScores.module1Pre);
+  const module1Content = getScoreStatus(mobileModuleScores.module1Content);
+  const module2Post = getScoreStatus(mobileModuleScores.module2Post);
+  const module2Pre = getScoreStatus(mobileModuleScores.module2Pre);
+  const module2Content = getScoreStatus(mobileModuleScores.module2Content);
+  const module3Post = getScoreStatus(mobileModuleScores.module3Post);
+  const module3Pre = getScoreStatus(mobileModuleScores.module3Pre);
+  const module3Content = getScoreStatus(mobileModuleScores.module3Content);
+  const module4Post = getScoreStatus(mobileModuleScores.module4Post);
+  const module4Pre = getScoreStatus(mobileModuleScores.module4Pre);
+  const module4Content = getScoreStatus(mobileModuleScores.module4Content);
+  const mobileExam1 = getScoreStatus(mobilePracticeScores.practiceExam1);
+  const mobileExam2 = getScoreStatus(mobilePracticeScores.practiceExam2);
+  const amdDisassembly = getScoreStatus(practicalTests.amdDisassembly, 75);
+  const intelDisassembly = getScoreStatus(practicalTests.intelDisassembly, 75);
+  const amdAssembly = getScoreStatus(practicalTests.amdAssembly, 75);
+  const intelAssembly = getScoreStatus(practicalTests.intelAssembly, 75);
 
-  const resultItems = [quiz1, quiz2, quiz3, assembly, disassembly];
+  const resultItems = [
+    module1Content,
+    module1Pre,
+    module1Post.exists ? module1Post : quiz1,
+    module2Content,
+    module2Pre,
+    module2Post.exists ? module2Post : quiz2,
+    module3Content,
+    module3Pre,
+    module3Post.exists ? module3Post : quiz3,
+    module4Content,
+    module4Pre,
+    module4Post.exists ? module4Post : quiz4,
+    mobileExam1,
+    mobileExam2,
+    amdDisassembly,
+    intelDisassembly,
+    amdAssembly,
+    intelAssembly,
+  ];
 
   const overallProgress = average(
     resultItems.map((item) => item.completionPercent ?? 0)
@@ -197,6 +323,16 @@ function buildStudentRecord(docSnap) {
     lastName,
     name: getFullName(data),
     email: data.email || "No email",
+    contactNumber:
+      data.contactNumber ||
+      data.phoneNumber ||
+      data.contact ||
+      data.mobileNumber ||
+      "",
+    createdAt: data.createdAt || data.created_at || data.createdOn || data.createdTime || null,
+    createdAtLabel: formatCreatedAt(
+      data.createdAt || data.created_at || data.createdOn || data.createdTime
+    ),
     studentId: data.studentId || data.studentID || data.schoolId || "",
     section: data.section || data.classSection || "",
     role: data.role || "student",
@@ -206,8 +342,27 @@ function buildStudentRecord(docSnap) {
     quiz1,
     quiz2,
     quiz3,
+    quiz4,
     assembly,
     disassembly,
+    module1Post,
+    module1Pre,
+    module1Content,
+    module2Post,
+    module2Pre,
+    module2Content,
+    module3Post,
+    module3Pre,
+    module3Content,
+    module4Post,
+    module4Pre,
+    module4Content,
+    mobileExam1,
+    mobileExam2,
+    amdDisassembly,
+    intelDisassembly,
+    amdAssembly,
+    intelAssembly,
 
     progress: overallProgress,
     averageScore,
@@ -219,11 +374,38 @@ function buildStudentRecord(docSnap) {
 
 function MetricCard({ label, value, subtext }) {
   return (
-    <div className="p-6 rounded-xl bg-[#13304a]/50 backdrop-blur-lg border border-white/10">
-      <p className="text-sm text-white/70">{label}</p>
-      <h2 className="text-2xl font-bold mt-2">{value}</h2>
-      {subtext ? <p className="text-[#b7fff0] text-sm mt-1">{subtext}</p> : null}
+    <div className="rounded-[22px] border border-[#1a2438] bg-[#0d1220] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.32)]">
+      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#7a8ba8]">{label}</p>
+      <h2 className="mt-3 text-3xl font-black tracking-tight text-white">{value}</h2>
+      {subtext ? <p className="mt-2 text-sm text-[#9fb0c9]">{subtext}</p> : null}
     </div>
+  );
+}
+
+function AdminNavButton({ active, onClick, icon: Icon, label }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={[
+        "flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left text-sm font-semibold transition",
+        active
+          ? "border-[#00ffb4]/30 bg-[#00ffb4]/10 text-white shadow-[0_16px_40px_rgba(0,255,180,0.08)]"
+          : "border-transparent text-[#c8d4e6] hover:border-[#1a2438] hover:bg-white/[0.04]",
+      ].join(" ")}
+    >
+      <span
+        className={[
+          "flex h-10 w-10 items-center justify-center rounded-2xl border",
+          active
+            ? "border-[#00ffb4]/25 bg-[#00ffb4]/10 text-[#00ffb4]"
+            : "border-[#1a2438] bg-[#0d1220] text-[#7a8ba8]",
+        ].join(" ")}
+      >
+        <Icon className="h-5 w-5" />
+      </span>
+      {label}
+    </button>
   );
 }
 
@@ -258,8 +440,13 @@ export default function AdminPage({ adminUser, onLogout }) {
       setError("");
 
       const querySnapshot = await getDocs(collection(db, "users"));
-      const users = querySnapshot.docs
-        .map(buildStudentRecord)
+      const usersWithScores = await Promise.all(
+        querySnapshot.docs.map(async (userDoc) => {
+          const mobileScores = await fetchMobileScoreDocs(userDoc.id);
+          return buildStudentRecord(userDoc, mobileScores);
+        })
+      );
+      const users = usersWithScores
         .filter((user) => user.role === "student")
         .sort((a, b) => a.name.localeCompare(b.name));
 
@@ -348,13 +535,25 @@ export default function AdminPage({ adminUser, onLogout }) {
     const examScore = average(accounts.map((account) => account.averageScore));
 
     const completionTrend = SCORE_ITEMS.map((item) => {
-      if (!activeUsers) return 0;
+      if (!activeUsers) {
+        return {
+          ...item,
+          completed: 0,
+          total: 0,
+          percent: 0,
+        };
+      }
 
       const completed = accounts.filter(
         (account) => account[item.field]?.completed
       ).length;
 
-      return Math.round((completed / activeUsers) * 100);
+      return {
+        ...item,
+        completed,
+        total: activeUsers,
+        percent: Math.round((completed / activeUsers) * 100),
+      };
     });
 
     const topUser =
@@ -385,138 +584,179 @@ export default function AdminPage({ adminUser, onLogout }) {
   }, [accounts]);
 
   return (
-    <div className="min-h-screen bg-[#0B2E5A] text-white flex">
+    <div className="min-h-screen bg-[#0a0e17] text-[#e8ecf4]">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_18%_8%,rgba(0,255,180,0.08),transparent_34%)]" />
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_92%_18%,rgba(0,255,180,0.05),transparent_30%)]" />
+      <div className="pointer-events-none fixed inset-0 bg-[linear-gradient(rgba(0,255,180,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,180,0.025)_1px,transparent_1px)] bg-[size:54px_54px] opacity-60" />
+
+      <div className="relative flex min-h-screen p-3 md:p-5">
       {/* SIDEBAR */}
-      <aside className="w-[250px] bg-[#03234A] p-4 flex flex-col justify-between">
+      <aside className="hidden w-[282px] shrink-0 flex-col justify-between overflow-hidden rounded-[30px] border border-[#1a2438] bg-[#0b1220]/90 p-5 shadow-[0_40px_120px_rgba(0,0,0,0.42)] backdrop-blur-xl lg:flex">
         <div>
-          <div className="flex items-center gap-3 mb-10">
-            <div className="h-10 w-10 rounded-xl bg-[#1E4D7A] flex items-center justify-center">
-              <div className="h-5 w-5 rounded-full border-2 border-white" />
+          <div className="mb-10 flex items-center gap-4 px-2 pt-1">
+            <img
+              src="/PNG/Articton.png"
+              alt="Articton Logo"
+              className="h-11 w-11 scale-[2.2] object-contain"
+            />
+            <div>
+              <span className="block text-xl font-bold tracking-wide text-white">Articton</span>
+              <span className="text-xs uppercase tracking-[0.25em] text-[#00ffb4]/70">Admin</span>
             </div>
-            <span className="text-xl font-semibold">Articton</span>
           </div>
 
-          <div className="space-y-3">
-            <button
+          <div className="space-y-2">
+            <AdminNavButton
+              icon={UserCog}
+              label="Account Management"
+              active={activeTab === "accounts"}
               onClick={() => setActiveTab("accounts")}
-              className={`w-full text-left px-4 py-3 rounded-xl transition ${
-                activeTab === "accounts"
-                  ? "bg-[#2E78A6]"
-                  : "hover:bg-[#1E4D7A]"
-              }`}
-            >
-              Account Management
-            </button>
+            />
 
-            <button
+            <AdminNavButton
+              icon={BarChart3}
+              label="Analytics"
+              active={activeTab === "analytics"}
               onClick={() => setActiveTab("analytics")}
-              className={`w-full text-left px-4 py-3 rounded-xl transition ${
-                activeTab === "analytics"
-                  ? "bg-[#2E78A6]"
-                  : "hover:bg-[#1E4D7A]"
-              }`}
-            >
-              Analytics
-            </button>
+            />
           </div>
         </div>
 
-        <div className="mt-auto bg-[#2E78A6] rounded-2xl p-4 flex items-center gap-3 shadow-lg">
-          <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center">
-            <span className="text-lg font-semibold">A</span>
-          </div>
-          <div className="min-w-0">
-            <div className="font-semibold truncate">Administrator Account</div>
-            <div className="text-xs text-white/70 truncate">{adminEmail}</div>
+        <div className="mt-auto rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#00ffb4]/25 bg-[#00ffb4]/10 text-[#00ffb4]">
+              <ShieldCheck className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="truncate text-sm font-semibold text-white">Administrator</div>
+              <div className="truncate text-xs text-[#7a8ba8]">{adminEmail}</div>
+            </div>
           </div>
         </div>
       </aside>
 
       {/* MAIN PANEL */}
-      <main className="flex-1 relative p-8 overflow-hidden">
+      <main className="relative min-w-0 flex-1 px-0 py-1 lg:pl-5">
         {/* HEADER */}
-        <div className="flex items-center justify-between mb-10">
+        <div className="mb-6 rounded-[28px] border border-[#1a2438] bg-[#0d1220]/88 p-5 shadow-[0_28px_80px_rgba(0,0,0,0.34)] backdrop-blur-xl md:p-6">
+          <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
           <div>
-            <h1 className="text-4xl font-bold">
+            <div className="mb-3 flex items-center gap-3 lg:hidden">
+              <img
+                src="/PNG/Articton.png"
+                alt="Articton Logo"
+                className="h-9 w-9 scale-[2.1] object-contain"
+              />
+              <span className="text-xl font-bold text-white">Articton</span>
+            </div>
+            <div className="text-xs font-semibold uppercase tracking-[0.28em] text-[#00ffb4]/70">
+              Administrator Console
+            </div>
+            <h1 className="mt-3 text-3xl font-black tracking-tight text-white md:text-4xl">
               {activeTab === "accounts" ? "Account Management" : "Analytics"}
             </h1>
-            <p className="mt-2 text-sm text-white/60">
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-[#9fb0c9]">
               Scores are fetched live from Firebase user documents.
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="flex rounded-2xl border border-[#1a2438] bg-[#0b1220] p-1 lg:hidden">
+              <button
+                type="button"
+                onClick={() => setActiveTab("accounts")}
+                className={[
+                  "rounded-xl px-4 py-2 text-sm font-semibold transition",
+                  activeTab === "accounts"
+                    ? "bg-[#00ffb4] text-[#0a0e17]"
+                    : "text-[#9fb0c9] hover:text-white",
+                ].join(" ")}
+              >
+                Accounts
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("analytics")}
+                className={[
+                  "rounded-xl px-4 py-2 text-sm font-semibold transition",
+                  activeTab === "analytics"
+                    ? "bg-[#00ffb4] text-[#0a0e17]"
+                    : "text-[#9fb0c9] hover:text-white",
+                ].join(" ")}
+              >
+                Analytics
+              </button>
+            </div>
             <button
               type="button"
               onClick={fetchUsers}
               disabled={loading}
-              className="px-4 py-2.5 rounded-full bg-white/10 hover:bg-white/15 transition disabled:opacity-50"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#00ffb4]/30 bg-[#00ffb4]/10 px-4 py-3 text-sm font-semibold text-[#00ffb4] transition hover:bg-[#00ffb4]/16 disabled:opacity-50"
             >
+              <RefreshCw className={["h-4 w-4", loading ? "animate-spin" : ""].join(" ")} />
               {loading ? "Refreshing..." : "Refresh"}
             </button>
 
             {/* Dropdown */}
             <div className="relative">
               <button
-                className="flex items-center gap-3 bg-[#2E78A6]/70 px-4 py-2.5 rounded-full hover:bg-[#2E78A6] transition"
+                className="flex items-center gap-3 rounded-2xl border border-[#1a2438] bg-[#0b1220] px-4 py-3 text-sm text-[#dbe6f5] transition hover:bg-white/[0.04]"
                 onClick={() => setDropdownOpen(!dropdownOpen)}
               >
-                <div className="h-8 w-8 rounded-full bg-white/20 flex items-center justify-center text-sm font-semibold uppercase">
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-[#00ffb4]/25 bg-[#00ffb4]/10 text-sm font-bold uppercase text-[#00ffb4]">
                   {adminName.charAt(0)}
                 </div>
-                <span className="font-medium">{adminName}</span>
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className={`h-4 w-4 transition ${
-                    dropdownOpen ? "rotate-180" : ""
-                  }`}
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                </svg>
+                <span className="max-w-[180px] truncate font-medium">{adminName}</span>
+                <ChevronDown className={["h-4 w-4 transition", dropdownOpen ? "rotate-180" : ""].join(" ")} />
               </button>
 
               {dropdownOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-[#194066] border border-white/10 rounded-xl shadow-xl z-20 overflow-hidden">
+                <div className="absolute right-0 z-20 mt-2 w-52 overflow-hidden rounded-2xl border border-[#1a2438] bg-[#0b1220] shadow-[0_24px_60px_rgba(0,0,0,0.42)]">
                   <button
-                    className="w-full text-left px-4 py-2 hover:bg-[#2E78A6] transition"
+                    className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-[#dbe6f5] transition hover:bg-white/[0.05]"
                     onClick={() => alert("Settings clicked")}
                   >
+                    <Settings className="h-4 w-4 text-[#7a8ba8]" />
                     Settings
                   </button>
                   <button
-                    className="w-full text-left px-4 py-2 hover:bg-[#2E78A6] transition"
+                    className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-red-200 transition hover:bg-red-500/10"
                     onClick={onLogout}
                   >
+                    <LogOut className="h-4 w-4" />
                     Logout
                   </button>
                 </div>
               )}
             </div>
           </div>
+          </div>
         </div>
 
         {/* ACCOUNT MANAGEMENT */}
         {activeTab === "accounts" && (
           <>
-            {loading && <p className="text-white/80">Loading students...</p>}
-            {error && <p className="text-red-300 mb-4">{error}</p>}
+            {loading && (
+              <div className="rounded-2xl border border-[#1a2438] bg-[#0d1220] p-6 text-center text-[#9fb0c9]">
+                Loading students...
+              </div>
+            )}
+            {error && (
+              <div className="mb-4 rounded-2xl border border-red-400/20 bg-red-500/10 p-4 text-red-200">
+                {error}
+              </div>
+            )}
 
             {!loading && !error && (
               <>
-                <div className="overflow-x-auto rounded-2xl border border-white/10 bg-white/[0.03]">
-                  <div className="min-w-[1450px]">
-                    <div className="grid grid-cols-[1.25fr_1.6fr_repeat(5,1fr)_0.8fr_120px_110px] gap-4 px-5 py-4 text-sm text-white/80 border-b border-white/10">
+                <div className="overflow-x-auto rounded-[28px] border border-[#1a2438] bg-[#0d1220] shadow-[0_28px_80px_rgba(0,0,0,0.34)]">
+                  <div className="min-w-[1320px]">
+                    <div className="grid grid-cols-[1.25fr_1.55fr_0.9fr_1fr_1.6fr_0.75fr_120px_110px] gap-4 border-b border-white/10 bg-[#0b1220] px-5 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8ba8]">
                       <div>Name</div>
                       <div>E-mail</div>
-                      <div>Module 1</div>
-                      <div>Module 2</div>
-                      <div>Module 3</div>
-                      <div>Assembly PT</div>
-                      <div>Disassembly PT</div>
+                      <div>Created</div>
+                      <div>Contact No.</div>
+                      <div>UID</div>
                       <div>Avg Score</div>
                       <div>Update</div>
                       <div>Remove</div>
@@ -526,7 +766,7 @@ export default function AdminPage({ adminUser, onLogout }) {
                       {accounts.map((account) => (
                         <div
                           key={account.id}
-                          className="grid grid-cols-[1.25fr_1.6fr_repeat(5,1fr)_0.8fr_120px_110px] gap-4 items-center px-5 py-4 bg-[#3A7EA4]/85 hover:bg-[#3A7EA4] transition"
+                          className="grid grid-cols-[1.25fr_1.55fr_0.9fr_1fr_1.6fr_0.75fr_120px_110px] items-center gap-4 px-5 py-4 transition hover:bg-white/[0.04]"
                         >
                           <div>
                             {editingId === account.id ? (
@@ -536,21 +776,21 @@ export default function AdminPage({ adminUser, onLogout }) {
                                   value={editFirstName}
                                   onChange={(e) => setEditFirstName(e.target.value)}
                                   placeholder="First Name"
-                                  className="px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white outline-none"
+                                  className="rounded-xl border border-[#1a2438] bg-[#0b1220] px-3 py-2 text-sm text-white outline-none focus:border-[#00ffb4]/40 focus:ring-2 focus:ring-[#00ffb4]/15"
                                 />
                                 <input
                                   type="text"
                                   value={editLastName}
                                   onChange={(e) => setEditLastName(e.target.value)}
                                   placeholder="Last Name"
-                                  className="px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white outline-none"
+                                  className="rounded-xl border border-[#1a2438] bg-[#0b1220] px-3 py-2 text-sm text-white outline-none focus:border-[#00ffb4]/40 focus:ring-2 focus:ring-[#00ffb4]/15"
                                 />
                               </div>
                             ) : (
                               <div>
-                                <div className="font-semibold">{account.name}</div>
+                                <div className="font-semibold text-white">{account.name}</div>
                                 {account.studentId || account.section ? (
-                                  <div className="text-xs text-white/65 mt-1">
+                                  <div className="mt-1 text-xs text-[#7a8ba8]">
                                     {[account.studentId, account.section]
                                       .filter(Boolean)
                                       .join(" • ")}
@@ -560,18 +800,28 @@ export default function AdminPage({ adminUser, onLogout }) {
                             )}
                           </div>
 
-                          <div className="text-sm break-all">{account.email}</div>
+                          <div className="break-all text-sm text-[#c8d4e6]">{account.email}</div>
 
-                          <div>
-                            <div className="text-xl font-bold">
-                              {account.progress}%
-                            </div>
-                            <div className="text-xs text-white/65">
-                              {account.completedCount}/{account.totalActivities} done
-                            </div>
+                          <div className="text-sm text-[#c8d4e6]">
+                            {account.createdAtLabel}
                           </div>
 
-                          <div className="font-semibold text-white">{account.averageScore}%</div>
+                          <div className="text-sm text-[#c8d4e6]">
+                            {account.contactNumber || "Not set"}
+                          </div>
+
+                          <div
+                            className="truncate font-mono text-xs text-[#9fb0c9]"
+                            title={account.uid}
+                          >
+                            {account.uid}
+                          </div>
+
+                          <div>
+                            <span className="rounded-full border border-[#00ffb4]/20 bg-[#00ffb4]/10 px-3 py-1.5 text-sm font-bold text-[#00ffb4]">
+                              {account.averageScore}%
+                            </span>
+                          </div>
 
                           <div>
                             {editingId === account.id ? (
@@ -580,14 +830,14 @@ export default function AdminPage({ adminUser, onLogout }) {
                                   type="button"
                                   onClick={() => saveEdit(account.id)}
                                   disabled={savingId === account.id}
-                                  className="px-3 py-2 rounded-lg bg-green-500 hover:bg-green-600 disabled:opacity-60"
+                                  className="rounded-xl bg-[#00ffb4] px-3 py-2 text-sm font-bold text-[#0a0e17] transition hover:scale-[1.01] disabled:opacity-60"
                                 >
                                   {savingId === account.id ? "Saving..." : "Save"}
                                 </button>
                                 <button
                                   type="button"
                                   onClick={cancelEdit}
-                                  className="px-3 py-2 rounded-lg bg-gray-500 hover:bg-gray-600"
+                                  className="rounded-xl border border-[#1a2438] bg-white/[0.04] px-3 py-2 text-sm font-semibold text-[#dbe6f5] transition hover:bg-white/[0.07]"
                                 >
                                   Cancel
                                 </button>
@@ -596,7 +846,7 @@ export default function AdminPage({ adminUser, onLogout }) {
                               <button
                                 type="button"
                                 onClick={() => startEdit(account)}
-                                className="px-4 py-2 rounded-lg bg-yellow-500 hover:bg-yellow-600 text-black font-semibold"
+                                className="rounded-xl border border-[#00ffb4]/30 bg-[#00ffb4]/10 px-4 py-2 text-sm font-semibold text-[#00ffb4] transition hover:bg-[#00ffb4]/16"
                               >
                                 Update
                               </button>
@@ -608,7 +858,7 @@ export default function AdminPage({ adminUser, onLogout }) {
                               type="button"
                               onClick={() => removeUser(account.id)}
                               disabled={deletingId === account.id}
-                              className="px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600 disabled:opacity-60"
+                              className="rounded-xl border border-red-400/25 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-200 transition hover:bg-red-500/16 disabled:opacity-60"
                             >
                               {deletingId === account.id ? "Removing..." : "Remove"}
                             </button>
@@ -617,7 +867,7 @@ export default function AdminPage({ adminUser, onLogout }) {
                       ))}
 
                       {!accounts.length && (
-                        <div className="px-5 py-8 text-center text-white/70">
+                        <div className="px-5 py-8 text-center text-[#9fb0c9]">
                           No student accounts found.
                         </div>
                       )}
@@ -632,7 +882,7 @@ export default function AdminPage({ adminUser, onLogout }) {
         {/* ANALYTICS */}
         {activeTab === "analytics" && (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-4">
               <MetricCard
                 label="Students"
                 value={analyticsData.activeUsers.toLocaleString()}
@@ -658,67 +908,73 @@ export default function AdminPage({ adminUser, onLogout }) {
               />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="p-6 rounded-xl bg-[#13304a]/50 backdrop-blur-lg border border-white/10">
-                <h3 className="text-lg font-semibold mb-4">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              <div className="rounded-[28px] border border-[#1a2438] bg-[#0d1220] p-6 shadow-[0_28px_80px_rgba(0,0,0,0.34)]">
+                <h3 className="mb-4 text-lg font-bold tracking-tight text-white">
                   Activity Completion
                 </h3>
 
-                <div className="h-48 flex items-end gap-3">
-                  {analyticsData.completionTrend.map((value, index) => (
-                    <div
-                      key={SCORE_ITEMS[index].label}
-                      className="flex-1 flex flex-col items-center justify-end gap-2"
-                    >
-                      <div
-                        className="w-full bg-[#5F9598] rounded-t-md transition-all duration-300"
-                        style={{ height: `${Math.max(value, 4)}%` }}
-                        title={`${value}%`}
-                      />
-                      <span className="text-xs text-white/60">
-                        {value}%
-                      </span>
+                <div className="overflow-x-auto pb-2">
+                  <div className="min-w-[1120px]">
+                    <div className="flex h-48 items-end gap-3">
+                      {analyticsData.completionTrend.map((item) => (
+                        <div
+                          key={item.key}
+                          className="flex flex-1 flex-col items-center justify-end gap-2"
+                        >
+                          <div
+                            className="w-full rounded-t-md bg-[#00ffb4] shadow-[0_0_24px_rgba(0,255,180,0.18)] transition-all duration-300"
+                            style={{ height: `${Math.max(item.percent, 4)}%` }}
+                            title={`${item.completed}/${item.total} completed`}
+                          />
+                          <span className="text-xs text-[#9fb0c9]">
+                            {item.percent}%
+                          </span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
 
-                <div className="flex justify-between text-xs text-white/60 mt-3">
-                  {SCORE_ITEMS.map((item) => (
-                    <span key={item.key}>{item.label}</span>
-                  ))}
+                    <div className="mt-3 flex justify-between text-xs text-[#7a8ba8]">
+                      {analyticsData.completionTrend.map((item) => (
+                        <span key={item.key} className="max-w-[76px] text-center leading-4">
+                          {item.label}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div className="p-6 rounded-xl bg-[#13304a]/50 backdrop-blur-lg border border-white/10">
-                <h3 className="text-lg font-semibold mb-4">Top User Overview</h3>
+              <div className="rounded-[28px] border border-[#1a2438] bg-[#0d1220] p-6 shadow-[0_28px_80px_rgba(0,0,0,0.34)]">
+                <h3 className="mb-4 text-lg font-bold tracking-tight text-white">Top User Overview</h3>
 
                 {analyticsData.userOverview ? (
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between bg-[#1b365d] rounded-xl p-4">
+                    <div className="flex items-center justify-between rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4">
                       <div>
-                        <p className="font-semibold">
+                        <p className="font-semibold text-white">
                           {analyticsData.userOverview.name}
                         </p>
-                        <p className="text-sm text-white/60">
+                        <p className="text-sm text-[#7a8ba8]">
                           {analyticsData.userOverview.email}
                         </p>
                       </div>
 
-                      <div className="bg-[#5F9598]/30 px-4 py-2 rounded-lg font-semibold">
+                      <div className="rounded-xl border border-[#00ffb4]/20 bg-[#00ffb4]/10 px-4 py-2 font-bold text-[#00ffb4]">
                         {analyticsData.userOverview.averageScore}%
                       </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
-                      <div className="rounded-xl bg-white/5 border border-white/10 p-4">
-                        <div className="text-sm text-white/60">Progress</div>
-                        <div className="mt-1 text-2xl font-bold">
+                      <div className="rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4">
+                        <div className="text-sm text-[#7a8ba8]">Progress</div>
+                        <div className="mt-1 text-2xl font-black text-white">
                           {analyticsData.userOverview.progress}%
                         </div>
                       </div>
-                      <div className="rounded-xl bg-white/5 border border-white/10 p-4">
-                        <div className="text-sm text-white/60">Completed</div>
-                        <div className="mt-1 text-2xl font-bold">
+                      <div className="rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4">
+                        <div className="text-sm text-[#7a8ba8]">Completed</div>
+                        <div className="mt-1 text-2xl font-black text-white">
                           {analyticsData.userOverview.completedCount}/
                           {analyticsData.userOverview.totalActivities}
                         </div>
@@ -726,7 +982,7 @@ export default function AdminPage({ adminUser, onLogout }) {
                     </div>
                   </div>
                 ) : (
-                  <div className="bg-[#1b365d] rounded-xl p-4 text-white/60">
+                  <div className="rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4 text-[#9fb0c9]">
                     No student score data yet.
                   </div>
                 )}
@@ -735,6 +991,7 @@ export default function AdminPage({ adminUser, onLogout }) {
           </>
         )}
       </main>
+    </div>
     </div>
   );
 }

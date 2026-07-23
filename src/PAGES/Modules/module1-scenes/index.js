@@ -26,11 +26,11 @@ export const module1ScenesBase = [
   cpuScene,
   motherboardScene,
   ramScene,
+  ssdScene,
   hddScene,
   psuScene,
-  caseScene,
   gpuScene,
-  ssdScene,
+  caseScene,
 ];
 
 // Keep AMD list indices aligned with `module1ScenesBase` to avoid index mismatches
@@ -38,11 +38,11 @@ export const module1ScenesAMD = [
   cpuSceneAMD,
   motherboardSceneAMD,
   ramSceneAMD,
+  ssdScene,
   hddSceneAMD,
   psuSceneAMD,
-  caseSceneAMD,
   gpuScene,
-  ssdScene,
+  caseSceneAMD,
 ];
 
 // Keep Intel list indices aligned with `module1ScenesBase` as well
@@ -50,9 +50,9 @@ export const module1ScenesIntel = [
   cpuSceneIntel,
   motherboardSceneIntel,
   ramSceneIntel,
+  ssdScene,
   hddSceneIntel,
   psuSceneIntel,
-  caseSceneIntel,
   gpuScene,
-  ssdScene,
+  caseSceneIntel,
 ];
