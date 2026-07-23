@@ -87,16 +87,82 @@ const LEGACY_STORAGE_KEYS = [
   "module3AssembledPartsINTEL",
 ];
 
+function playCompletionSound(enabled, isFinal = false) {
+  if (!enabled || typeof window === "undefined") return;
+
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) return;
+
+  try {
+    const context = new AudioContextClass();
+    const notes = isFinal
+      ? [
+          { frequency: 523.25, delay: 0, duration: 0.12 },
+          { frequency: 659.25, delay: 0.11, duration: 0.14 },
+          { frequency: 783.99, delay: 0.24, duration: 0.2 },
+        ]
+      : [
+          { frequency: 659.25, delay: 0, duration: 0.1 },
+          { frequency: 880, delay: 0.09, duration: 0.16 },
+        ];
+
+    const masterGain = context.createGain();
+    masterGain.gain.setValueAtTime(0.0001, context.currentTime);
+    masterGain.gain.exponentialRampToValueAtTime(0.16, context.currentTime + 0.015);
+    masterGain.connect(context.destination);
+
+    notes.forEach(({ frequency, delay, duration }) => {
+      const oscillator = context.createOscillator();
+      const noteGain = context.createGain();
+      const startAt = context.currentTime + delay;
+      const endAt = startAt + duration;
+
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(frequency, startAt);
+      noteGain.gain.setValueAtTime(0.0001, startAt);
+      noteGain.gain.exponentialRampToValueAtTime(0.75, startAt + 0.012);
+      noteGain.gain.exponentialRampToValueAtTime(0.0001, endAt);
+      oscillator.connect(noteGain);
+      noteGain.connect(masterGain);
+      oscillator.start(startAt);
+      oscillator.stop(endAt + 0.02);
+    });
+
+    const totalDuration = isFinal ? 650 : 420;
+    window.setTimeout(() => {
+      context.close().catch(() => {});
+    }, totalDuration);
+  } catch (error) {
+    console.warn("Completion sound could not be played:", error);
+  }
+}
+
+function getCompletionDate() {
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    }).format(new Date());
+  } catch {
+    return new Date().toLocaleDateString();
+  }
+}
+
+
 const PART_BY_KEY = Object.freeze(
   Object.fromEntries(PART_MODELS.map((part) => [part.key, part]))
 );
 
-function cloneSceneForDisplay(scene, { disableRaycast = false } = {}) {
+function cloneSceneForDisplay(
+  scene,
+  { disableRaycast = false, enableShadows = true } = {}
+) {
   const clone = scene.clone(true);
   clone.traverse((object) => {
     if (!object.isMesh) return;
-    object.castShadow = true;
-    object.receiveShadow = true;
+    object.castShadow = enableShadows;
+    object.receiveShadow = enableShadows;
     if (disableRaycast) object.raycast = () => null;
   });
   return clone;
@@ -128,8 +194,12 @@ function getAutomaticLayFlatQuaternion(modelSize) {
 function StaticAuthoredModel({ part, disableRaycast = true }) {
   const { scene } = useGLTF(encodeURI(part.path));
   const clone = useMemo(
-    () => cloneSceneForDisplay(scene, { disableRaycast }),
-    [disableRaycast, scene]
+    () =>
+      cloneSceneForDisplay(scene, {
+        disableRaycast,
+        enableShadows: !["cpu", "ram1", "ram2", "ssd"].includes(part.key),
+      }),
+    [disableRaycast, part.key, scene]
   );
 
   return <primitive object={clone} dispose={null} />;
@@ -359,12 +429,6 @@ function InteractiveCenteredObject({
       groupRef.current.position.set(...startPosition);
       rotationRef.current.quaternion.copy(tableQuaternion);
 
-      // Pre-align the active component with the highlighted installation
-      // height. This prevents small parts such as the CPU from beginning
-      // below the desk or below the target plane before the user grabs them.
-      if (isActive) {
-        groupRef.current.position.y = lockedTargetYRef.current;
-      }
     }
 
     groupRef.current.updateMatrixWorld(true);
@@ -739,13 +803,11 @@ function InteractiveCenteredObject({
           return;
         }
       }
-    } else if (
-      isActive &&
-      phaseRef.current !== "installed" &&
-      phaseRef.current !== "grabbed"
-    ) {
-      // Keep the currently active part at target height before the first grab
-      // and after an out-of-range release. X and Z remain fully user-controlled.
+    } else if (isActive && phaseRef.current === "released") {
+      // After the user has grabbed the part once, keep the target-height lock
+      // active between attempts. A newly selected part remains at its authored
+      // table position until the first click, so it never disappears before
+      // the learner can see or grab it.
       lockedTargetYRef.current = installationTarget.position.y;
       groupRef.current.position.y = lockedTargetYRef.current;
     } else if (phaseRef.current === "installed") {
@@ -883,7 +945,10 @@ function AssemblyPart({
   onTelemetry,
 }) {
   const { scene } = useGLTF(encodeURI(part.path));
-  const clone = useMemo(() => cloneSceneForDisplay(scene), [scene]);
+  const clone = useMemo(
+    () => cloneSceneForDisplay(scene, { enableShadows: part.key !== "cpu" }),
+    [part.key, scene]
+  );
   const bounds = useMemo(() => getModelBounds(clone), [clone]);
 
   return (
@@ -911,6 +976,7 @@ function AssemblyPart({
 /* Pulsing installation highlight at the GLB-authored target           */
 /* ------------------------------------------------------------------ */
 
+
 function InstallationTargetGuide({ part }) {
   const { scene } = useGLTF(encodeURI(part.path));
   const pulseRef = useRef(null);
@@ -919,7 +985,8 @@ function InstallationTargetGuide({ part }) {
   const guideData = useMemo(() => {
     const fillScene = scene.clone(true);
     const wireScene = scene.clone(true);
-    const materials = [];
+    const fillMaterials = [];
+    const wireMaterials = [];
 
     fillScene.traverse((object) => {
       if (!object.isMesh) return;
@@ -928,13 +995,13 @@ function InstallationTargetGuide({ part }) {
       const material = new THREE.MeshBasicMaterial({
         color: "#00ffb4",
         transparent: true,
-        opacity: 0.1,
+        opacity: part.key === "cpu" ? 0.04 : 0.09,
         depthTest: false,
         depthWrite: false,
         side: THREE.DoubleSide,
       });
       object.material = material;
-      materials.push(material);
+      fillMaterials.push(material);
     });
 
     wireScene.traverse((object) => {
@@ -944,44 +1011,57 @@ function InstallationTargetGuide({ part }) {
       const material = new THREE.MeshBasicMaterial({
         color: "#7dffdc",
         transparent: true,
-        opacity: 0.78,
+        opacity: 0.76,
         wireframe: true,
         depthTest: false,
         depthWrite: false,
         side: THREE.DoubleSide,
       });
       object.material = material;
-      materials.push(material);
+      wireMaterials.push(material);
     });
 
     fillScene.updateMatrixWorld(true);
     const bounds = new THREE.Box3().setFromObject(fillScene);
+    const center = bounds.getCenter(new THREE.Vector3());
+    const size = bounds.getSize(new THREE.Vector3());
+    const callout = new THREE.Vector3(
+      center.x + Math.max(size.x * 0.82, 0.95),
+      center.y + Math.max(size.y * 1.25, 0.95),
+      center.z + Math.max(size.z * 0.45, 0.55)
+    );
+
     return {
       fillScene,
       wireScene,
-      materials,
-      center: bounds.getCenter(new THREE.Vector3()),
-      size: bounds.getSize(new THREE.Vector3()),
+      fillMaterials,
+      wireMaterials,
+      center,
+      size,
+      callout,
     };
-  }, [scene]);
+  }, [part.key, scene]);
 
   useEffect(() => {
-    return () => guideData.materials.forEach((material) => material.dispose());
+    return () => {
+      [...guideData.fillMaterials, ...guideData.wireMaterials].forEach(
+        (material) => material.dispose()
+      );
+    };
   }, [guideData]);
 
   useFrame(({ clock }) => {
-    const pulse = (Math.sin(clock.getElapsedTime() * 3.5) + 1) / 2;
+    const pulse = (Math.sin(clock.elapsedTime * 3.5) + 1) / 2;
 
     if (pulseRef.current) {
-      const scale = 0.985 + pulse * 0.03;
-      pulseRef.current.scale.setScalar(scale);
-      pulseRef.current.traverse((object) => {
-        if (!object.isMesh || !object.material) return;
-        object.material.opacity = object.material.wireframe
-          ? 0.5 + pulse * 0.36
-          : 0.06 + pulse * 0.12;
-      });
+      pulseRef.current.scale.setScalar(0.985 + pulse * 0.03);
     }
+    guideData.fillMaterials.forEach((material) => {
+      material.opacity = (part.key === "cpu" ? 0.025 : 0.05) + pulse * 0.09;
+    });
+    guideData.wireMaterials.forEach((material) => {
+      material.opacity = 0.5 + pulse * 0.34;
+    });
 
     if (markerRef.current?.material) {
       markerRef.current.material.opacity = 0.35 + pulse * 0.55;
@@ -1001,7 +1081,7 @@ function InstallationTargetGuide({ part }) {
         <primitive object={guideData.wireScene} dispose={null} />
       </group>
 
-      <mesh ref={markerRef} position={guideData.center} renderOrder={1002}>
+      <mesh ref={markerRef} position={guideData.center.toArray()} renderOrder={1002}>
         <sphereGeometry args={[markerRadius, 24, 16]} />
         <meshBasicMaterial
           color="#00ffb4"
@@ -1013,44 +1093,23 @@ function InstallationTargetGuide({ part }) {
         />
       </mesh>
 
-      <mesh
-        position={guideData.center}
-        rotation={[-Math.PI / 2, 0, 0]}
-        renderOrder={1003}
-      >
-        <ringGeometry
-          args={[markerRadius * 1.45, markerRadius * 2.25, 48]}
-        />
-        <meshBasicMaterial
-          color="#00ffb4"
-          transparent
-          opacity={0.34}
-          side={THREE.DoubleSide}
-          depthTest={false}
-          depthWrite={false}
-        />
-      </mesh>
-
       <Html
         center
-        position={[
-          guideData.center.x,
-          guideData.center.y + Math.max(guideData.size.y * 0.7, 0.8),
-          guideData.center.z,
-        ]}
+        position={guideData.callout.toArray()}
+        transform
+        sprite
+        distanceFactor={11}
+        occlude={false}
         style={{ pointerEvents: "none" }}
       >
-        <div className="whitespace-nowrap rounded-xl border border-[#00ffb4]/35 bg-[#07111d]/94 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-[#73ffd4] shadow-[0_10px_30px_rgba(0,0,0,0.45)] backdrop-blur-md">
+        <div className="whitespace-nowrap rounded-xl border border-[#00ffb4]/40 bg-[#07111d]/95 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#73ffd4] shadow-[0_12px_35px_rgba(0,0,0,0.5)] backdrop-blur-md">
+          <span className="mr-2 inline-flex rounded-full border border-[#00ffb4]/35 bg-[#00ffb4]/12 px-2 py-0.5 text-[8px]">TARGET</span>
           Install {COMPONENT_LABELS[part.key]} here
         </div>
       </Html>
     </group>
   );
 }
-
-/* ------------------------------------------------------------------ */
-/* Motherboard carrier: installed CPU/RAM/SSD travel with the board    */
-/* ------------------------------------------------------------------ */
 
 function MotherboardUnit({
   contentFrameRef,
@@ -1161,6 +1220,7 @@ class ModelErrorBoundary extends React.Component {
 }
 
 function AssemblyScene({
+  rootRef,
   activePartKey,
   completedParts,
   onPartCompleted,
@@ -1172,7 +1232,7 @@ function AssemblyScene({
   const motherboardContentRef = useRef(null);
 
   return (
-    <group>
+    <group ref={rootRef}>
       <StaticAuthoredModel part={PART_BY_KEY.table} disableRaycast />
       <StaticAuthoredModel part={PART_BY_KEY.case} disableRaycast />
 
@@ -1221,93 +1281,82 @@ function AssemblyScene({
   );
 }
 
-function AssistedCameraRig({
-  telemetry,
-  controlsRef,
-  focusRequest,
-  isDraggingPart,
-}) {
-  const { camera } = useThree();
-  const animationRef = useRef(null);
-  const fromCameraRef = useRef(new THREE.Vector3());
-  const toCameraRef = useRef(new THREE.Vector3());
-  const fromTargetRef = useRef(new THREE.Vector3());
-  const toTargetRef = useRef(new THREE.Vector3());
-  const viewDirectionRef = useRef(new THREE.Vector3());
+
+
+function FullTableBirdEyeCamera({ sceneRootRef, controlsRef, overviewRequest }) {
+  const { camera, size } = useThree();
+  const initializedRef = useRef(false);
+  const handledRequestRef = useRef(-1);
 
   useEffect(() => {
-    if (!telemetry || !controlsRef.current || isDraggingPart) return;
+    const isInitial = !initializedRef.current;
+    const isRequested = overviewRequest !== handledRequestRef.current;
+    if (!isInitial && !isRequested) return undefined;
 
-    const partPosition = new THREE.Vector3(...telemetry.position);
-    const targetPosition = new THREE.Vector3(...telemetry.targetPosition);
-    const midpoint = partPosition.clone().lerp(targetPosition, 0.5);
-    const span = Math.max(partPosition.distanceTo(targetPosition), 3.5);
+    let frameId = 0;
+    let attempts = 0;
 
-    fromCameraRef.current.copy(camera.position);
-    fromTargetRef.current.copy(controlsRef.current.target);
+    const frameWholeWorkspace = () => {
+      const root = sceneRootRef.current;
+      const controls = controlsRef.current;
+      if (!root || !controls) {
+        attempts += 1;
+        if (attempts < 60) frameId = requestAnimationFrame(frameWholeWorkspace);
+        return;
+      }
 
-    viewDirectionRef.current
-      .copy(camera.position)
-      .sub(controlsRef.current.target);
+      root.updateWorldMatrix(true, true);
+      const box = new THREE.Box3().setFromObject(root);
+      if (box.isEmpty()) {
+        attempts += 1;
+        if (attempts < 60) frameId = requestAnimationFrame(frameWholeWorkspace);
+        return;
+      }
 
-    if (viewDirectionRef.current.lengthSq() < 0.001) {
-      viewDirectionRef.current.set(1.15, 0.78, 1.15);
-    }
+      const center = box.getCenter(new THREE.Vector3());
+      const sceneSize = box.getSize(new THREE.Vector3());
+      const aspect = Math.max(size.width / Math.max(size.height, 1), 0.5);
+      const verticalFov = THREE.MathUtils.degToRad(camera.fov);
+      const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * aspect);
+      const verticalDistance =
+        (sceneSize.y * 0.72) / Math.max(Math.tan(verticalFov / 2), 0.2);
+      const horizontalDistance =
+        (sceneSize.x * 0.72) / Math.max(Math.tan(horizontalFov / 2), 0.2);
+      const depthDistance = sceneSize.z * 0.9;
+      const distance = Math.max(
+        verticalDistance,
+        horizontalDistance,
+        depthDistance,
+        12
+      );
 
-    viewDirectionRef.current.normalize();
-    viewDirectionRef.current.y = Math.max(viewDirectionRef.current.y, 0.28);
-    viewDirectionRef.current.normalize();
+      // Elevated diagonal direction preserves a useful bird's-eye view while
+      // keeping every loose component, the motherboard, case, and full table
+      // inside the viewport on both wide and smaller screens.
+      const direction = new THREE.Vector3(0.42, 1.28, 0.88).normalize();
+      const target = center.clone();
+      target.y += sceneSize.y * 0.02;
 
-    const verticalFov = THREE.MathUtils.degToRad(camera.fov);
-    const fitDistance =
-      (span * 0.58) / Math.max(Math.tan(verticalFov / 2), 0.2);
-    const cameraDistance = THREE.MathUtils.clamp(
-      fitDistance + 6.5,
-      10,
-      125
-    );
+      camera.position.copy(target).addScaledVector(direction, distance * 1.52);
+      camera.near = Math.max(0.01, distance / 600);
+      camera.far = Math.max(1600, distance * 24);
+      camera.updateProjectionMatrix();
 
-    toTargetRef.current.copy(midpoint);
-    toCameraRef.current
-      .copy(midpoint)
-      .addScaledVector(viewDirectionRef.current, cameraDistance);
-
-    animationRef.current = {
-      startedAt: performance.now(),
-      duration: CAMERA_FOCUS_DURATION_MS,
+      controls.target.copy(target);
+      camera.lookAt(target);
+      controls.update();
+      initializedRef.current = true;
+      handledRequestRef.current = overviewRequest;
     };
-  }, [camera, controlsRef, focusRequest, isDraggingPart, telemetry?.key]);
 
-  useFrame(() => {
-    const animation = animationRef.current;
-    const controls = controlsRef.current;
-    if (!animation || !controls || isDraggingPart) return;
-
-    const raw = THREE.MathUtils.clamp(
-      (performance.now() - animation.startedAt) / animation.duration,
-      0,
-      1
-    );
-    const eased = raw * raw * (3 - 2 * raw);
-
-    camera.position.lerpVectors(
-      fromCameraRef.current,
-      toCameraRef.current,
-      eased
-    );
-    controls.target.lerpVectors(
-      fromTargetRef.current,
-      toTargetRef.current,
-      eased
-    );
-    camera.lookAt(controls.target);
-    controls.update();
-
-    if (raw >= 1) animationRef.current = null;
-  });
+    frameId = requestAnimationFrame(frameWholeWorkspace);
+    return () => cancelAnimationFrame(frameId);
+  }, [camera, controlsRef, overviewRequest, sceneRootRef, size.height, size.width]);
 
   return null;
 }
+
+
 
 function ModelViewer({
   activePartKey,
@@ -1318,39 +1367,124 @@ function ModelViewer({
 }) {
   const [isDraggingPart, setIsDraggingPart] = useState(false);
   const [telemetry, setTelemetry] = useState(null);
-  const [focusRequest, setFocusRequest] = useState(0);
+  const [overviewRequest, setOverviewRequest] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const viewerRef = useRef(null);
   const controlsRef = useRef(null);
+  const sceneRootRef = useRef(null);
 
   useEffect(() => {
+    // Changing steps must not zoom into one item. Keep the whole-table view
+    // stable so the next loose component is immediately visible.
     setTelemetry(null);
-    setFocusRequest((value) => value + 1);
   }, [activePartKey]);
 
+  const refreshOverviewAfterResize = useCallback(() => {
+    // Fullscreen changes the canvas dimensions. Wait for the browser to finish
+    // laying out the fullscreen element before recalculating the overview.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setOverviewRequest((value) => value + 1);
+      });
+    });
+  }, []);
+
+  const syncFullscreenState = useCallback(() => {
+    const fullscreenElement =
+      document.fullscreenElement || document.webkitFullscreenElement || null;
+
+    setIsFullscreen(fullscreenElement === viewerRef.current);
+    refreshOverviewAfterResize();
+  }, [refreshOverviewAfterResize]);
+
+  useEffect(() => {
+    document.addEventListener("fullscreenchange", syncFullscreenState);
+    document.addEventListener("webkitfullscreenchange", syncFullscreenState);
+
+    return () => {
+      document.removeEventListener("fullscreenchange", syncFullscreenState);
+      document.removeEventListener("webkitfullscreenchange", syncFullscreenState);
+    };
+  }, [syncFullscreenState]);
+
+  const toggleFullscreen = useCallback(async () => {
+    if (isDraggingPart || !viewerRef.current) return;
+
+    const fullscreenElement =
+      document.fullscreenElement || document.webkitFullscreenElement || null;
+
+    try {
+      if (fullscreenElement === viewerRef.current) {
+        const exitFullscreen =
+          document.exitFullscreen || document.webkitExitFullscreen;
+
+        if (exitFullscreen) {
+          await Promise.resolve(exitFullscreen.call(document));
+        }
+        return;
+      }
+
+      // Exit another fullscreen element first, if one is active.
+      if (fullscreenElement) {
+        const exitFullscreen =
+          document.exitFullscreen || document.webkitExitFullscreen;
+
+        if (exitFullscreen) {
+          await Promise.resolve(exitFullscreen.call(document));
+        }
+      }
+
+      const requestFullscreen =
+        viewerRef.current.requestFullscreen ||
+        viewerRef.current.webkitRequestFullscreen;
+
+      if (requestFullscreen) {
+        await Promise.resolve(requestFullscreen.call(viewerRef.current));
+      }
+    } catch (error) {
+      console.error("Unable to toggle fullscreen mode:", error);
+    }
+  }, [isDraggingPart]);
+
   return (
-    <div className="relative h-full w-full">
+    <div
+      ref={viewerRef}
+      className={[
+        "relative h-full w-full overflow-hidden bg-[#070c14]",
+        isFullscreen ? "rounded-none" : "",
+      ].join(" ")}
+      style={isFullscreen ? { width: "100vw", height: "100vh" } : undefined}
+    >
       <Canvas
-        camera={{ position: [38, 24, 46], fov: 48, near: 0.01, far: 1200 }}
-        dpr={[1, 2]}
+        camera={{ position: [35, 72, 52], fov: 46, near: 0.01, far: 1400 }}
+        dpr={[1, 1.45]}
         shadows
+        performance={{ min: 0.55 }}
         className="h-full w-full"
-        gl={{ antialias: true }}
+        gl={{
+          antialias: true,
+          powerPreference: "high-performance",
+          alpha: false,
+          stencil: false,
+        }}
         style={{ touchAction: "none" }}
       >
         <color attach="background" args={["#070c14"]} />
-        <hemisphereLight args={["#ffffff", "#182338", 1.2]} />
-        <ambientLight intensity={0.72} />
+        <hemisphereLight args={["#ffffff", "#182338", 1.12]} />
+        <ambientLight intensity={0.7} />
         <directionalLight
           position={[6, 10, 7]}
-          intensity={1.9}
+          intensity={1.72}
           castShadow
-          shadow-mapSize-width={2048}
-          shadow-mapSize-height={2048}
+          shadow-mapSize-width={1024}
+          shadow-mapSize-height={1024}
         />
-        <directionalLight position={[-5, 4, 2]} intensity={0.75} />
+        <directionalLight position={[-5, 4, 2]} intensity={0.65} />
 
         <ModelErrorBoundary parts={PART_MODELS}>
           <Suspense fallback={<Loader />}>
             <AssemblyScene
+              rootRef={sceneRootRef}
               activePartKey={activePartKey}
               completedParts={completedParts}
               onPartCompleted={onPartCompleted}
@@ -1362,25 +1496,25 @@ function ModelViewer({
           </Suspense>
         </ModelErrorBoundary>
 
-        <AssistedCameraRig
-          telemetry={telemetry}
+        <FullTableBirdEyeCamera
+          sceneRootRef={sceneRootRef}
           controlsRef={controlsRef}
-          focusRequest={focusRequest}
-          isDraggingPart={isDraggingPart}
+          overviewRequest={overviewRequest}
         />
 
         <OrbitControls
           ref={controlsRef}
           makeDefault
           enabled={!isDraggingPart}
-          enablePan
-          panSpeed={0.75}
+          enablePan={false}
           enableZoom
-          zoomSpeed={0.62}
+          zoomSpeed={0.48}
           zoomToCursor
           enableDamping
           dampingFactor={0.12}
-          minDistance={2.5}
+          minPolarAngle={0.08}
+          maxPolarAngle={Math.PI * 0.46}
+          minDistance={10}
           maxDistance={190}
           mouseButtons={{
             LEFT: null,
@@ -1391,23 +1525,28 @@ function ModelViewer({
       </Canvas>
 
       <div className="absolute left-4 top-4 z-[80] flex max-w-[calc(100%-180px)] flex-wrap gap-2">
-        <div className="pointer-events-none rounded-xl border border-[#00ffb4]/35 bg-[#00ffb4]/14 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#b7fff0] shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl">
-          {ASSEMBLY_UX_VERSION}
-        </div>
-        <div className="pointer-events-none rounded-xl border border-[#00ffb4]/30 bg-[#0b1220]/92 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#7dffdc] shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl">
-          Exact Y Lock: On
-        </div>
-        <div className="pointer-events-none rounded-xl border border-[#00ffb4]/30 bg-[#0b1220]/92 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#7dffdc] shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl">
-          Wide Magnet Zone: On
-        </div>
         <button
           type="button"
-          onClick={() => setFocusRequest((value) => value + 1)}
-          disabled={!telemetry || isDraggingPart}
+          onClick={() => setOverviewRequest((value) => value + 1)}
+          disabled={isDraggingPart}
           className="rounded-xl border border-[#00ffb4]/30 bg-[#00ffb4]/12 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#7dffdc] shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl transition hover:bg-[#00ffb4]/20 disabled:cursor-not-allowed disabled:opacity-45"
         >
-          Focus Part + Target
+          Reset Full-Table Bird&apos;s-eye
         </button>
+
+        <button
+          type="button"
+          onClick={toggleFullscreen}
+          disabled={isDraggingPart}
+          aria-pressed={isFullscreen}
+          className="rounded-xl border border-[#00ffb4]/30 bg-[#0b1220]/92 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#7dffdc] shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl transition hover:bg-[#00ffb4]/12 disabled:cursor-not-allowed disabled:opacity-45"
+          title={isFullscreen ? "Exit fullscreen view" : "Open the 3D workspace in fullscreen"}
+        >
+          {isFullscreen ? "Exit Full Screen" : "Full Screen"}
+        </button>
+        <div className="pointer-events-none rounded-xl border border-white/10 bg-[#0b1220]/86 px-3 py-2 text-[10px] font-semibold text-[#9fb0ca] backdrop-blur-xl">
+          The camera keeps the complete table, case, motherboard, and all loose parts visible. Step changes no longer zoom into one component.
+        </div>
       </div>
 
       {telemetry ? (
@@ -1429,7 +1568,7 @@ function ModelViewer({
             <span>{telemetry.yLocked ? "Y locked" : "Ready"}</span>
           </div>
           <div className="mt-1 text-[10px] text-[#7a8ba8]">
-            The glowing ring shows the normal magnet range. Move the part close to the center for the final snap.
+            Exact target-height lock remains active. The normal magnet engages only near the installation point.
           </div>
         </div>
       ) : null}
@@ -1515,6 +1654,7 @@ function ModuleBackground() {
   );
 }
 
+
 function Sidebar({
   open,
   onToggle,
@@ -1525,33 +1665,43 @@ function Sidebar({
   currentStepCompleted,
   onViewCertificate,
 }) {
+  const activeButtonRef = useRef(null);
+
+  useEffect(() => {
+    activeButtonRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+    });
+  }, [currentStep]);
+
   return (
     <div
       className={[
         "absolute left-0 top-0 z-[200] h-full transition-all duration-300",
-        open ? "w-[280px]" : "w-[64px]",
+        open ? "w-[clamp(220px,22vw,280px)]" : "w-[64px]",
       ].join(" ")}
     >
-      <div className="h-full border-r border-[#1a2438] bg-[#0b1220]/92 shadow-[0_18px_60px_rgba(0,0,0,0.28)] backdrop-blur-xl">
-        <div className="flex items-center justify-between border-b border-[#1a2438] px-4 py-4">
+      <div className="flex h-full min-h-0 flex-col border-r border-[#1a2438] bg-[#0b1220]/92 backdrop-blur-xl shadow-[0_18px_60px_rgba(0,0,0,0.28)]">
+        <div className="flex shrink-0 items-center justify-between border-b border-[#1a2438] px-4 py-4">
           {open ? (
             <div>
               <div className="text-sm font-bold text-white">Assembly Steps</div>
-              <div className="text-[11px] text-[#7a8ba8]">
-                INTEL Platform
-              </div>
+              <div className="text-[11px] text-[#7a8ba8]">INTEL Platform</div>
             </div>
           ) : null}
           <button
             type="button"
             onClick={onToggle}
-            className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#1a2438] bg-white/[0.03] text-[#dbe6f5] transition hover:bg-white/[0.06]"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#1a2438] bg-white/[0.03] text-[#dbe6f5] transition hover:bg-white/[0.06]"
           >
             {open ? "←" : "→"}
           </button>
         </div>
 
-        <div className="space-y-2 p-3">
+        <div
+          className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-3 pr-2 [scrollbar-color:rgba(0,255,180,0.35)_rgba(255,255,255,0.05)] [scrollbar-width:thin]"
+          style={{ scrollbarGutter: "stable" }}
+        >
           {steps.map((item, index) => {
             const done = !!completedSteps[item.key];
             const active = currentStep === index;
@@ -1560,11 +1710,12 @@ function Sidebar({
             return (
               <button
                 key={item.key}
+                ref={active ? activeButtonRef : null}
                 type="button"
                 onClick={() => onSelect(index)}
                 aria-disabled={!unlocked}
                 className={[
-                  "flex w-full items-center gap-3 rounded-2xl border px-3 py-3 text-left transition",
+                  "flex w-full scroll-m-3 items-center gap-3 rounded-2xl border px-3 py-3 text-left transition",
                   active
                     ? "border-[#00ffb4]/25 bg-[#00ffb4]/10"
                     : "border-[#1a2438] bg-white/[0.03]",
@@ -1587,7 +1738,7 @@ function Sidebar({
                 </span>
                 {open ? (
                   <div className="min-w-0">
-                    <div className="text-sm font-semibold leading-5 text-white">
+                    <div className="truncate text-sm font-semibold text-white">
                       {item.name}
                     </div>
                     <div className="text-[11px] text-[#7a8ba8]">
@@ -1607,7 +1758,7 @@ function Sidebar({
         </div>
 
         {currentStep === steps.length - 1 && currentStepCompleted ? (
-          <div className="border-t border-[#1a2438] p-3">
+          <div className="shrink-0 border-t border-[#1a2438] p-3">
             <button
               type="button"
               onClick={onViewCertificate}
@@ -1627,6 +1778,265 @@ function Sidebar({
   );
 }
 
+function ModuleIntroCard({ platform, moduleType, onStart }) {
+  const isAssembly = moduleType === "Assembly";
+
+  return (
+    <div className="absolute inset-0 z-[750] flex items-center justify-center bg-[#050912]/78 p-5 backdrop-blur-md">
+      <div className="relative w-full max-w-2xl overflow-hidden rounded-[30px] border border-[#00ffb4]/30 bg-[#0b1220]/96 p-7 shadow-[0_40px_120px_rgba(0,0,0,0.7)] md:p-9">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(0,255,180,0.13),transparent_42%)]" />
+        <div className="relative">
+          <div className="inline-flex items-center gap-2 rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/8 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-[#00ffb4]">
+            Module {isAssembly ? "3" : "2"} • {platform} Platform
+          </div>
+          <h2 className="mt-5 text-3xl font-black tracking-tight text-white md:text-4xl">
+            {moduleType} Guided Practice
+          </h2>
+          <p className="mt-3 max-w-xl text-sm leading-7 text-[#9fb0ca]">
+            {isAssembly
+              ? "Install each component in order using the bird’s-eye workspace, exact target-height assistance, and normal magnetic snap."
+              : "Remove each component in order. The camera first identifies the installed part, then opens to the table workspace after detachment."}
+          </p>
+
+          <div className="mt-6 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4">
+              <div className="text-xs font-black uppercase tracking-[0.16em] text-[#00ffb4]">1. Identify</div>
+              <div className="mt-2 text-xs leading-5 text-[#9fb0ca]">
+                Follow the highlighted source and target labels.
+              </div>
+            </div>
+            <div className="rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4">
+              <div className="text-xs font-black uppercase tracking-[0.16em] text-[#00ffb4]">2. Move</div>
+              <div className="mt-2 text-xs leading-5 text-[#9fb0ca]">
+                Click to grab, move smoothly, then click again to release.
+              </div>
+            </div>
+            <div className="rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4">
+              <div className="text-xs font-black uppercase tracking-[0.16em] text-[#00ffb4]">3. Complete</div>
+              <div className="mt-2 text-xs leading-5 text-[#9fb0ca]">
+                A sound and progress update confirm every correct placement.
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-7 flex flex-wrap items-center justify-between gap-4">
+            <div className="text-xs text-[#7a8ba8]">
+              Right-drag rotates • mouse wheel zooms • camera locks while moving a part
+            </div>
+            <button
+              type="button"
+              onClick={onStart}
+              className="rounded-2xl bg-[#00ffb4] px-7 py-3 text-sm font-black text-[#07111d] shadow-[0_16px_45px_rgba(0,255,180,0.25)] transition hover:scale-[1.03]"
+            >
+              Start Guided Practice →
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+function StepCompletionCard({
+  platform,
+  moduleType,
+  stepNumber,
+  totalSteps,
+  label,
+  nextLabel,
+  isFinal,
+  onContinue,
+  onCertificate,
+}) {
+  const isAssembly = moduleType === "Assembly";
+  const actionWord = isAssembly ? "installed" : "removed and seated";
+  const title = isAssembly
+    ? `${label} Installation Complete`
+    : `${label} Disassembly Complete`;
+
+  return (
+    <div
+      className="absolute inset-0 z-[780] flex items-center justify-center bg-[#050912]/82 p-5 backdrop-blur-md"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="step-completion-title"
+    >
+      <div className="relative w-full max-w-2xl overflow-hidden rounded-[30px] border border-[#00ffb4]/35 bg-[#0b1220]/97 p-7 shadow-[0_40px_120px_rgba(0,0,0,0.76),0_0_70px_rgba(0,255,180,0.10)] md:p-9">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_0%,rgba(0,255,180,0.16),transparent_42%)]" />
+        <div className="pointer-events-none absolute -right-24 -top-24 h-56 w-56 rounded-full border border-[#00ffb4]/15 bg-[#00ffb4]/5 blur-2xl" />
+
+        <div className="relative">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#00ffb4]/30 bg-[#00ffb4]/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.22em] text-[#73ffd4]">
+              Step {stepNumber} of {totalSteps} Complete
+            </div>
+            <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-[#9fb0ca]">
+              {platform} Platform
+            </div>
+          </div>
+
+          <div className="mt-6 flex items-start gap-5">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-[#00ffb4]/40 bg-[#00ffb4]/12 text-3xl font-black text-[#00ffb4] shadow-[0_0_34px_rgba(0,255,180,0.18)]">
+              ✓
+            </div>
+            <div className="min-w-0">
+              <div className="text-[11px] font-black uppercase tracking-[0.24em] text-[#00ffb4]">
+                Excellent Work
+              </div>
+              <h2
+                id="step-completion-title"
+                className="mt-2 text-2xl font-black leading-tight text-white md:text-4xl"
+              >
+                {title}
+              </h2>
+              <p className="mt-3 text-sm leading-7 text-[#9fb0ca]">
+                You correctly {actionWord} the {label}. The component is locked in its completed position and your progress has been updated.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-7 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-[#1a2438] bg-white/[0.035] p-4">
+              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#00ffb4]">Accuracy</div>
+              <div className="mt-2 text-sm font-bold text-white">Correct placement</div>
+            </div>
+            <div className="rounded-2xl border border-[#1a2438] bg-white/[0.035] p-4">
+              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#00ffb4]">Progress</div>
+              <div className="mt-2 text-sm font-bold text-white">Step saved</div>
+            </div>
+            <div className="rounded-2xl border border-[#1a2438] bg-white/[0.035] p-4">
+              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#00ffb4]">Next</div>
+              <div className="mt-2 truncate text-sm font-bold text-white">
+                {isFinal ? `Full ${moduleType}` : nextLabel}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-7 rounded-2xl border border-[#00ffb4]/18 bg-[#00ffb4]/6 px-4 py-3 text-xs leading-6 text-[#b7c6dd]">
+            {isFinal
+              ? `All required ${moduleType.toLowerCase()} steps are complete. You may review the finished scene or open your certificate.`
+              : `The next component remains locked until you continue, so the sequence stays clear and controlled.`}
+          </div>
+
+          <div className="mt-7 flex flex-wrap justify-end gap-3">
+            {isFinal ? (
+              <>
+                <button
+                  type="button"
+                  onClick={onContinue}
+                  className="rounded-2xl border border-[#1a2438] bg-white/[0.04] px-5 py-3 text-sm font-semibold text-[#dbe6f5] transition hover:bg-white/[0.08]"
+                >
+                  Review Full {moduleType}
+                </button>
+                <button
+                  type="button"
+                  onClick={onCertificate}
+                  className="rounded-2xl bg-[#00ffb4] px-6 py-3 text-sm font-black text-[#07111d] shadow-[0_16px_45px_rgba(0,255,180,0.18)] transition hover:scale-[1.02]"
+                >
+                  View Certificate →
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={onContinue}
+                className="rounded-2xl bg-[#00ffb4] px-6 py-3 text-sm font-black text-[#07111d] shadow-[0_16px_45px_rgba(0,255,180,0.18)] transition hover:scale-[1.02]"
+              >
+                Continue to {nextLabel} →
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CompletionCertificate({
+  platform,
+  moduleNumber,
+  moduleType,
+  description,
+  userName,
+  onBack,
+  onSwitchPlatform,
+}) {
+  const alternatePlatform = platform === "AMD" ? "INTEL" : "AMD";
+
+  return (
+    <div className="min-h-screen w-full overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased print:bg-white">
+      <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden px-5 py-8">
+        <ModuleBackground />
+        <div className="relative z-10 w-full max-w-4xl overflow-hidden rounded-[34px] border border-[#00ffb4]/35 bg-[#0d1220]/94 p-7 text-center shadow-[0_40px_120px_rgba(0,0,0,0.65)] backdrop-blur-xl md:p-12 print:border-black print:bg-white print:text-black print:shadow-none">
+          <div className="pointer-events-none absolute inset-4 rounded-[26px] border border-dashed border-[#00ffb4]/30 print:border-black/40" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(0,255,180,0.14),transparent_42%)] print:hidden" />
+
+          <div className="relative">
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-[#00ffb4]/40 bg-[#00ffb4]/10 text-4xl font-black text-[#00ffb4] shadow-[0_0_40px_rgba(0,255,180,0.18)] print:border-black print:bg-transparent print:text-black">
+              ✓
+            </div>
+            <div className="mt-5 text-[11px] font-black uppercase tracking-[0.34em] text-[#00ffb4] print:text-black">
+              Certificate of Completion
+            </div>
+            <h1 className="mt-3 text-4xl font-black tracking-tight text-white md:text-6xl print:text-black">
+              Congratulations
+            </h1>
+            <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-[#9fb0ca] print:text-black/70">
+              This certifies that <span className="font-bold text-white print:text-black">{userName || "the learner"}</span> successfully completed
+            </p>
+            <h2 className="mt-3 text-2xl font-black text-[#dffef5] md:text-3xl print:text-black">
+              Module {moduleNumber} — {platform} {moduleType}
+            </h2>
+            <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-[#9fb0ca] print:text-black/70">
+              {description}
+            </p>
+
+            <div className="mx-auto mt-7 grid max-w-2xl gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4 print:border-black/30 print:bg-transparent">
+                <div className="text-[10px] uppercase tracking-[0.18em] text-[#7a8ba8] print:text-black/60">Platform</div>
+                <div className="mt-1 text-lg font-black text-white print:text-black">{platform}</div>
+              </div>
+              <div className="rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4 print:border-black/30 print:bg-transparent">
+                <div className="text-[10px] uppercase tracking-[0.18em] text-[#7a8ba8] print:text-black/60">Progress</div>
+                <div className="mt-1 text-lg font-black text-white print:text-black">100%</div>
+              </div>
+              <div className="rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4 print:border-black/30 print:bg-transparent">
+                <div className="text-[10px] uppercase tracking-[0.18em] text-[#7a8ba8] print:text-black/60">Completed</div>
+                <div className="mt-1 text-sm font-black text-white print:text-black">{getCompletionDate()}</div>
+              </div>
+            </div>
+
+            <div className="mt-8 flex flex-wrap justify-center gap-3 print:hidden">
+              <button
+                type="button"
+                onClick={onBack}
+                className="rounded-2xl bg-[#00ffb4] px-6 py-3 text-sm font-black text-[#07111d] transition hover:scale-[1.03]"
+              >
+                Back to Modules →
+              </button>
+              <button
+                type="button"
+                onClick={onSwitchPlatform}
+                className="rounded-2xl border border-[#00ffb4]/35 bg-[#00ffb4]/10 px-6 py-3 text-sm font-black text-[#7dffdc] transition hover:bg-[#00ffb4]/18"
+              >
+                Try {alternatePlatform} Version
+              </button>
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="rounded-2xl border border-[#1a2438] bg-white/[0.04] px-6 py-3 text-sm font-semibold text-[#dbe6f5] transition hover:bg-white/[0.08]"
+              >
+                Print Certificate
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /* Main Module 3 component                                             */
 /* ------------------------------------------------------------------ */
@@ -1635,6 +2045,7 @@ export default function Module3AssemblyINTEL({
   onFinish,
   onBack,
   onLogout,
+  onSwitchPlatform,
 }) {
   const [step, setStep] = useState(0);
   const [completedParts, setCompletedParts] = useState([]);
@@ -1644,6 +2055,8 @@ export default function Module3AssemblyINTEL({
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showCertificate, setShowCertificate] = useState(false);
+  const [showIntro, setShowIntro] = useState(true);
+  const [pendingStepCompletion, setPendingStepCompletion] = useState(null);
   const [validationMessage, setValidationMessage] = useState(
     "Begin with the CPU. Click it once to activate Y-level assist, then guide it across the green target plane. The normal magnet will assist only when it is close to the target."
   );
@@ -1699,6 +2112,8 @@ export default function Module3AssemblyINTEL({
     setStep(0);
     setSceneRevision((value) => value + 1);
     setShowCertificate(false);
+    setShowIntro(true);
+    setPendingStepCompletion(null);
     setValidationMessage(
       "Scene restarted. Click the CPU once; Y-level assist will align it with the target height and the normal magnet will assist near the target."
     );
@@ -1771,29 +2186,68 @@ export default function Module3AssemblyINTEL({
 
   const handlePartCompleted = useCallback(
     (partKey) => {
-      if (partKey !== activePartKey || completedParts.includes(partKey)) return;
-
-      const nextCompletedParts = [...completedParts, partKey];
-      setCompletedParts(nextCompletedParts);
-
-      const finished =
-        nextCompletedParts.length === ASSEMBLY_SEQUENCE.length;
-      if (finished) {
-        setStep(steps.length - 1);
-        setValidationMessage(
-          "Full assembly complete. Every required component has been installed in the correct order."
-        );
-        void saveFinalCompletion();
+      if (
+        pendingStepCompletion ||
+        partKey !== activePartKey ||
+        completedParts.includes(partKey)
+      ) {
         return;
       }
 
-      const nextStepIndex = step + 1;
-      const nextPartKey = steps[nextStepIndex]?.partKey;
-      setStep(nextStepIndex);
+      const nextCompletedParts = [...completedParts, partKey];
+      const finished = nextCompletedParts.length === ASSEMBLY_SEQUENCE.length;
+      const nextStepIndex = finished ? steps.length - 1 : step + 1;
+      const nextPartKey = finished ? null : steps[nextStepIndex]?.partKey;
+
+      setCompletedParts(nextCompletedParts);
+      playCompletionSound(settings.sound, finished);
       setValidationMessage(
-        `${COMPONENT_LABELS[partKey]} installed. Next: ${COMPONENT_LABELS[nextPartKey]}.`
+        finished
+          ? `${COMPONENT_LABELS[partKey]} installed. Full assembly is now complete.`
+          : `${COMPONENT_LABELS[partKey]} installed correctly. Confirm the completion card to continue.`
       );
-    }, [activePartKey, completedParts, saveFinalCompletion, step]
+      setPendingStepCompletion({
+        partKey,
+        label: COMPONENT_LABELS[partKey],
+        completedStepIndex: step,
+        nextStepIndex,
+        nextLabel: finished ? "Full Assembly" : COMPONENT_LABELS[nextPartKey],
+        isFinal: finished,
+      });
+
+      if (finished) void saveFinalCompletion();
+    },
+    [
+      activePartKey,
+      completedParts,
+      pendingStepCompletion,
+      saveFinalCompletion,
+      settings.sound,
+      step,
+    ]
+  );
+
+  const handleContinueAfterStep = useCallback(
+    (openCertificate = false) => {
+      if (!pendingStepCompletion) return;
+
+      const completed = pendingStepCompletion;
+      setPendingStepCompletion(null);
+      setStep(completed.nextStepIndex);
+
+      if (completed.isFinal) {
+        setValidationMessage(
+          "Full assembly complete. Every required component has been installed in the correct order."
+        );
+        if (openCertificate) setShowCertificate(true);
+        return;
+      }
+
+      setValidationMessage(
+        `${completed.label} installation complete. Next: ${completed.nextLabel}.`
+      );
+    },
+    [pendingStepCompletion]
   );
 
   const handleLockedPartClick = useCallback(
@@ -1879,39 +2333,18 @@ export default function Module3AssemblyINTEL({
 
   if (showCertificate) {
     return (
-      <div className="min-h-screen w-full overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased">
-        <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden px-6">
-          <ModuleBackground />
-          <div className="relative z-10 w-full max-w-3xl rounded-[34px] border border-[#00ffb4]/35 bg-[#0d1220]/90 p-8 text-center shadow-[0_40px_120px_rgba(0,0,0,0.65)] backdrop-blur-xl md:p-12">
-            <div className="pointer-events-none absolute inset-4 rounded-[26px] border border-dashed border-[#00ffb4]/30" />
-            <div className="relative">
-              <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full border border-[#00ffb4]/40 bg-[#00ffb4]/10 text-4xl font-black text-[#00ffb4] shadow-[0_0_40px_rgba(0,255,180,0.18)]">
-                ✓
-              </div>
-              <div className="mb-3 text-[12px] font-bold uppercase tracking-[0.32em] text-[#00ffb4]">
-                Certificate of Completion
-              </div>
-              <h1 className="mb-4 text-4xl font-black tracking-tight text-white md:text-6xl">
-                Congratulations
-              </h1>
-              <h2 className="mb-6 text-xl font-bold text-[#dbe6f5] md:text-3xl">
-                You Have Completed Module 3 — INTEL Assembly
-              </h2>
-              <p className="mx-auto mb-8 max-w-xl text-sm leading-7 text-[#9fb0ca]">
-                You completed the ordered installation of the CPU, two RAM
-                modules, SSD, motherboard, PSU, HDD, and GPU.
-              </p>
-              <button
-                type="button"
-                onClick={handleBackToDashboard}
-                className="rounded-2xl bg-[#00ffb4] px-7 py-3 text-sm font-black text-[#0a0e17] shadow-[0_18px_50px_rgba(0,255,180,0.22)] transition hover:scale-[1.03]"
-              >
-                Back to Dashboard →
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+      <CompletionCertificate
+        platform="INTEL"
+        moduleNumber="3"
+        moduleType="Assembly"
+        description="You completed the ordered installation of the CPU, two RAM modules, SSD, motherboard, PSU, HDD, and GPU."
+        userName={user.name}
+        onBack={handleBackToDashboard}
+        onSwitchPlatform={() => {
+          if (typeof onSwitchPlatform === "function") onSwitchPlatform();
+          else if (typeof onBack === "function") onBack("Modules");
+        }}
+      />
     );
   }
 
@@ -1919,6 +2352,28 @@ export default function Module3AssemblyINTEL({
     <div className="fixed inset-0 h-screen w-screen overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased">
       <div className="relative h-full w-full overflow-hidden">
         <ModuleBackground />
+
+        {showIntro ? (
+          <ModuleIntroCard
+            platform="INTEL"
+            moduleType="Assembly"
+            onStart={() => setShowIntro(false)}
+          />
+        ) : null}
+
+        {pendingStepCompletion ? (
+          <StepCompletionCard
+            platform="INTEL"
+            moduleType="Assembly"
+            stepNumber={pendingStepCompletion.completedStepIndex + 1}
+            totalSteps={ASSEMBLY_SEQUENCE.length}
+            label={pendingStepCompletion.label}
+            nextLabel={pendingStepCompletion.nextLabel}
+            isFinal={pendingStepCompletion.isFinal}
+            onContinue={() => handleContinueAfterStep(false)}
+            onCertificate={() => handleContinueAfterStep(true)}
+          />
+        ) : null}
 
         <div className="relative flex h-full w-full flex-col overflow-hidden">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(0,255,180,0.08),transparent_35%)]" />
@@ -2033,7 +2488,7 @@ export default function Module3AssemblyINTEL({
 
                 <div
                   className="absolute bottom-3 right-3 top-3 z-[40] overflow-hidden rounded-[18px] border border-[#1a2438] bg-black/20 transition-all duration-300 md:bottom-4 md:right-4 md:top-4"
-                  style={{ left: sidebarOpen ? 280 : 64 }}
+                  style={{ left: sidebarOpen ? "clamp(220px, 22vw, 280px)" : 64 }}
                 >
                   <ModelViewer
                     key={sceneRevision}

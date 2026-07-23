@@ -1,11 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import Settings from "../Components/Settings";
-import QuizModule1 from "./Quizzes/QuizModule1";
-import QuizModule2 from "./Quizzes/QuizModule2";
-import QuizModule3 from "./Quizzes/QuizModule3";
-import FullAssemblyPracticalTest from "./PracticalTests/FullAssemblyPracticalTest";
-import FullDisassemblyPracticalTest from "./PracticalTests/FullDisassemblyPracticalTest";
+import AMDFullAssemblyPracticalTest from "./PracticalTests/AMD/AMDFullAssemblyPracticalTest.jsx";
+import AMDFullDisassemblyPracticalTest from "./PracticalTests/AMD/AMDFullDisassemblyPracticalTest.jsx";
+import INTELFullAssemblyPracticalTest from "./PracticalTests/INTEL/INTELFullAssemblyPracticalTest.jsx";
+import INTELFullDisassemblyPracticalTest from "./PracticalTests/INTEL/INTELFullDisassemblyPracticalTest.jsx";
 import { auth, db } from "../firebase.js";
 import { onAuthStateChanged } from "firebase/auth";
 import {
@@ -43,43 +42,12 @@ function isCompletedProgress(progress) {
   return !!progress?.completed || !!progress?.finished || (progress?.percent || 0) >= 100;
 }
 
-function getQuizProgressStatus(quizProgress, moduleKey) {
-  const progress = quizProgress?.[moduleKey] || null;
-  const completed = !!progress?.completed || !!progress?.finished;
-
-  const scorePercent =
-    progress?.percent !== null && progress?.percent !== undefined
-      ? progress.percent
-      : null;
-
-  const completionPercent = completed ? 100 : 0;
-
-  return {
-    moduleKey,
-    completed,
-    passed: !!progress?.passed,
-    score: progress?.score ?? null,
-    total: progress?.total ?? null,
-
-    // This is the quiz score percentage. Use this for pass/unlock checks.
-    percent: scorePercent,
-    scorePercent,
-
-    // This is only for dashboard completion display.
-    completionPercent,
-
-    updatedAt: progress?.updatedAt ?? null,
-    raw: progress,
-  };
-}
-
 export default function Dashboard({
   onLogout,
   onOpenModule,
   initialSection = "Dashboard",
 }) {
   const [section, setSection] = useState(initialSection);
-  const [activeTestId, setActiveTestId] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [firebaseUser, setFirebaseUser] = useState(null);
@@ -116,23 +84,6 @@ export default function Dashboard({
       console.error("Error refreshing profile:", err);
     }
   }, []);
-
-  const handleQuizComplete = useCallback((moduleKey, progressPayload = {}) => {
-    setProfile((previous) => ({
-      ...(previous || {}),
-      quizProgress: {
-        ...(previous?.quizProgress || {}),
-        [moduleKey]: {
-          ...(previous?.quizProgress?.[moduleKey] || {}),
-          ...progressPayload,
-          completed: true,
-          finished: true,
-        },
-      },
-    }));
-
-    refreshUserProfile();
-  }, [refreshUserProfile]);
 
   const handleSettingChange = (key, value) => {
     setSettings((prev) => ({
@@ -199,49 +150,27 @@ const openModule = (id, platform)=>{
  onOpenModule(id);
 }
 
-  const openQuiz = (quiz) => {
-    if (!quiz || quiz.locked) return;
-
-    setActiveTestId(quiz.id);
-
-    if (quiz.id === "quiz-module-1") {
-      setSection("Quiz Module 1");
-      return;
-    }
-
-    if (quiz.id === "quiz-module-2") {
-      setSection("Quiz Module 2");
-      return;
-    }
-
-    if (quiz.id === "quiz-module-3") {
-      setSection("Quiz Module 3");
-      return;
-    }
-
-    if (quiz.id === "quiz-module-4") {
-      setSection("Quiz Module 4");
-    }
-  };
-
   const openTest = (test) => {
     if (!test || test.locked) return;
 
-    setActiveTestId(test.id);
-
-    if (test.id === "full-assembly-practical") {
-      setSection("Full Assembly Practical");
+    if (test.id === "amd-full-assembly-practical") {
+      setSection("AMD Full Assembly Practical");
       return;
     }
 
-    if (test.id === "full-disassembly-practical") {
-      setSection("Full Disassembly Practical");
+    if (test.id === "amd-full-disassembly-practical") {
+      setSection("AMD Full Disassembly Practical");
+      return;
     }
-  };
 
-  const backToQuizzes = async () => {
-    await refreshUserProfile();
-    setSection("Quizzes");
+    if (test.id === "intel-full-assembly-practical") {
+      setSection("INTEL Full Assembly Practical");
+      return;
+    }
+
+    if (test.id === "intel-full-disassembly-practical") {
+      setSection("INTEL Full Disassembly Practical");
+    }
   };
 
   const backToPracticeTests = async () => {
@@ -286,13 +215,6 @@ const openModule = (id, platform)=>{
     const module2Done = isCompletedProgress(module2Progress);
     const module3Done = isCompletedProgress(module3Progress);
     const module4Done = isCompletedProgress(module4Progress);
-
-    const quizProgress = profile?.quizProgress || {};
-
-    const quiz1 = getQuizProgressStatus(quizProgress, "module1");
-    const quiz2 = getQuizProgressStatus(quizProgress, "module2");
-    const quiz3 = getQuizProgressStatus(quizProgress, "module3");
-    const quiz4 = getQuizProgressStatus(quizProgress, "module4");
 
     const moduleNames = {
       cpu: "CPU",
@@ -399,36 +321,22 @@ const openModule = (id, platform)=>{
       },
     ];
 
-    const formatActivityQuiz = (quiz, moduleDone) => {
-      if (quiz.completed) {
-        return `Completed • ${quiz.completionPercent}% Completed • ${quiz.scorePercent ?? 0}% Score`;
-      }
-
-      if (moduleDone) return "Available";
-      return "Locked";
-    };
-
     const practiceTestAccess = profile?.practiceTestAccess || {};
 
     const assemblyPracticalUnlocked =
-      practiceTestAccess?.module2?.unlocked === true ||
-      (quiz2.scorePercent || 0) >= 60;
+      practiceTestAccess?.module2?.unlocked === true || module2Done;
 
     const disassemblyPracticalUnlocked =
-      practiceTestAccess?.module3?.unlocked === true ||
-      (quiz3.scorePercent || 0) >= 60;
+      practiceTestAccess?.module3?.unlocked === true || module3Done;
 
     const activity = [
-      { id: "a1", t: "Module 1 • Quiz", d: formatActivityQuiz(quiz1, module1Done) },
-      { id: "a2", t: "Module 2 • Quiz", d: formatActivityQuiz(quiz2, module2Done) },
-      { id: "a3", t: "Module 3 • Quiz", d: formatActivityQuiz(quiz3, module3Done) },
       {
-        id: "a4",
+        id: "a1",
         t: "Practical Tests",
         d:
           assemblyPracticalUnlocked || disassemblyPracticalUnlocked
             ? "Available"
-            : "Locked until required quizzes are completed",
+            : "Locked until required modules are completed",
       },
     ];
 
@@ -437,76 +345,42 @@ const openModule = (id, platform)=>{
       { id: "hands-on", icon: "badge", title: "Hands-On", subtitle: "Pass 1 Practical Test" },
     ];
 
-    const quizzes = [
-      {
-        id: "quiz-module-1",
-        title: "Module 1 Quiz",
-        desc: "Hardware identification • Mixed multiple choice",
-        status: quiz1.completed ? "Completed" : module1Done ? "Ready" : "Locked",
-        locked: !module1Done,
-        completed: quiz1.completed,
-        progress: quiz1,
-        lockReason: "Finish Module 1 first.",
-        completedReason: "Previous quiz score saved.",
-      },
-      {
-        id: "quiz-module-2",
-        title: "Module 2 Quiz",
-        desc: "PC assembly concepts and step order",
-        status: quiz2.completed ? "Completed" : module2Done ? "Ready" : "Locked",
-        locked: !module2Done,
-        completed: quiz2.completed,
-        progress: quiz2,
-        lockReason: "Finish Module 2 first.",
-        completedReason: "Previous quiz score saved.",
-      },
-      {
-        id: "quiz-module-3",
-        title: "Module 3 Quiz",
-        desc: "PC disassembly concepts and step order",
-        status: quiz3.completed ? "Completed" : module3Done ? "Ready" : "Locked",
-        locked: !module3Done,
-        completed: quiz3.completed,
-        progress: quiz3,
-        lockReason: "Finish Module 3 first.",
-        completedReason: "Previous quiz score saved.",
-      },
-      {
-        id: "quiz-module-4",
-        title: "Module 4 Quiz",
-        desc: "Software configuration • Windows and BIOS",
-        status: module4Done ? "Ready" : "Locked",
-        locked: !module4Done,
-        completed: false,
-        progress: quiz4,
-        isStatic: true,
-        lockReason: "Finish Module 4 first.",
-        staticReason: "Module 4 quiz file is not connected yet.",
-      },
-    ];
-
     const tests = [
       {
-        id: "full-assembly-practical",
-        title: "Full Assembly Practical Test",
-        desc: "Step-by-step PC assembly validation",
+        id: "amd-full-assembly-practical",
+        title: "AMD Full Assembly Practical Test",
+        desc: "AMD PC assembly validation",
         status: assemblyPracticalUnlocked ? "Ready" : "Locked",
         locked: !assemblyPracticalUnlocked,
-        lockReason: "Score 60% or higher in Module 2 Quiz first.",
-        unlockHint: "Requires at least 60% in Module 2 Quiz.",
+        lockReason: "Complete Module 2 before accessing this practical test.",
       },
       {
-        id: "full-disassembly-practical",
-        title: "Full Disassembly Practical Test",
-        desc: "Step-by-step PC disassembly validation",
+        id: "amd-full-disassembly-practical",
+        title: "AMD Full Disassembly Practical Test",
+        desc: "AMD PC disassembly validation",
         status: disassemblyPracticalUnlocked ? "Ready" : "Locked",
         locked: !disassemblyPracticalUnlocked,
-        lockReason: "Score 60% or higher in Module 3 Quiz first.",
-        unlockHint: "Requires at least 60% in Module 3 Quiz.",
+        lockReason: "Complete Module 3 before accessing this practical test.",
       },
-    ];
+      {
+        id: "intel-full-assembly-practical",
+        title: "Intel Full Assembly Practical Test",
+        desc: "Intel PC assembly validation",
+        status: assemblyPracticalUnlocked ? "Ready" : "Locked",
+        locked: !assemblyPracticalUnlocked,
+        lockReason: "Complete Module 2 before accessing this practical test.",
+      },
+      {
+        id: "intel-full-disassembly-practical",
+        title: "Intel Full Disassembly Practical Test",
+        desc: "Intel PC disassembly validation",
+        status: disassemblyPracticalUnlocked ? "Ready" : "Locked",
+        locked: !disassemblyPracticalUnlocked,
+        lockReason: "Complete Module 3 before accessing this practical test.",
+      },
+    ];    ;
 
-    return { user, modules, activity, achievements, quizzes, tests };
+    return { user, modules, activity, achievements, tests };
   }, [profile, firebaseUser]);
 
   useEffect(() => {
@@ -550,9 +424,7 @@ const openModule = (id, platform)=>{
   }, [allModules]);
 
   const sectionLabel =
-    section.startsWith("Quiz Module")
-      ? "Quizzes"
-      : section === "Full Assembly Practical" || section === "Full Disassembly Practical"
+    section === "Full Assembly Practical" || section === "Full Disassembly Practical"
       ? "Practice Tests"
       : section;
 
@@ -601,7 +473,6 @@ const openModule = (id, platform)=>{
                   <div className="space-y-2">
                     <SideItem label="Dashboard" active={sectionLabel} onClick={() => setSection("Dashboard")} icon="home" />
                     <SideItem label="Modules" active={sectionLabel} onClick={() => setSection("Modules")} icon="modules" />
-                    <SideItem label="Quizzes" active={sectionLabel} onClick={() => setSection("Quizzes")} icon="tests" />
                     <SideItem label="Practice Tests" active={sectionLabel} onClick={() => setSection("Practice Tests")} icon="tests" />
                     <SideItem label="Profile" active={sectionLabel} onClick={() => setSection("Profile")} icon="profile" />
                   </div>
@@ -664,49 +535,33 @@ const openModule = (id, platform)=>{
                           </PageMotion>
                         ) : null}
 
-                        {section === "Quizzes" ? (
-                          <PageMotion keyName="quizzes" reduce={reduce}>
-                            <QuizzesList quizzes={data.quizzes} onOpen={(quiz) => openQuiz(quiz)} />
-                          </PageMotion>
-                        ) : null}
-
                         {section === "Practice Tests" ? (
                           <PageMotion keyName="tests" reduce={reduce}>
                             <PracticalTestsList tests={data.tests} onOpen={(test) => openTest(test)} />
                           </PageMotion>
                         ) : null}
 
-                        {section === "Quiz Module 1" ? (
-                          <PageMotion keyName="quiz-module-1" reduce={reduce}>
-                            <QuizModule1 onBack={backToQuizzes} onQuizComplete={handleQuizComplete} />
+                        {section === "AMD Full Assembly Practical" ? (
+                          <PageMotion keyName="amd-full-assembly" reduce={reduce}>
+                            <AMDFullAssemblyPracticalTest onBack={backToPracticeTests} />
                           </PageMotion>
                         ) : null}
 
-                        {section === "Quiz Module 2" ? (
-                          <PageMotion keyName="quiz-module-2" reduce={reduce}>
-                            <QuizModule2 onBack={backToQuizzes} onQuizComplete={handleQuizComplete} />
+                        {section === "AMD Full Disassembly Practical" ? (
+                          <PageMotion keyName="amd-full-disassembly" reduce={reduce}>
+                            <AMDFullDisassemblyPracticalTest onBack={backToPracticeTests} />
                           </PageMotion>
                         ) : null}
 
-                        {section === "Quiz Module 3" ? (
-                          <PageMotion keyName="quiz-module-3" reduce={reduce}>
-                            <QuizModule3 onBack={backToQuizzes} onQuizComplete={handleQuizComplete} />
+                        {section === "INTEL Full Assembly Practical" ? (
+                          <PageMotion keyName="intel-full-assembly" reduce={reduce}>
+                            <INTELFullAssemblyPracticalTest onBack={backToPracticeTests} />
                           </PageMotion>
                         ) : null}
 
-                        {section === "Quiz Module 4" ? (
-                          <ComingSoonAssessment title="Module 4 Quiz" onBack={() => setSection("Quizzes")} />
-                        ) : null}
-
-                        {section === "Full Assembly Practical" ? (
-                          <PageMotion keyName="full-assembly-practical" reduce={reduce}>
-                            <FullAssemblyPracticalTest onBack={backToPracticeTests} />
-                          </PageMotion>
-                        ) : null}
-
-                        {section === "Full Disassembly Practical" ? (
-                          <PageMotion keyName="full-disassembly-practical" reduce={reduce}>
-                            <FullDisassemblyPracticalTest onBack={backToPracticeTests} />
+                        {section === "INTEL Full Disassembly Practical" ? (
+                          <PageMotion keyName="intel-full-disassembly" reduce={reduce}>
+                            <INTELFullDisassemblyPracticalTest onBack={backToPracticeTests} />
                           </PageMotion>
                         ) : null}
 
@@ -1241,24 +1096,11 @@ function ModulesSelection({ modules, onBack, onOpenModule }) {
   );
 }
 
-function QuizzesList({ quizzes, onOpen }) {
-  return (
-    <AssessmentList
-      title="Quizzes"
-      subtitle="Quizzes unlock after finishing their matching module. Completed quizzes show your previous score and can be retaken."
-      items={quizzes}
-      onOpen={onOpen}
-      openLabel="Open Quiz"
-      retakeLabel="Retake Quiz"
-    />
-  );
-}
-
 function PracticalTestsList({ tests, onOpen }) {
   return (
     <AssessmentList
       title="Practice Tests"
-      subtitle="Assembly unlocks after scoring 60% or higher in Module 2 Quiz. Disassembly unlocks after scoring 60% or higher in Module 3 Quiz."
+      subtitle="Assembly unlocks after finishing Module 2. Disassembly unlocks after finishing Module 3."
       items={tests}
       onOpen={onOpen}
       openLabel="Open Test"
