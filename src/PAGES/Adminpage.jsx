@@ -3,6 +3,7 @@ import { db } from "../firebase";
 import {
   BarChart3,
   ChevronDown,
+  FileText,
   LogOut,
   RefreshCw,
   Settings,
@@ -17,6 +18,7 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { fetchMobileScoreDocs, mergeMobileScoresIntoProfile } from "../utils/mobileScores";
+import ModuleContentWorkspace from "../Components/ModuleContentWorkspace";
 
 const QUIZ_KEYS = [
   { key: "module1", label: "Module 1" },
@@ -619,6 +621,13 @@ export default function AdminPage({ adminUser, onLogout }) {
               active={activeTab === "analytics"}
               onClick={() => setActiveTab("analytics")}
             />
+
+            <AdminNavButton
+              icon={FileText}
+              label="Module Approvals"
+              active={activeTab === "content"}
+              onClick={() => setActiveTab("content")}
+            />
           </div>
         </div>
 
@@ -653,10 +662,16 @@ export default function AdminPage({ adminUser, onLogout }) {
               Administrator Console
             </div>
             <h1 className="mt-3 text-3xl font-black tracking-tight text-white md:text-4xl">
-              {activeTab === "accounts" ? "Account Management" : "Analytics"}
+              {activeTab === "accounts"
+                ? "Account Management"
+                : activeTab === "analytics"
+                ? "Analytics"
+                : "Module Approvals"}
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-[#9fb0c9]">
-              Scores are fetched live from Firebase user documents.
+              {activeTab === "content"
+                ? "Review Faculty content requests and publish approved cards to the Flutter mobile app."
+                : "Scores are fetched live from Firebase user documents."}
             </p>
           </div>
 
@@ -685,6 +700,18 @@ export default function AdminPage({ adminUser, onLogout }) {
                 ].join(" ")}
               >
                 Analytics
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("content")}
+                className={[
+                  "rounded-xl px-4 py-2 text-sm font-semibold transition",
+                  activeTab === "content"
+                    ? "bg-[#00ffb4] text-[#0a0e17]"
+                    : "text-[#9fb0c9] hover:text-white",
+                ].join(" ")}
+              >
+                Content
               </button>
             </div>
             <button
@@ -989,6 +1016,10 @@ export default function AdminPage({ adminUser, onLogout }) {
               </div>
             </div>
           </>
+        )}
+
+        {activeTab === "content" && (
+          <ModuleContentWorkspace mode="admin" user={adminUser} />
         )}
       </main>
     </div>

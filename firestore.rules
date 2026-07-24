@@ -1,8 +1,85 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function getUserRole(uid) {
+      return get(/databases/$(database)/documents/users/$(uid)).data.role;
+    }
+
+    function isAdmin() {
+      return signedIn()
+             && getUserRole(request.auth.uid) in ["admin", "Admin", "ADMIN"];
+    }
+
+    function isFaculty() {
+      return signedIn()
+             && getUserRole(request.auth.uid) in ["faculty", "Faculty", "FACULTY"];
+    }
+
+    function isStudentRole(role) {
+      return role in ["student", "Student", "STUDENT"];
+    }
+
+    match /users/{uid} {
+      allow read: if isAdmin()
+                  || (isFaculty() && isStudentRole(resource.data.role))
+                  || (signedIn() && request.auth.uid == uid);
+
+      allow create: if signedIn()
+                    && request.auth.uid == uid
+                    && request.resource.data.uid == uid
+                    && request.resource.data.role == "student";
+
+      allow update: if isAdmin()
+                    || (
+                      signedIn()
+                      && request.auth.uid == uid
+                      && request.resource.data.uid == resource.data.uid
+                      && request.resource.data.role == resource.data.role
+                    );
+
+      allow delete: if isAdmin();
+
+      match /module_scores/{document=**} {
+        allow read: if isAdmin() || isFaculty() || (signedIn() && request.auth.uid == uid);
+        allow write: if isAdmin() || (signedIn() && request.auth.uid == uid);
+      }
+
+      match /practice_scores/{document=**} {
+        allow read: if isAdmin() || isFaculty() || (signedIn() && request.auth.uid == uid);
+        allow write: if isAdmin() || (signedIn() && request.auth.uid == uid);
+      }
+    }
+
+    match /module_content_cards/{cardId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /module_change_requests/{requestId} {
+      allow create: if isFaculty()
+                    && request.resource.data.status == "pending"
+                    && request.resource.data.requestedBy == request.auth.uid;
+
+      allow read: if isAdmin()
+                  || (
+                    isFaculty()
+                    && resource.data.requestedBy == request.auth.uid
+                  );
+
+      allow update: if isAdmin()
+                    && request.resource.data.status in ["approved", "rejected"];
+
+      allow delete: if isAdmin();
+    }
+
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
   }
 }

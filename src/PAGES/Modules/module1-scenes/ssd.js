@@ -11,7 +11,7 @@ export const ssdScene = {
     modelRotation: [0, 0.2, 0],
     modelPosition: [0, 0, 0],
     normalize: { enabled: true, targetSize: 2.3 },
-    pinStyle: { buttonPx: 20, glowRadius: 0.012, distanceFactor: 16 },
+    pinStyle: { buttonPx: 10, numberPx: 6, glowRadius: 0.012, distanceFactor: 16 },
   },
   slides: [
     {
@@ -33,6 +33,7 @@ export const ssdScene = {
       number: 1,
       title: "Connector Edge",
       position: [0.65, 0, 0.12],
+      frontAxis: [0, 1, 0],
       en: "The connector links the SSD to the motherboard so data and power can pass through.",
     },
     {
@@ -40,6 +41,7 @@ export const ssdScene = {
       number: 2,
       title: "Storage Chips",
       position: [-0.28, 0.04, 0.05],
+      frontAxis: [0, 1, 0],
       en: "Flash memory chips store files, applications, and operating system data.",
     },
     {
@@ -47,6 +49,7 @@ export const ssdScene = {
       number: 3,
       title: "Controller Area",
       position: [0.1, 0.05, -0.18],
+      frontAxis: [0, 1, 0],
       en: "The controller manages how data is read, written, and organized across the SSD.",
     },
   ],

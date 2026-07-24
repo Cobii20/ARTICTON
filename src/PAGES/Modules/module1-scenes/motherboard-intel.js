@@ -12,7 +12,7 @@ export const motherboardSceneIntel = {
           modelScale: 0.1,
           modelRotation: [0, Math.PI /180, 0],
           modelPosition: [0, 0, 0],
-          pinStyle: { buttonPx: 36, glowRadius: 0.05 },
+          pinStyle: { buttonPx: 36, numberPx: 10, glowRadius: 0.05, distanceFactor: 10 },
           normalize: { enabled: false },
         },
         slides: [
@@ -35,6 +35,7 @@ export const motherboardSceneIntel = {
             number: 1,
             title: "CPU Socket Area",
             position: [0.2, 0.3, -0.8],
+            frontAxis: [0, 1, 0],
             en: "The CPU socket holds and connects the processor to the motherboard.",
           },
           {
@@ -42,6 +43,7 @@ export const motherboardSceneIntel = {
             number: 2,
             title: "RAM Slots",
             position: [1.4, 0.32, -1],
+            frontAxis: [0, 1, 0],
             en: "DIMM slots where memory modules are installed.",
           },
           {
@@ -49,6 +51,7 @@ export const motherboardSceneIntel = {
             number: 3,
             title: "24-pin ATX Power Connector",
             position: [2, 0.2, -0.55],
+            frontAxis: [0, 1, 0],
             en: "Main power input from the PSU to the motherboard.",
           },
         ],

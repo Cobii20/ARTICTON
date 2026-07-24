@@ -11,7 +11,7 @@ export const psuScene = {
           modelRotation: [0, 0, 0],
           modelPosition: [-0.1, 1.5, 0.1],
           normalize: { enabled: true, targetSize: 2.6 },
-          pinStyle: { buttonPx: 34, glowRadius: 0.05, distanceFactor: 14 },
+          pinStyle: { buttonPx: 10, numberPx: 6, glowRadius: 0.05, distanceFactor: 14 },
         },
         slides: [
           {
@@ -27,6 +27,29 @@ export const psuScene = {
           },
         ],
         hotspots: [
-         
+          {
+            id: "psu-hs-1",
+            number: 1,
+            title: "Cooling Fan",
+            position: [0, 0.32, 0.2],
+            frontAxis: [0, 1, 0],
+            en: "The PSU fan moves heat away from internal power components during operation.",
+          },
+          {
+            id: "psu-hs-2",
+            number: 2,
+            title: "AC Power Input",
+            position: [-0.48, 0.08, 0.2],
+            frontAxis: [0, 1, 0],
+            en: "This socket receives AC wall power before the PSU converts it into regulated DC outputs.",
+          },
+          {
+            id: "psu-hs-3",
+            number: 3,
+            title: "DC Cable Output Area",
+            position: [0.5, 0.02, -0.12],
+            frontAxis: [0, 1, 0],
+            en: "Power cables from this area deliver DC power to the motherboard, CPU, GPU, and drives.",
+          },
         ],
       };

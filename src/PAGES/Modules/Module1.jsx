@@ -139,9 +139,10 @@ function HotspotPin({
   onClick,
   pin = { buttonPx: 36, glowRadius: 0.05, distanceFactor: 10 },
   uiOffset,
-  frontAxis = [0, 1, 0],
+  frontAxis,
 }) {
   const btn = pin.buttonPx ?? 36;
+  const numberPx = pin.numberPx ?? Math.max(6, Math.round(btn * 0.35));
   const glow = pin.glowRadius ?? 0.05;
   const dist = pin.distanceFactor ?? 10;
   const offX = uiOffset?.[0] ?? 0;
@@ -156,6 +157,11 @@ function HotspotPin({
 
     const worldPos = new THREE.Vector3();
     groupRef.current.getWorldPosition(worldPos);
+
+    if (!frontAxis) {
+      setPinOpacity(1);
+      return;
+    }
 
     const normal = new THREE.Vector3(...frontAxis)
       .normalize()
@@ -182,9 +188,10 @@ function HotspotPin({
       <Html center distanceFactor={dist} occlude={false}>
         <motion.button
           type="button"
-          onClick={onClick}
-          whileHover={{ scale: 1.07 }}
-          whileTap={{ scale: 0.95 }}
+          onClick={(event) => {
+            event.stopPropagation();
+            onClick();
+          }}
           className={[
             "relative flex items-center justify-center rounded-full border backdrop-blur-md shadow-[0_16px_45px_rgba(0,0,0,0.55)] transition select-none",
             active
@@ -202,7 +209,7 @@ function HotspotPin({
         >
           <span className="absolute inset-[3px] rounded-full border border-black/10" />
           <span
-            style={{ fontSize: Math.max(11, Math.round(btn * 0.33)) }}
+            style={{ fontSize: numberPx }}
             className="font-extrabold"
           >
             {number}
@@ -218,7 +225,6 @@ function ModelScene({
   hotspots,
   activeId,
   setActiveId,
-  activeHotspot,
   debug,
   setLastCoords,
   modelScale = 1,
@@ -303,12 +309,6 @@ function ModelScene({
         />
       ))}
 
-      {activeHotspot ? (
-        <HotspotHologram
-          hotspot={activeHotspot}
-          onClose={() => setActiveId(null)}
-        />
-      ) : null}
     </group>
   );
 }
@@ -357,7 +357,7 @@ function HotspotHologram({ hotspot, onClose }) {
   );
 }
 
-function LabEnvironment({ sceneName, completedCount, totalCount, showLabels = true }) {
+function LabEnvironment({ sceneName, activeHotspot, showLabels = true }) {
   const ringRef = useRef();
   const scanRef = useRef();
 
@@ -394,16 +394,13 @@ function LabEnvironment({ sceneName, completedCount, totalCount, showLabels = tr
               <div className="text-[10px] font-black uppercase tracking-[0.24em] text-[#00ffb4]">
                 Articton Lab
               </div>
-              <div className="mt-1 text-[18px] font-black text-white">{sceneName}</div>
-              <div className="mt-2 text-[11px] leading-5 text-[#9fb0ca]">
-                Select a glowing marker to inspect component details inside the 3D workspace.
+              <div className="mt-1 text-[18px] font-black text-white">
+                {activeHotspot?.title || sceneName}
               </div>
-            </div>
-          </Html>
-
-          <Html position={[1.95, -0.02, -0.65]} center distanceFactor={8} occlude={false}>
-            <div className="rounded-full border border-[#00ffb4]/25 bg-[#06131b]/72 px-4 py-2 text-[11px] font-bold text-[#dbe6f5] shadow-[0_0_24px_rgba(0,255,180,0.16)] backdrop-blur-xl">
-              {completedCount}/{totalCount} parts complete
+              <div className="mt-2 text-[11px] leading-5 text-[#9fb0ca]">
+                {activeHotspot?.en ||
+                  "Select a glowing marker to inspect component details inside the 3D workspace."}
+              </div>
             </div>
           </Html>
         </>
@@ -964,7 +961,9 @@ export default function Module1Page({ onBack, onLogout }) {
     modules.forEach((m) => useGLTF.preload(m.url));
   }, [modules]);
 
-  const activeHotspot = null;
+  const activeHotspot = useMemo(() => {
+    return (current?.hotspots || []).find((hotspot) => hotspot.id === activeId) || null;
+  }, [current?.hotspots, activeId]);
 
   const user = useMemo(
     () => ({
@@ -1454,8 +1453,7 @@ export default function Module1Page({ onBack, onLogout }) {
                       <Suspense fallback={null}>
                         <LabEnvironment
                           sceneName={isComponentStage ? current.name : "Processor Platform Lab"}
-                          completedCount={modules.filter((m) => completedParts[m.key]).length}
-                          totalCount={modules.length}
+                          activeHotspot={activeHotspot}
                           showLabels={isComponentStage}
                         />
 
@@ -1474,15 +1472,13 @@ export default function Module1Page({ onBack, onLogout }) {
                         <Bounds
                             fit
                             clip
-                            observe
                             margin={current?.view?.boundsMargin ?? 1.15}
                             controls={controlsRef}
                           >
                             <ModelScene
                               url={current.url}
-                              hotspots={[]}
+                              hotspots={current.hotspots || []}
                               activeId={activeId}
-                              activeHotspot={activeHotspot}
                               setActiveId={setActiveId}
                               debug={debug}
                               setLastCoords={setLastCoords}

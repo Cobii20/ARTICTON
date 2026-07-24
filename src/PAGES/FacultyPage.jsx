@@ -3,6 +3,7 @@ import { collection, getDocs, query, where } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "../firebase";
 import { fetchMobileScoreDocs, mergeMobileScoresIntoProfile } from "../utils/mobileScores";
+import ModuleContentWorkspace from "../Components/ModuleContentWorkspace";
 
 const PASSING_PERCENT = 60;
 const MODULE_ACTIVITY_GROUPS = [
@@ -250,6 +251,7 @@ export default function FacultyPage({ onLogout }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [user, setUser] = useState(null);
+  const [activeTab, setActiveTab] = useState("progress");
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -347,13 +349,43 @@ export default function FacultyPage({ onLogout }) {
             <div className="text-sm uppercase tracking-[0.25em] text-[#00ffb4]/70">
               Faculty Dashboard
             </div>
-            <h1 className="mt-4 text-4xl font-black tracking-tight">Class progress overview</h1>
+            <h1 className="mt-4 text-4xl font-black tracking-tight">
+              {activeTab === "progress" ? "Class progress overview" : "Mobile module editor"}
+            </h1>
             <p className="mt-4 max-w-2xl text-sm leading-7 text-[#9fb0c9]">
-              Review student performance, open profiles, check completion status, and stay on top of class progress.
+              {activeTab === "progress"
+                ? "Review student performance, open profiles, check completion status, and stay on top of class progress."
+                : "Create Firestore module content edits for the Flutter app and send them to admin approval."}
             </p>
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="flex rounded-2xl border border-[#1a2438] bg-[#0b1220] p-1">
+              <button
+                type="button"
+                onClick={() => setActiveTab("progress")}
+                className={[
+                  "rounded-xl px-4 py-2 text-sm font-semibold transition",
+                  activeTab === "progress"
+                    ? "bg-[#00ffb4] text-[#0a0e17]"
+                    : "text-[#9fb0c9] hover:text-white",
+                ].join(" ")}
+              >
+                Progress
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("content")}
+                className={[
+                  "rounded-xl px-4 py-2 text-sm font-semibold transition",
+                  activeTab === "content"
+                    ? "bg-[#00ffb4] text-[#0a0e17]"
+                    : "text-[#9fb0c9] hover:text-white",
+                ].join(" ")}
+              >
+                Module Content
+              </button>
+            </div>
             <div className="rounded-2xl border border-[#1a2438] bg-[#0d1220] px-4 py-3 text-sm text-[#dbe6f5]">
               {user?.email || "Faculty"}
             </div>
@@ -367,6 +399,9 @@ export default function FacultyPage({ onLogout }) {
           </div>
         </div>
 
+        {activeTab === "content" ? (
+          <ModuleContentWorkspace mode="faculty" user={user} />
+        ) : (
         <div className="grid gap-4 xl:grid-cols-[1.45fr_0.9fr]">
           <div className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -516,6 +551,7 @@ export default function FacultyPage({ onLogout }) {
             </div>
           </div>
         </div>
+        )}
       </div>
     </div>
   );
