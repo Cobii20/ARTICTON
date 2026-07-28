@@ -514,7 +514,6 @@ function MotherboardDraggable({ isPlaced = false, onPlaced, onResetPlaced }) {
       setDetached(true);
       setSnapped(true);
       setAnimatingExtract(false);
-      setAnimationProgress(1);
       setNearTarget(false);
     } else {
       placeMotherboardInstalled();

@@ -12,8 +12,9 @@ import { OrbitControls, useGLTF, Html } from "@react-three/drei";
 import Settings from "../../../Components/Settings";
 import { auth, db } from "../../../firebase.js";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { AchievementToast, unlockAchievement } from "../../../utils/achievements.jsx";
+import { getUserSettings } from "../../../utils/userSettings";
 
 /* ================================================================== */
 /* INTEL FULL DISASSEMBLY — PRACTICAL TEST                            */
@@ -1169,13 +1170,30 @@ function ModelViewer({
 /* Header / background (visual chrome kept consistent with modules)    */
 /* ------------------------------------------------------------------ */
 
-function HeaderDropdown({ onBack, setIsSettingsOpen }) {
+function HeaderDropdown({ onBack, setIsSettingsOpen, profile }) {
+  const displayName = profile
+    ? `${profile.firstName || ""} ${profile.lastName || ""}`.trim() || "Profile"
+    : "Profile";
+  const avatarUrl = profile?.avatarUrl || "";
   const handleBack = () => {
     if (typeof onBack === "function") onBack("Modules");
   };
 
   return (
     <div className="flex flex-wrap items-center justify-end gap-3">
+      <div className="flex max-w-[230px] items-center gap-3 rounded-2xl border border-[#1a2438] bg-[#0d1220]/95 px-3 py-2.5">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/10 text-sm font-bold uppercase text-[#00ffb4]">
+          {avatarUrl ? (
+            <img src={avatarUrl} alt="Profile" className="h-full w-full object-cover" />
+          ) : (
+            displayName.charAt(0).toUpperCase()
+          )}
+        </span>
+        <span className="min-w-0 leading-tight text-left">
+          <span className="block truncate text-sm font-semibold text-white">{displayName}</span>
+          <span className="block text-[11px] text-[#7a8ba8]">Profile</span>
+        </span>
+      </div>
       <button
         type="button"
         onClick={handleBack}
@@ -1419,7 +1437,7 @@ export default function INTELFullDisassemblyPracticalTest({ onFinish, onBack }) 
   const [validationMessage, setValidationMessage] = useState(
     "No hints are active. Click any exposed component to begin removing it."
   );
-  const [settings, setSettings] = useState({ sound: true, animations: true, darkMode: true });
+  const [settings, setSettings] = useState(getUserSettings);
 
   const reachableKeys = useMemo(() => {
     const reachable = new Set();
@@ -1451,8 +1469,20 @@ export default function INTELFullDisassemblyPracticalTest({ onFinish, onBack }) 
   }, []);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (currentUser) => {
+    const unsub = onAuthStateChanged(auth, async (currentUser) => {
       setFirebaseUser(currentUser || null);
+      if (!currentUser) {
+        setProfile(null);
+        return;
+      }
+
+      try {
+        const userSnap = await getDoc(doc(db, "users", currentUser.uid));
+        setProfile(userSnap.exists() ? userSnap.data() : null);
+      } catch (error) {
+        console.error("Error fetching INTEL full disassembly profile:", error);
+        setProfile(null);
+      }
     });
     return () => unsub();
   }, []);
@@ -1620,7 +1650,7 @@ export default function INTELFullDisassemblyPracticalTest({ onFinish, onBack }) 
                     Restart Test
                   </button>
 
-                  <HeaderDropdown onBack={onBack} setIsSettingsOpen={setIsSettingsOpen} />
+                  <HeaderDropdown onBack={onBack} setIsSettingsOpen={setIsSettingsOpen} profile={profile} />
                 </div>
               </div>
 

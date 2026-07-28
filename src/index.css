@@ -38,3 +38,140 @@ canvas {
   background: #5f9598;
   border-radius: 6px;
 }
+
+html.articton-light,
+html.articton-light body,
+html.articton-light #root {
+  background-color: #f3f8fb;
+  color: #142235;
+}
+
+html.articton-light ::-webkit-scrollbar-track {
+  background: #dcecef;
+}
+
+html.articton-light ::-webkit-scrollbar-thumb {
+  background: #7aaeb2;
+}
+
+html.articton-light [class*="bg-[#0a0e17]"],
+html.articton-light [class*="bg-[#061e29]"],
+html.articton-light [class*="bg-[#031018]"] {
+  background-color: #f3f8fb !important;
+}
+
+html.articton-light [class*="bg-[#0d1220]"],
+html.articton-light [class*="bg-[#0b1220]"],
+html.articton-light [class*="bg-[#111827]"],
+html.articton-light [class*="bg-[#111b2f]"] {
+  background-color: #ffffff !important;
+}
+
+html.articton-light [class*="bg-[linear-gradient(135deg"],
+html.articton-light [class*="bg-[linear-gradient(90deg"],
+html.articton-light [class*="bg-gradient-to-b"],
+html.articton-light [class*="bg-gradient-to-br"] {
+  background-image: linear-gradient(135deg, #f8fbfd, #eef6f8) !important;
+}
+
+html.articton-light [class*="bg-[radial-gradient"] {
+  background-image: radial-gradient(circle at center, rgba(0, 166, 132, 0.08), transparent 62%) !important;
+}
+
+html.articton-light [class*="bg-black/10"] {
+  background-color: transparent !important;
+}
+
+html.articton-light [class*="ring-white/5"] {
+  box-shadow: inset 0 0 0 1px rgba(145, 164, 184, 0.26) !important;
+}
+
+html.articton-light [class*="bg-white/[0.03]"],
+html.articton-light [class*="bg-white/[0.04]"],
+html.articton-light [class*="bg-white/[0.05]"],
+html.articton-light [class*="bg-white/[0.06]"],
+html.articton-light [class*="bg-white/[0.02]"] {
+  background-color: rgba(255, 255, 255, 0.84) !important;
+}
+
+html.articton-light [class*="border-[#1a2438]"],
+html.articton-light [class*="border-[#26324a]"],
+html.articton-light [class*="border-white/10"],
+html.articton-light [class*="border-transparent"] {
+  border-color: #c4d3e4 !important;
+}
+
+html.articton-light [class*="text-white"],
+html.articton-light [class*="text-[#e8ecf4]"],
+html.articton-light [class*="text-[#dbe6f5]"],
+html.articton-light [class*="text-[#f3f4f4]"] {
+  color: #142235 !important;
+}
+
+html.articton-light [class*="text-[#7a8ba8]"],
+html.articton-light [class*="text-[#9fb0ca]"],
+html.articton-light [class*="text-[#9fb0c9]"],
+html.articton-light [class*="text-[#c8d4e6]"] {
+  color: #4f647d !important;
+}
+
+html.articton-light [class*="text-[#00ffb4]"],
+html.articton-light [class*="text-[#b7fff0]"],
+html.articton-light [class*="text-[#9fdccb]"] {
+  color: #007965 !important;
+}
+
+html.articton-light [class*="bg-[#00ffb4]"] {
+  background-color: #00b894 !important;
+}
+
+html.articton-light [class*="bg-[#00ffb4]/"],
+html.articton-light [class*="bg-[#00b4ff]/"] {
+  background-color: rgba(0, 184, 148, 0.11) !important;
+}
+
+html.articton-light [class*="border-[#00ffb4]/"] {
+  border-color: rgba(0, 137, 113, 0.28) !important;
+}
+
+html.articton-light [class*="text-yellow-"] {
+  color: #8a4b00 !important;
+}
+
+html.articton-light [class*="text-red-"] {
+  color: #9f1d1d !important;
+}
+
+html.articton-light input,
+html.articton-light textarea,
+html.articton-light select {
+  color: #142235;
+  background-color: #ffffff;
+}
+
+html.articton-light input::placeholder,
+html.articton-light textarea::placeholder {
+  color: #7a8da3;
+}
+
+html.articton-light [class*="shadow-[0_70px"],
+html.articton-light [class*="shadow-[0_34px"],
+html.articton-light [class*="shadow-[0_30px"],
+html.articton-light [class*="shadow-[0_26px"],
+html.articton-light [class*="shadow-[0_20px"],
+html.articton-light [class*="shadow-[0_18px"],
+html.articton-light [class*="shadow-[0_12px"] {
+  box-shadow: 0 22px 70px rgba(25, 52, 78, 0.13) !important;
+}
+
+html.articton-light [class*="shadow-[inset"] {
+  box-shadow: inset 0 0 0 1px rgba(153, 173, 191, 0.26) !important;
+}
+
+html.articton-light aside {
+  background-color: rgba(255, 255, 255, 0.92) !important;
+}
+
+html.articton-light details > div {
+  background-color: rgba(255, 255, 255, 0.94) !important;
+}

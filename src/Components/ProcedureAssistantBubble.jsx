@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Square, Volume2, VolumeX } from "lucide-react";
 import { getComponentProcedureNote } from "../utils/procedureNotes";
 
@@ -25,8 +25,6 @@ export default function ProcedureAssistantBubble({
     "speechSynthesis" in window &&
     "SpeechSynthesisUtterance" in window;
 
-  if (!note) return null;
-
   const title = mode === "assembly" ? "Assembly AI" : "Disassembly AI";
   const subtitle = `${platform} step-aware assistant`;
   const latestAssistantIndex = useMemo(() => {
@@ -37,7 +35,7 @@ export default function ProcedureAssistantBubble({
     return -1;
   }, [messages]);
 
-  const speakText = (text, key) => {
+  const speakText = useCallback((text, key) => {
     if (!speechSupported || !text) return;
 
     window.speechSynthesis.cancel();
@@ -59,13 +57,13 @@ export default function ProcedureAssistantBubble({
 
     setSpeakingKey(key);
     window.speechSynthesis.speak(utterance);
-  };
+  }, [speechSupported]);
 
-  const stopSpeech = () => {
+  const stopSpeech = useCallback(() => {
     if (!speechSupported) return;
     window.speechSynthesis.cancel();
     setSpeakingKey(null);
-  };
+  }, [speechSupported]);
 
   useEffect(() => {
     if (
@@ -81,18 +79,20 @@ export default function ProcedureAssistantBubble({
     const latestMessage = messages[latestAssistantIndex];
     lastAutoReadIndexRef.current = latestAssistantIndex;
     speakText(latestMessage.content, `message-${latestAssistantIndex}`);
-  }, [autoRead, latestAssistantIndex, messages, open, speechSupported]);
+  }, [autoRead, latestAssistantIndex, messages, open, speakText, speechSupported]);
 
   useEffect(() => {
     if (!open) stopSpeech();
-  }, [open]);
+  }, [open, stopSpeech]);
 
-  useEffect(() => () => stopSpeech(), []);
+  useEffect(() => () => stopSpeech(), [stopSpeech]);
 
   const handleSubmit = (event) => {
     event.preventDefault();
     onSend?.();
   };
+
+  if (!note) return null;
 
   if (open) {
     return (

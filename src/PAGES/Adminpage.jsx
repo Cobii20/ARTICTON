@@ -19,6 +19,7 @@ import {
 import { httpsCallable } from "firebase/functions";
 import { fetchMobileScoreDocs, mergeMobileScoresIntoProfile } from "../utils/mobileScores";
 import ModuleContentWorkspace from "../Components/ModuleContentWorkspace";
+import AccountProfileModal from "../Components/AccountProfileModal";
 
 const QUIZ_KEYS = [
   { key: "module1", label: "Module 1" },
@@ -81,6 +82,17 @@ function getFullName(data) {
     data.displayName ||
     data.fullName ||
     "No Name"
+  );
+}
+
+function getProfilePhotoUrl(data) {
+  return (
+    data.avatarUrl ||
+    data.photoURL ||
+    data.profilePhotoUrl ||
+    data.profilePictureUrl ||
+    data.imageUrl ||
+    ""
   );
 }
 
@@ -324,6 +336,7 @@ function buildStudentRecord(docSnap, mobileScoreDocs = []) {
     firstName,
     lastName,
     name: getFullName(data),
+    avatarUrl: getProfilePhotoUrl(data),
     email: data.email || "No email",
     contactNumber:
       data.contactNumber ||
@@ -384,6 +397,21 @@ function MetricCard({ label, value, subtext }) {
   );
 }
 
+function StudentAvatar({ student, size = "md" }) {
+  const dimension = size === "lg" ? "h-12 w-12 text-base" : "h-10 w-10 text-sm";
+  const fallback = (student?.name || student?.email || "S").charAt(0).toUpperCase();
+
+  return (
+    <div className={`${dimension} flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/10 font-bold text-[#00ffb4]`}>
+      {student?.avatarUrl ? (
+        <img src={student.avatarUrl} alt={`${student.name || "Student"} profile`} className="h-full w-full object-cover" />
+      ) : (
+        fallback
+      )}
+    </div>
+  );
+}
+
 function AdminNavButton({ active, onClick, icon: Icon, label }) {
   return (
     <button
@@ -404,7 +432,7 @@ function AdminNavButton({ active, onClick, icon: Icon, label }) {
             : "border-[#1a2438] bg-[#0d1220] text-[#7a8ba8]",
         ].join(" ")}
       >
-        <Icon className="h-5 w-5" />
+        {React.createElement(Icon, { className: "h-5 w-5" })}
       </span>
       {label}
     </button>
@@ -422,15 +450,21 @@ export default function AdminPage({ adminUser, onLogout }) {
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("accounts");
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [adminProfile, setAdminProfile] = useState(adminUser || null);
 
-  const adminName = useMemo(() => {
-    if (!adminUser) return "Admin";
-    const first = adminUser.firstName || "";
-    const last = adminUser.lastName || "";
-    return `${first} ${last}`.trim() || adminUser.displayName || "Admin";
+  useEffect(() => {
+    setAdminProfile(adminUser || null);
   }, [adminUser]);
 
-  const adminEmail = adminUser?.email || "No email";
+  const adminName = useMemo(() => {
+    if (!adminProfile) return "Admin";
+    const first = adminProfile.firstName || "";
+    const last = adminProfile.lastName || "";
+    return `${first} ${last}`.trim() || adminProfile.displayName || "Admin";
+  }, [adminProfile]);
+
+  const adminEmail = adminProfile?.email || adminUser?.email || "No email";
 
   useEffect(() => {
     fetchUsers();
@@ -738,7 +772,11 @@ export default function AdminPage({ adminUser, onLogout }) {
                 onClick={() => setDropdownOpen(!dropdownOpen)}
               >
                 <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-[#00ffb4]/25 bg-[#00ffb4]/10 text-sm font-bold uppercase text-[#00ffb4]">
-                  {adminName.charAt(0)}
+                  {adminProfile?.avatarUrl ? (
+                    <img src={adminProfile.avatarUrl} alt="Admin profile" className="h-full w-full rounded-xl object-cover" />
+                  ) : (
+                    adminName.charAt(0)
+                  )}
                 </div>
                 <span className="max-w-[180px] truncate font-medium">{adminName}</span>
                 <ChevronDown className={["h-4 w-4 transition", dropdownOpen ? "rotate-180" : ""].join(" ")} />
@@ -748,10 +786,13 @@ export default function AdminPage({ adminUser, onLogout }) {
                 <div className="absolute right-0 z-20 mt-2 w-52 overflow-hidden rounded-2xl border border-[#1a2438] bg-[#0b1220] shadow-[0_24px_60px_rgba(0,0,0,0.42)]">
                   <button
                     className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-[#dbe6f5] transition hover:bg-white/[0.05]"
-                    onClick={() => alert("Settings clicked")}
+                    onClick={() => {
+                      setDropdownOpen(false);
+                      setIsProfileOpen(true);
+                    }}
                   >
                     <Settings className="h-4 w-4 text-[#7a8ba8]" />
-                    Settings
+                    Profile
                   </button>
                   <button
                     className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-red-200 transition hover:bg-red-500/10"
@@ -766,6 +807,13 @@ export default function AdminPage({ adminUser, onLogout }) {
           </div>
           </div>
         </div>
+
+        <AccountProfileModal
+          isOpen={isProfileOpen}
+          onClose={() => setIsProfileOpen(false)}
+          profile={adminProfile}
+          onProfileUpdated={setAdminProfile}
+        />
 
         {/* ACCOUNT MANAGEMENT */}
         {activeTab === "accounts" && (
@@ -821,8 +869,10 @@ export default function AdminPage({ adminUser, onLogout }) {
                                 />
                               </div>
                             ) : (
-                              <div>
-                                <div className="font-semibold text-white">{account.name}</div>
+                              <div className="flex min-w-0 items-center gap-3">
+                                <StudentAvatar student={account} />
+                                <div className="min-w-0">
+                                  <div className="truncate font-semibold text-white">{account.name}</div>
                                 {account.studentId || account.section ? (
                                   <div className="mt-1 text-xs text-[#7a8ba8]">
                                     {[account.studentId, account.section]
@@ -830,6 +880,7 @@ export default function AdminPage({ adminUser, onLogout }) {
                                       .join(" • ")}
                                   </div>
                                 ) : null}
+                                </div>
                               </div>
                             )}
                           </div>
@@ -984,17 +1035,20 @@ export default function AdminPage({ adminUser, onLogout }) {
 
                 {analyticsData.userOverview ? (
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4">
-                      <div>
-                        <p className="font-semibold text-white">
-                          {analyticsData.userOverview.name}
-                        </p>
-                        <p className="text-sm text-[#7a8ba8]">
-                          {analyticsData.userOverview.email}
-                        </p>
+                    <div className="flex items-center justify-between gap-4 rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <StudentAvatar student={analyticsData.userOverview} size="lg" />
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold text-white">
+                            {analyticsData.userOverview.name}
+                          </p>
+                          <p className="truncate text-sm text-[#7a8ba8]">
+                            {analyticsData.userOverview.email}
+                          </p>
+                        </div>
                       </div>
 
-                      <div className="rounded-xl border border-[#00ffb4]/20 bg-[#00ffb4]/10 px-4 py-2 font-bold text-[#00ffb4]">
+                      <div className="shrink-0 rounded-xl border border-[#00ffb4]/20 bg-[#00ffb4]/10 px-4 py-2 font-bold text-[#00ffb4]">
                         {analyticsData.userOverview.averageScore}%
                       </div>
                     </div>

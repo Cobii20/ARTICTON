@@ -68,13 +68,43 @@ function getScorePercent(data) {
 }
 
 function getModuleScorePriority(data) {
-  if (data.testType === "post_test") return 3;
-  if (data.testType === "pre_test") return 2;
-  if (data.testType === "content") return 1;
+  const testType = normalizeAssessmentType(data);
+  if (testType === "post_test") return 3;
+  if (testType === "pre_test") return 2;
+  if (testType === "content") return 1;
   return 0;
 }
 
-function getModuleActivityName(testType) {
+function normalizeAssessmentType(data = {}) {
+  const text = compactText(
+    data.testType,
+    data.assessmentType,
+    data.type,
+    data.category,
+    data.title,
+    data.name,
+    data.id,
+    data.assessmentId,
+    data.testId
+  );
+
+  if (text.includes("post test") || text.includes("posttest") || text.includes("post")) {
+    return "post_test";
+  }
+
+  if (text.includes("pre test") || text.includes("pretest") || text.includes("pre")) {
+    return "pre_test";
+  }
+
+  if (text.includes("content") || text.includes("lesson")) {
+    return "content";
+  }
+
+  return data.testType || "";
+}
+
+function getModuleActivityName(data) {
+  const testType = normalizeAssessmentType(data);
   if (testType === "content") return "Content";
   if (testType === "pre_test") return "Pre";
   if (testType === "post_test") return "Post";
@@ -83,7 +113,7 @@ function getModuleActivityName(testType) {
 
 function shouldReplaceModuleScore(current, incoming) {
   if (!current) return true;
-  if (incoming.testType === "content" && getScorePercent(current) !== null) {
+  if (normalizeAssessmentType(incoming) === "content" && getScorePercent(current) !== null) {
     return false;
   }
 
@@ -185,13 +215,15 @@ export function mergeMobileScoresIntoProfile(profile = {}, mobileScoreDocs = [])
   const practicalTests = { ...(profile.practicalTests || {}) };
   const mobileModuleScores = { ...(profile.mobileModuleScores || {}) };
   const mobilePracticeScores = { ...(profile.mobilePracticeScores || {}) };
+  const mobileSpecificAssessments = { ...(profile.mobileSpecificAssessments || {}) };
 
   mobileScoreDocs.forEach((scoreDoc) => {
     const scoreKey = detectScoreKey(scoreDoc, scoreDoc.id);
     if (!scoreKey) return;
 
+    const activityName = getModuleActivityName(scoreDoc);
+
     if (scoreKey.startsWith("module")) {
-      const activityName = getModuleActivityName(scoreDoc.testType);
       if (activityName) {
         mobileModuleScores[`${scoreKey}${activityName}`] = toProgressPayload(scoreDoc);
       }
@@ -199,6 +231,11 @@ export function mergeMobileScoresIntoProfile(profile = {}, mobileScoreDocs = [])
       if (shouldReplaceModuleScore(quizProgress[scoreKey], scoreDoc)) {
         quizProgress[scoreKey] = toProgressPayload(scoreDoc);
       }
+      return;
+    }
+
+    if (activityName) {
+      mobileSpecificAssessments[`${scoreKey}${activityName}`] = toProgressPayload(scoreDoc);
       return;
     }
 
@@ -231,6 +268,7 @@ export function mergeMobileScoresIntoProfile(profile = {}, mobileScoreDocs = [])
     practicalTests,
     mobileModuleScores,
     mobilePracticeScores,
+    mobileSpecificAssessments,
     hasMobileScores,
   };
 }
