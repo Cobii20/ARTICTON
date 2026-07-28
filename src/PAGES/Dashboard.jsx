@@ -1220,7 +1220,7 @@ function PracticalScoresCard({ tests = [], onViewAll }) {
 
       {completedTests.length === 0 ? (
         <div className="mt-5 rounded-2xl border border-[#1a2438] bg-white/[0.03] px-5 py-4 text-sm text-[#7a8ba8]">
-          No practical-test result has been recorded yet.
+          No practical result has been recorded yet.
         </div>
       ) : (
         <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

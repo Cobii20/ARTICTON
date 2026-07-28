@@ -7,73 +7,124 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function getUserRole(uid) {
-      return get(/databases/$(database)/documents/users/$(uid)).data.role;
+    function hasVerifiedOtp() {
+      return signedIn()
+        && exists(
+          /databases/$(database)/documents/otp_sessions/$(request.auth.uid)
+        )
+        && get(
+          /databases/$(database)/documents/otp_sessions/$(request.auth.uid)
+        ).data.uid == request.auth.uid
+        && get(
+          /databases/$(database)/documents/otp_sessions/$(request.auth.uid)
+        ).data.authTime == request.auth.token.auth_time
+        && get(
+          /databases/$(database)/documents/otp_sessions/$(request.auth.uid)
+        ).data.expiresAt > request.time;
+    }
+
+    function userRole() {
+      return get(
+        /databases/$(database)/documents/users/$(request.auth.uid)
+      ).data.role;
     }
 
     function isAdmin() {
-      return signedIn()
-             && getUserRole(request.auth.uid) in ["admin", "Admin", "ADMIN"];
+      return hasVerifiedOtp() && userRole() in ["admin", "Admin", "ADMIN"];
     }
 
     function isFaculty() {
-      return signedIn()
-             && getUserRole(request.auth.uid) in ["faculty", "Faculty", "FACULTY"];
+      return hasVerifiedOtp() && userRole() in ["faculty", "Faculty", "FACULTY"];
     }
 
-    function isStudentRole(role) {
-      return role in ["student", "Student", "STUDENT"];
+    function isOwnUser(uid) {
+      return hasVerifiedOtp() && request.auth.uid == uid;
+    }
+
+    match /otp_challenges/{uid} {
+      allow read, write: if false;
+    }
+
+    match /otp_sessions/{uid} {
+      allow read, write: if false;
+    }
+
+    match /assessment_answer_keys/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /assessment_questions/{document=**} {
+      allow read: if hasVerifiedOtp();
+      allow write: if isAdmin();
+    }
+
+    match /assessment_definitions/{definitionId} {
+      allow read, write: if isAdmin();
     }
 
     match /users/{uid} {
-      allow read: if isAdmin()
-                  || (isFaculty() && isStudentRole(resource.data.role))
-                  || (signedIn() && request.auth.uid == uid);
-
       allow create: if signedIn()
-                    && request.auth.uid == uid
-                    && request.resource.data.uid == uid
-                    && request.resource.data.role == "student";
+        && request.auth.uid == uid
+        && request.resource.data.uid == uid
+        && request.resource.data.role == "student";
+
+      allow read: if isAdmin() || isFaculty() || isOwnUser(uid);
 
       allow update: if isAdmin()
-                    || (
-                      signedIn()
-                      && request.auth.uid == uid
-                      && request.resource.data.uid == resource.data.uid
-                      && request.resource.data.role == resource.data.role
-                    );
+        || (
+          isOwnUser(uid)
+          && request.resource.data.uid == resource.data.uid
+          && request.resource.data.email == resource.data.email
+          && request.resource.data.role == resource.data.role
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            "firstName",
+            "middleName",
+            "lastName",
+            "gender",
+            "birthday",
+            "program",
+            "contactNumber",
+            "moduleProgress",
+            "updatedAt"
+          ])
+        );
 
-      allow delete: if isAdmin();
+      allow delete: if false;
 
-      match /module_scores/{document=**} {
-        allow read: if isAdmin() || isFaculty() || (signedIn() && request.auth.uid == uid);
-        allow write: if isAdmin() || (signedIn() && request.auth.uid == uid);
+      match /module_scores/{scoreId} {
+        allow read: if isAdmin() || isFaculty() || isOwnUser(uid);
+        allow create, update, delete: if false;
       }
 
-      match /practice_scores/{document=**} {
-        allow read: if isAdmin() || isFaculty() || (signedIn() && request.auth.uid == uid);
-        allow write: if isAdmin() || (signedIn() && request.auth.uid == uid);
+      match /practice_scores/{scoreId} {
+        allow read: if isAdmin() || isFaculty() || isOwnUser(uid);
+        allow create, update, delete: if false;
+      }
+
+      match /assessment_attempts/{attemptId} {
+        allow read: if isAdmin() || isFaculty() || isOwnUser(uid);
+        allow create, update, delete: if false;
       }
     }
 
     match /module_content_cards/{cardId} {
-      allow read: if signedIn();
+      allow read: if hasVerifiedOtp();
       allow create, update, delete: if isAdmin();
     }
 
     match /module_change_requests/{requestId} {
       allow create: if isFaculty()
-                    && request.resource.data.status == "pending"
-                    && request.resource.data.requestedBy == request.auth.uid;
+        && request.resource.data.status == "pending"
+        && request.resource.data.requestedBy == request.auth.uid;
 
       allow read: if isAdmin()
-                  || (
-                    isFaculty()
-                    && resource.data.requestedBy == request.auth.uid
-                  );
+        || (
+          isFaculty()
+          && resource.data.requestedBy == request.auth.uid
+        );
 
       allow update: if isAdmin()
-                    && request.resource.data.status in ["approved", "rejected"];
+        && request.resource.data.status in ["approved", "rejected"];
 
       allow delete: if isAdmin();
     }

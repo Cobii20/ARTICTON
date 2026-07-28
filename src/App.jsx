@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { onAuthStateChanged, signOut } from "firebase/auth";
+import { httpsCallable } from "firebase/functions";
+import { auth, functions } from "./firebase";
 
 // Main pages
 import ArtictonLandingPage from "./PAGES/LandingPage";
 import Dashboard from "./PAGES/Dashboard";
-import PracticalTestPage from "./PAGES/PracticalTestPage";
 import AdminPage from "./PAGES/Adminpage";
 
 // Module pages
@@ -24,7 +26,6 @@ import FacultyPage from "./PAGES/FacultyPage";
 export default function App() {
   const [page, setPage] = useState("landing");
   const [userProfile, setUserProfile] = useState(null);
-  const [activeTestId, setActiveTestId] = useState(null);
   const [dashboardSection, setDashboardSection] = useState("Dashboard");
 
   const handleLogin = (profile) => {
@@ -41,12 +42,40 @@ export default function App() {
     }
   };
 
-  const handleLogout = () => {
+  const resetApplicationState = useCallback(() => {
     setUserProfile(null);
-    setActiveTestId(null);
     setDashboardSection("Dashboard");
     setPage("landing");
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      if (auth.currentUser) {
+        const endOtpSession = httpsCallable(functions, "endOtpSession");
+        await endOtpSession({});
+      }
+    } catch (error) {
+      console.warn("Could not delete OTP session:", error);
+    }
+
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Firebase sign-out failed:", error);
+    } finally {
+      resetApplicationState();
+    }
   };
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (!firebaseUser) {
+        resetApplicationState();
+      }
+    });
+
+    return unsubscribe;
+  }, [resetApplicationState]);
 
   const handleModuleBack = (target = "Dashboard") => {
     if (target === "logout") {
@@ -152,18 +181,6 @@ export default function App() {
   }
 
  
-
-  if (page === "practical-test") {
-    return (
-      <PracticalTestPage
-        testId={activeTestId || "pc-assembly"}
-        onBack={() => {
-          setDashboardSection("Practice Tests");
-          setPage("dashboard");
-        }}
-      />
-    );
-  }
 
   if (page === "admin") {
     return (

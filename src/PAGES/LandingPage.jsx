@@ -7,6 +7,7 @@ import { auth, db, functions } from "../firebase.js";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  signOut,
 } from "firebase/auth";
 import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
@@ -434,12 +435,20 @@ function SignupPage({ onBack, onSwitchToLogin, onAfterSignup }) {
         program,
         contactNumber: contactNumber.trim(),
         updatedAt: serverTimestamp(),
-        createdAt: new Date().toISOString(),
+        createdAt: serverTimestamp(),
       });
 
+      await signOut(auth);
       setLoading(false);
+      alert("Registration successful. Please sign in and complete OTP verification.");
       onAfterSignup?.();
     } catch (error) {
+      try {
+        await signOut(auth);
+      } catch (signOutError) {
+        console.error("Failed to clean up signup session:", signOutError);
+      }
+
       setLoading(false);
 
       if (error.code === "auth/email-already-in-use") {
@@ -686,22 +695,19 @@ function LoginPage({ onBack, onSwitchToSignup, onSuccessLogin }) {
     try {
       setLoading(true);
 
-      await signInWithEmailAndPassword(auth, email.trim(), pass);
+      const cleanEmail = email.trim().toLowerCase();
 
+      await signInWithEmailAndPassword(auth, cleanEmail, pass);
       const sendEmailOtp = httpsCallable(functions, "sendEmailOtp");
-      const cleanEmail = email.trim();
 
-      if (!cleanEmail) {
-        setLoading(false);
-        return setErr("Email is empty before sending OTP");
-      }
-
-      await sendEmailOtp({ email: cleanEmail });
-
+      await sendEmailOtp({});
       setStep("otp");
-      setLoading(false);
     } catch (error) {
-      setLoading(false);
+      try {
+        await signOut(auth);
+      } catch (signOutError) {
+        console.error("Failed to clean up login session:", signOutError);
+      }
 
       if (
         error.code === "auth/invalid-credential" ||
@@ -712,35 +718,46 @@ function LoginPage({ onBack, onSwitchToSignup, onSuccessLogin }) {
       } else {
         setErr(error.message);
       }
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleVerifyOtp = async (e) => {
     e.preventDefault();
-
-    const verifyEmailOtp = httpsCallable(functions, "verifyEmailOtp");
-
-    try {
-      await verifyEmailOtp({ email: email.trim(), otp });
-    } catch (error) {
-      return setErr(error.message || "Invalid OTP");
-    }
+    setLoading(true);
+    setErr("");
 
     try {
-      setLoading(true);
+      const verifyEmailOtp = httpsCallable(functions, "verifyEmailOtp");
+
+      await verifyEmailOtp({ otp: otp.trim() });
 
       const user = auth.currentUser;
+      if (!user) {
+        throw new Error("The authentication session was lost.");
+      }
+
       const d = await getDoc(doc(db, "users", user.uid));
 
-      let profile = null;
-      if (d.exists()) profile = d.data();
-      else profile = { uid: user.uid, email: user.email };
+      if (!d.exists()) {
+        await signOut(auth);
+        throw new Error(
+          "Your account profile could not be found. Contact an administrator."
+        );
+      }
 
-      setLoading(false);
-      onSuccessLogin?.(profile);
+      const profile = d.data();
+
+      onSuccessLogin?.({
+        ...profile,
+        uid: user.uid,
+        email: user.email,
+      });
     } catch (error) {
-      setLoading(false);
       setErr(error.message);
+    } finally {
+      setLoading(false);
     }
   };
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { db } from "../firebase";
+import { db, functions } from "../firebase";
 import {
   BarChart3,
   ChevronDown,
@@ -13,10 +13,10 @@ import {
 import {
   collection,
   getDocs,
-  deleteDoc,
   doc,
   updateDoc,
 } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
 import { fetchMobileScoreDocs, mergeMobileScoresIntoProfile } from "../utils/mobileScores";
 import ModuleContentWorkspace from "../Components/ModuleContentWorkspace";
 
@@ -430,7 +430,7 @@ export default function AdminPage({ adminUser, onLogout }) {
     return `${first} ${last}`.trim() || adminUser.displayName || "Admin";
   }, [adminUser]);
 
-  const adminEmail = adminUser?.email || "admin@email.com";
+  const adminEmail = adminUser?.email || "No email";
 
   useEffect(() => {
     fetchUsers();
@@ -513,18 +513,25 @@ export default function AdminPage({ adminUser, onLogout }) {
 
   const removeUser = async (id) => {
     const confirmed = window.confirm(
-      "Are you sure you want to remove this student?"
+      "Delete this student's Authentication account, profile, scores, and attempts? This cannot be undone."
     );
 
     if (!confirmed) return;
 
     try {
       setDeletingId(id);
-      await deleteDoc(doc(db, "users", id));
+
+      const deleteStudentAccount = httpsCallable(
+        functions,
+        "deleteStudentAccount"
+      );
+
+      await deleteStudentAccount({ uid: id });
       setAccounts((prev) => prev.filter((acc) => acc.id !== id));
+      alert("The student account was deleted successfully.");
     } catch (err) {
-      console.error("Error deleting user:", err);
-      alert("Failed to remove user.");
+      console.error("Delete-student error:", err);
+      alert(err.message || "The student account could not be deleted.");
     } finally {
       setDeletingId(null);
     }
