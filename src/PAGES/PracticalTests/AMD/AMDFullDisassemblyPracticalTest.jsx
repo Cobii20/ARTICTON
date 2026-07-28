@@ -12,7 +12,8 @@ import { OrbitControls, useGLTF, Html } from "@react-three/drei";
 import Settings from "../../../Components/Settings";
 import { auth, db } from "../../../firebase.js";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { AchievementToast, unlockAchievement } from "../../../utils/achievements.jsx";
 
 /* ================================================================== */
 /* AMD FULL DISASSEMBLY — PRACTICAL TEST                              */
@@ -50,13 +51,13 @@ const PART_MODELS = [
 const MOVABLE_COMPONENT_KEYS = new Set(REMOVAL_SEQUENCE);
 
 const COMPONENT_LABELS = {
-  gpu: "GPU",
-  ssd: "SSD",
-  hdd: "HDD",
-  ram1: "RAM 1",
-  ram2: "RAM 2",
-  cpu: "CPU",
-  psu: "PSU",
+  gpu: "GPU (Graphics Processing Unit)",
+  ssd: "SSD (Solid State Drive)",
+  hdd: "HDD (Hard Disk Drive)",
+  ram1: "RAM (Random Access Memory) 1",
+  ram2: "RAM (Random Access Memory) 2",
+  cpu: "CPU (Central Processing Unit)",
+  psu: "PSU (Power Supply Unit)",
   motherboard: "Motherboard",
 };
 
@@ -143,6 +144,8 @@ function formatDuration(totalSeconds) {
   const seconds = Math.floor(totalSeconds % 60);
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
+
+
 
 function playCompletionSound(enabled, isFinal = false) {
   if (!enabled || typeof window === "undefined") return;
@@ -1015,7 +1018,7 @@ function ModelViewer({
   onInteractionMessage,
 }) {
   const [isDraggingPart, setIsDraggingPart] = useState(false);
-  const [telemetry, setTelemetry] = useState(null);
+  const [, setTelemetry] = useState(null);
   const [overviewRequest, setOverviewRequest] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const viewerRef = useRef(null);
@@ -1144,7 +1147,7 @@ function ModelViewer({
           disabled={isDraggingPart}
           className="rounded-xl border border-[#00ffb4]/30 bg-[#00ffb4]/12 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#7dffdc] shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl transition hover:bg-[#00ffb4]/20 disabled:cursor-not-allowed disabled:opacity-45"
         >
-          Show Whole Table
+          Reset Camera View
         </button>
         <button
           type="button"
@@ -1157,19 +1160,7 @@ function ModelViewer({
         </button>
       </div>
 
-      {telemetry ? (
-        <div className="pointer-events-none absolute bottom-4 left-4 z-[80] w-[min(280px,calc(100%-32px))] rounded-2xl border border-[#00ffb4]/25 bg-[#0b1220]/94 px-4 py-3 text-[11px] leading-5 text-[#dbe6f5] shadow-[0_12px_35px_rgba(0,0,0,0.4)] backdrop-blur-xl">
-          <div className="mb-1 flex items-center justify-between gap-4">
-            <span className="font-bold text-[#00ffb4]">{telemetry.label}</span>
-          </div>
-          <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
-            <div
-              className="h-full rounded-full bg-[#00ffb4] transition-[width] duration-150"
-              style={{ width: `${Math.round(telemetry.progress * 100)}%` }}
-            />
-          </div>
-        </div>
-      ) : null}
+
     </div>
   );
 }
@@ -1178,13 +1169,13 @@ function ModelViewer({
 /* Header / background (visual chrome kept consistent with modules)    */
 /* ------------------------------------------------------------------ */
 
-function HeaderDropdown({ userName, userEmail = "", onBack, onLogout, setIsSettingsOpen }) {
+function HeaderDropdown({ onBack, setIsSettingsOpen }) {
   const handleBack = () => {
     if (typeof onBack === "function") onBack("Modules");
   };
 
   return (
-    <div className="flex items-center gap-4">
+    <div className="flex flex-wrap items-center justify-end gap-3">
       <button
         type="button"
         onClick={handleBack}
@@ -1192,33 +1183,13 @@ function HeaderDropdown({ userName, userEmail = "", onBack, onLogout, setIsSetti
       >
         Go back to Dashboard
       </button>
-
-      <details className="group relative z-50">
-        <summary className="list-none cursor-pointer rounded-2xl border border-[#1a2438] bg-[#0d1220]/95 px-4 py-2.5 transition hover:bg-[#111b2f]">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/10 text-sm font-bold text-[#00ffb4]">
-              {(userName || "U").charAt(0).toUpperCase()}
-            </div>
-            <div className="leading-tight text-left">
-              <div className="text-sm font-semibold text-white">{userName}</div>
-              <div className="text-[11px] text-[#7a8ba8]">{userEmail || "No email"}</div>
-            </div>
-            <div className="text-sm text-[#7a8ba8] transition group-open:rotate-180">▾</div>
-          </div>
-        </summary>
-
-        <div className="absolute right-0 top-full mt-2 z-[220] w-52 rounded-2xl border border-[#1a2438] bg-[#0d1220]/98 p-2 shadow-[0_18px_50px_rgba(0,0,0,0.35)] backdrop-blur-xl">
-          <button onClick={() => setIsSettingsOpen(true)} className="w-full rounded-xl px-4 py-2 text-left text-sm text-[#dbe6f5] transition hover:bg-white/5">
-            Settings
-          </button>
-          <button onClick={() => typeof onBack === "function" && onBack("Profile")} className="w-full rounded-xl px-4 py-2 text-left text-sm text-[#dbe6f5] transition hover:bg-white/5">
-            Profile
-          </button>
-          <button onClick={onLogout} className="w-full rounded-xl px-4 py-2 text-left text-sm text-red-400 transition hover:bg-red-500/10">
-            Logout
-          </button>
-        </div>
-      </details>
+      <button
+        type="button"
+        onClick={() => setIsSettingsOpen(true)}
+        className="rounded-2xl border border-[#1a2438] bg-white/[0.03] px-4 py-2.5 text-[13px] font-semibold text-[#dbe6f5] transition hover:bg-white/[0.06]"
+      >
+        Settings
+      </button>
     </div>
   );
 }
@@ -1237,7 +1208,7 @@ function ModuleBackground() {
    learner can tap to check off mentally, but selecting one does NOT
    choose it for them; it only scrolls/highlights for reference. Progress
    is driven entirely by what has actually been removed in the 3D scene. */
-function ChecklistSidebar({ open, onToggle, completedParts, mistakes, fumbles }) {
+function ChecklistSidebar({ open, onToggle, completedParts, checklistOrder, onResetScene }) {
   return (
     <div
       className={[
@@ -1249,42 +1220,24 @@ function ChecklistSidebar({ open, onToggle, completedParts, mistakes, fumbles })
         <div className="flex shrink-0 items-center justify-between border-b border-[#1a2438] px-4 py-4">
           {open ? (
             <div>
-              <div className="text-sm font-bold text-white">Removal Checklist</div>
-              <div className="text-[11px] text-[#7a8ba8]">Any order • AMD Platform</div>
+              <div className="text-sm font-bold text-white">Practical Steps</div>
+              <div className="text-[11px] text-[#7a8ba8]">AMD Platform</div>
             </div>
           ) : null}
-          <button
-            type="button"
-            onClick={onToggle}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#1a2438] bg-white/[0.03] text-[#dbe6f5] transition hover:bg-white/[0.06]"
-          >
-            {open ? "←" : "→"}
+          <button type="button" onClick={onToggle} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#1a2438] bg-white/[0.03] text-[#dbe6f5] transition hover:bg-white/[0.06]">
+            {open ? "<" : ">"}
           </button>
         </div>
 
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-3 pr-2 [scrollbar-color:rgba(0,255,180,0.35)_rgba(255,255,255,0.05)] [scrollbar-width:thin]">
-          {REMOVAL_SEQUENCE.map((key) => {
+          {(checklistOrder || REMOVAL_SEQUENCE).map((key, index) => {
             const done = completedParts.includes(key);
             return (
-              <div
-                key={key}
-                className={[
-                  "flex w-full items-center gap-3 rounded-2xl border px-3 py-3 text-left transition",
-                  done ? "border-[#00ffb4]/25 bg-[#00ffb4]/10" : "border-[#1a2438] bg-white/[0.03]",
-                ].join(" ")}
-              >
-                <span
-                  className={[
-                    "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold transition",
-                    done ? "bg-[#00ffb4] text-[#0a0e17]" : "border border-[#1a2438] bg-[#0d1220] text-[#7a8ba8]",
-                  ].join(" ")}
-                >
-                  {done ? "✓" : "•"}
-                </span>
+              <div key={key} className={["flex w-full items-center gap-3 rounded-2xl border px-3 py-3 text-left transition", done ? "border-[#00ffb4]/25 bg-[#00ffb4]/10" : "border-[#1a2438] bg-white/[0.03]"].join(" ")}>
+                <span className={["flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold transition", done ? "bg-[#00ffb4] text-[#0a0e17]" : "border border-[#1a2438] bg-[#0d1220] text-[#7a8ba8]"].join(" ")}>{index + 1}</span>
                 {open ? (
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold text-white">{COMPONENT_LABELS[key]}</div>
-                    <div className="text-[11px] text-[#7a8ba8]">{done ? "Removed" : "Not yet removed"}</div>
+                    <div className="truncate text-sm font-semibold text-white">Step {index + 1}</div>
                   </div>
                 ) : null}
               </div>
@@ -1292,18 +1245,11 @@ function ChecklistSidebar({ open, onToggle, completedParts, mistakes, fumbles })
           })}
         </div>
 
-        {open ? (
-          <div className="shrink-0 border-t border-[#1a2438] p-3 text-[11px] text-[#7a8ba8]">
-            <div className="flex justify-between">
-              <span>Mistakes</span>
-              <span className="font-bold text-[#ff9f7d]">{mistakes}</span>
-            </div>
-            <div className="mt-1 flex justify-between">
-              <span>Fumbles</span>
-              <span className="font-bold text-[#ffd27d]">{fumbles}</span>
-            </div>
-          </div>
-        ) : null}
+        <div className="shrink-0 border-t border-[#1a2438] p-3">
+          <button type="button" onClick={onResetScene} className={["flex items-center justify-center rounded-2xl border border-[#1a2438] bg-white/[0.03] font-semibold text-[#dbe6f5]", "transition hover:bg-white/[0.07]", open ? "w-full px-5 py-3 text-sm" : "h-10 w-10 text-sm"].join(" ")} title="Reset Scene">
+            {open ? "Reset Scene" : "R"}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -1455,7 +1401,7 @@ function ResultsCard({ result, onRetry, onBackToDashboard }) {
 /* Main component                                                     */
 /* ------------------------------------------------------------------ */
 
-export default function AMDFullDisassemblyPracticalTest({ onFinish, onBack, onLogout }) {
+export default function AMDFullDisassemblyPracticalTest({ onFinish, onBack }) {
   const [sceneRevision, setSceneRevision] = useState(0);
   const [firebaseUser, setFirebaseUser] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -1464,10 +1410,12 @@ export default function AMDFullDisassemblyPracticalTest({ onFinish, onBack, onLo
   const [showIntro, setShowIntro] = useState(true);
   const [testActive, setTestActive] = useState(false);
   const [completedParts, setCompletedParts] = useState([]);
+  const checklistOrder = REMOVAL_SEQUENCE;
   const [wrongOrderCount, setWrongOrderCount] = useState(0);
   const [fumbleCount, setFumbleCount] = useState(0);
   const [startedAt, setStartedAt] = useState(null);
   const [result, setResult] = useState(null);
+  const [achievementToast, setAchievementToast] = useState(null);
   const [validationMessage, setValidationMessage] = useState(
     "No hints are active. Click any exposed component to begin removing it."
   );
@@ -1497,34 +1445,17 @@ export default function AMDFullDisassemblyPracticalTest({ onFinish, onBack, onLo
     setStartedAt(null);
     setResult(null);
     setTestActive(false);
-    setSceneRevision((value) => value + 1);
+    setSceneRevision((value) => value + 1);
     setShowIntro(true);
     setValidationMessage("No hints are active. Click any exposed component to begin removing it.");
   }, []);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (currentUser) => {
-      if (!currentUser) {
-        setFirebaseUser(null);
-        setProfile(null);
-        return;
-      }
-      setFirebaseUser(currentUser);
-      try {
-        const userRef = doc(db, "users", currentUser.uid);
-        const snap = await getDoc(userRef);
-        if (snap.exists()) setProfile(snap.data());
-      } catch (error) {
-        console.error("Error fetching AMD Disassembly Practical Test profile:", error);
-      }
+    const unsub = onAuthStateChanged(auth, (currentUser) => {
+      setFirebaseUser(currentUser || null);
     });
     return () => unsub();
   }, []);
-
-  const user = {
-    name: profile ? `${profile.firstName || ""} ${profile.lastName || ""}`.trim() || "User" : "Loading...",
-    email: firebaseUser?.email || "No email",
-  };
 
   const saveTestResult = useCallback(
     async (finalResult) => {
@@ -1547,6 +1478,9 @@ export default function AMDFullDisassemblyPracticalTest({ onFinish, onBack, onLo
           },
           { merge: true }
         );
+        const achievement = await unlockAchievement(firebaseUser.uid, "amdDisassembly", { score: finalResult.score });
+        setAchievementToast(achievement);
+        window.setTimeout(() => setAchievementToast(null), 4200);
       } catch (error) {
         console.error("Error saving AMD Disassembly Practical Test result:", error);
       }
@@ -1638,9 +1572,10 @@ export default function AMDFullDisassemblyPracticalTest({ onFinish, onBack, onLo
   };
 
   return (
-    <div className="fixed inset-0 h-screen w-screen overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased">
+    <div className="absolute inset-0 h-full w-full overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased">
       <div className="relative h-full w-full overflow-hidden">
         <ModuleBackground />
+        <AchievementToast achievement={achievementToast} onClose={() => setAchievementToast(null)} />
 
         {showIntro ? <TestIntroCard onStart={handleStartTest} /> : null}
         {result ? (
@@ -1657,14 +1592,12 @@ export default function AMDFullDisassemblyPracticalTest({ onFinish, onBack, onLo
               <div>
                 Practical Test — <span className="text-[#dbe6f5]">Full Disassembly (AMD)</span>
               </div>
-              <div className="rounded-lg border border-[#ff9f7d]/30 bg-[#ff9f7d]/8 px-2 py-1 text-[11px] font-bold text-[#ff9f7d]">
-                {completedParts.length} / {REMOVAL_SEQUENCE.length} removed
-              </div>
+              <div className="rounded-lg border border-[#ff9f7d]/30 bg-[#ff9f7d]/8 px-2 py-1 text-[11px] font-bold text-[#ff9f7d]">Scored Practical</div>
             </div>
 
             <div className="relative z-[120] mt-3 px-6 md:px-10">
-              <div className="flex w-full items-center justify-between gap-4 rounded-[22px] border border-[#1a2438] bg-[#0b1220]/86 px-6 py-4 shadow-[0_18px_60px_rgba(0,0,0,0.30)] backdrop-blur-xl">
-                <div className="flex items-center gap-3">
+              <div className="flex w-full flex-wrap items-center justify-between gap-4 rounded-[22px] border border-[#1a2438] bg-[#0b1220]/86 px-6 py-4 shadow-[0_18px_60px_rgba(0,0,0,0.30)] backdrop-blur-xl">
+                <div className="flex flex-wrap items-center justify-end gap-3">
                   <img src="/PNG/Articton.png" alt="Articton Logo" className="h-10 w-10 scale-300 object-contain ml-4" />
                   <div>
                     <div className="text-base font-bold tracking-wide text-white">Articton</div>
@@ -1672,7 +1605,7 @@ export default function AMDFullDisassemblyPracticalTest({ onFinish, onBack, onLo
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center justify-end gap-3">
                   {validationMessage ? (
                     <div className="max-w-[520px] rounded-2xl border border-[#00ffb4]/20 bg-[#00ffb4]/8 px-4 py-2 text-xs font-semibold text-[#dffef5]">
                       {validationMessage}
@@ -1687,13 +1620,7 @@ export default function AMDFullDisassemblyPracticalTest({ onFinish, onBack, onLo
                     Restart Test
                   </button>
 
-                  <HeaderDropdown
-                    userName={user.name}
-                    userEmail={user.email}
-                    onBack={onBack}
-                    onLogout={onLogout}
-                    setIsSettingsOpen={setIsSettingsOpen}
-                  />
+                  <HeaderDropdown onBack={onBack} setIsSettingsOpen={setIsSettingsOpen} />
                 </div>
               </div>
 
@@ -1708,7 +1635,8 @@ export default function AMDFullDisassemblyPracticalTest({ onFinish, onBack, onLo
                     Click a part to detach • grab and carry it to its bench spot • click again to release
                   </div>
                 </div>
-                <div className="flex items-center gap-4 text-[11px] font-bold">
+                <div className="flex flex-wrap items-center gap-4 text-[11px] font-bold">
+                  <span className="text-[#00ffb4]">{completedParts.length} / {REMOVAL_SEQUENCE.length} removed</span>
                   <span className="text-[#ff9f7d]">{wrongOrderCount} order mistakes</span>
                   <span className="text-[#ffd27d]">{fumbleCount} fumbles</span>
                 </div>
@@ -1721,8 +1649,8 @@ export default function AMDFullDisassemblyPracticalTest({ onFinish, onBack, onLo
                   open={sidebarOpen}
                   onToggle={() => setSidebarOpen((value) => !value)}
                   completedParts={completedParts}
-                  mistakes={wrongOrderCount}
-                  fumbles={fumbleCount}
+                  checklistOrder={checklistOrder}
+                  onResetScene={resetTest}
                 />
 
                 <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_22%_0%,rgba(255,255,255,0.08),transparent_40%)]" />
@@ -1763,3 +1691,5 @@ export default function AMDFullDisassemblyPracticalTest({ onFinish, onBack, onLo
 
 /* Preload the AMD table and every component model up front */
 PART_MODELS.forEach((part) => useGLTF.preload(encodeURI(part.path)));
+
+

@@ -10,9 +10,11 @@ import * as THREE from "three";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Html, OrbitControls, useGLTF } from "@react-three/drei";
 import Settings from "../../../Components/Settings";
+import ModuleDetailCard from "../../../Components/ModuleDetailCard";
 import { auth, db } from "../../../firebase.js";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { AchievementToast, unlockAchievement } from "../../../utils/achievements.jsx";
 
 /* ------------------------------------------------------------------ */
 /* Module 3 ordered assembly configuration (INTEL platform)     */
@@ -48,14 +50,14 @@ const MOVABLE_COMPONENT_KEYS = new Set(ASSEMBLY_SEQUENCE);
 const MOTHERBOARD_CHILD_KEYS = new Set(["cpu", "ram1", "ram2", "ssd"]);
 
 const COMPONENT_LABELS = {
-  cpu: "CPU",
-  ram1: "RAM 1",
-  ram2: "RAM 2",
-  ssd: "SSD",
+  cpu: "CPU (Central Processing Unit)",
+  ram1: "RAM (Random Access Memory) 1",
+  ram2: "RAM (Random Access Memory) 2",
+  ssd: "SSD (Solid State Drive)",
   motherboard: "Motherboard",
-  psu: "PSU",
-  hdd: "HDD",
-  gpu: "GPU",
+  psu: "PSU (Power Supply Unit)",
+  hdd: "HDD (Hard Disk Drive)",
+  gpu: "GPU (Graphics Processing Unit)",
 };
 
 /* These are the final table seats measured during Module 2.
@@ -217,6 +219,8 @@ function InteractiveCenteredObject({
   startConfig,
   targetFrameRef = null,
   isActive,
+  isFullRun = false,
+  showGuides = true,
   isCompleted,
   onPartCompleted,
   onLockedPartClick,
@@ -269,7 +273,8 @@ function InteractiveCenteredObject({
   const parentWorldQuaternionRef = useRef(new THREE.Quaternion());
 
   const isMovablePart = MOVABLE_COMPONENT_KEYS.has(partKey);
-  const canInteract = isMovablePart && (isActive || isCompleted);
+  const canInteract = isMovablePart && (isActive || isCompleted || isFullRun);
+  const shouldShowGuides = showGuides && isActive;
 
   const installedQuaternion = useMemo(() => new THREE.Quaternion(), []);
   const tableQuaternion = useMemo(() => {
@@ -376,7 +381,7 @@ function InteractiveCenteredObject({
   }, [modelCenter]);
 
   const publishTelemetry = useCallback(() => {
-    if (!groupRef.current || !isMovablePart || !isActive || !onTelemetry) return;
+    if (!groupRef.current || !isMovablePart || !shouldShowGuides || !onTelemetry) return;
 
     const installationTarget = computeInstallationTarget();
     const centers = getVisualCenters(installationTarget);
@@ -408,11 +413,11 @@ function InteractiveCenteredObject({
     computeInstallationTarget,
     getVisualCenters,
     hardSnapDistance,
-    isActive,
     isMovablePart,
     label,
     onTelemetry,
     partKey,
+    shouldShowGuides,
   ]);
 
   useEffect(() => {
@@ -441,24 +446,24 @@ function InteractiveCenteredObject({
       1
     );
 
-    if (isActive) {
+    if (shouldShowGuides) {
       requestAnimationFrame(() => publishTelemetry());
     }
   }, [
     computeInstallationTarget,
-    isActive,
     isCompleted,
     publishTelemetry,
     setPhaseSafely,
+    shouldShowGuides,
     startPosition,
     tableQuaternion,
   ]);
 
   useEffect(() => {
-    if (!isActive) return;
+    if (!shouldShowGuides) return;
     const id = requestAnimationFrame(() => publishTelemetry());
     return () => cancelAnimationFrame(id);
-  }, [isActive, publishTelemetry]);
+  }, [publishTelemetry, shouldShowGuides]);
 
   const reportCompletion = useCallback(() => {
     if (completionReportedRef.current || isCompleted) return;
@@ -481,7 +486,9 @@ function InteractiveCenteredObject({
     document.body.style.cursor = "default";
     setPhaseSafely("installed");
     onInteractionMessage(
-      `${label} snapped into place and is now locked. The target height and orientation were corrected automatically.`
+      showGuides
+        ? `${label} snapped into place and is now locked. The target height and orientation were corrected automatically.`
+        : `${label} installed. Continue the full assembly run.`
     );
     publishTelemetry();
     reportCompletion();
@@ -493,6 +500,7 @@ function InteractiveCenteredObject({
     publishTelemetry,
     reportCompletion,
     setPhaseSafely,
+    showGuides,
   ]);
 
   const beginGrab = useCallback(
@@ -560,7 +568,9 @@ function InteractiveCenteredObject({
       onDragStateChange(true);
       document.body.style.cursor = "grabbing";
       onInteractionMessage(
-        `${label} grabbed. It has been raised to the exact height of the highlighted target and is now hard-locked on that Y level. Move only left, right, forward, or backward.`
+        showGuides
+          ? `${label} grabbed. It has been raised to the exact height of the highlighted target and is now hard-locked on that Y level. Move only left, right, forward, or backward.`
+          : `${label} grabbed. Place it correctly and click again to release.`
       );
       publishTelemetry();
     },
@@ -573,6 +583,7 @@ function InteractiveCenteredObject({
       onInteractionMessage,
       publishTelemetry,
       setPhaseSafely,
+      showGuides,
       updateMouse,
     ]
   );
@@ -600,7 +611,9 @@ function InteractiveCenteredObject({
     magnetNoticeRef.current = false;
     setPhaseSafely("released");
     onInteractionMessage(
-      `${label} released. Its Y level remains aligned with the highlight. Click it again and move it closer to the target center.`
+      showGuides
+        ? `${label} released. Its Y level remains aligned with the highlight. Click it again and move it closer to the target center.`
+        : `${label} released. Try placing it again.`
     );
     publishTelemetry();
   }, [
@@ -611,6 +624,7 @@ function InteractiveCenteredObject({
     onInteractionMessage,
     publishTelemetry,
     setPhaseSafely,
+    showGuides,
     snapDistance,
   ]);
 
@@ -675,7 +689,7 @@ function InteractiveCenteredObject({
       1
     );
 
-    if (isActive && phaseRef.current !== "installed") {
+    if (shouldShowGuides && phaseRef.current !== "installed") {
       if (tetherRef.current) {
         lineStartRef.current.copy(centers.currentLocal);
         lineEndRef.current.copy(centers.targetLocal);
@@ -771,7 +785,7 @@ function InteractiveCenteredObject({
               ? "strong"
               : "engaged";
 
-          if (!magnetNoticeRef.current) {
+          if (showGuides && !magnetNoticeRef.current) {
             magnetNoticeRef.current = true;
             onInteractionMessage(
               `Magnet engaged for ${label}. Move closer to the center for the final snap.`
@@ -803,7 +817,7 @@ function InteractiveCenteredObject({
           return;
         }
       }
-    } else if (isActive && phaseRef.current === "released") {
+    } else if (shouldShowGuides && phaseRef.current === "released") {
       // After the user has grabbed the part once, keep the target-height lock
       // active between attempts. A newly selected part remains at its authored
       // table position until the first click, so it never disappears before
@@ -822,7 +836,7 @@ function InteractiveCenteredObject({
     const interval = grabbingRef.current
       ? TELEMETRY_FRAME_INTERVAL
       : TELEMETRY_IDLE_FRAME_INTERVAL;
-    if (isActive && frameCounterRef.current % interval === 0) {
+    if (shouldShowGuides && frameCounterRef.current % interval === 0) {
       publishTelemetry();
     }
   });
@@ -1529,11 +1543,10 @@ function ModelViewer({
           type="button"
           onClick={() => setOverviewRequest((value) => value + 1)}
           disabled={isDraggingPart}
-          className="rounded-xl border border-[#00ffb4]/30 bg-[#00ffb4]/12 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#7dffdc] shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl transition hover:bg-[#00ffb4]/20 disabled:cursor-not-allowed disabled:opacity-45"
+          className="rounded-xl border border-[#00ffb4]/30 bg-[#0b1220]/92 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#7dffdc] shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl transition hover:bg-[#00ffb4]/12 disabled:cursor-not-allowed disabled:opacity-45"
         >
-          Reset Full-Table Bird&apos;s-eye
+          Reset Camera View
         </button>
-
         <button
           type="button"
           onClick={toggleFullscreen}
@@ -1544,9 +1557,6 @@ function ModelViewer({
         >
           {isFullscreen ? "Exit Full Screen" : "Full Screen"}
         </button>
-        <div className="pointer-events-none rounded-xl border border-white/10 bg-[#0b1220]/86 px-3 py-2 text-[10px] font-semibold text-[#9fb0ca] backdrop-blur-xl">
-          The camera keeps the complete table, case, motherboard, and all loose parts visible. Step changes no longer zoom into one component.
-        </div>
       </div>
 
       {telemetry ? (
@@ -1592,26 +1602,24 @@ function HeaderDropdown({
   };
 
   return (
-    <div className="flex items-center gap-4">
+    <div className="relative flex flex-wrap items-center justify-end gap-3">
       <button
         type="button"
         onClick={handleBack}
-        className="rounded-2xl border border-[#1a2438] bg-white/[0.03] px-4 py-2.5 text-[13px] font-semibold text-[#dbe6f5] transition hover:bg-white/[0.06]"
+        className="relative z-[70] rounded-2xl border border-[#1a2438] bg-white/[0.03] px-4 py-2.5 text-[13px] font-semibold text-[#dbe6f5] transition hover:bg-white/[0.06]"
       >
         Go back to Dashboard
       </button>
 
       <details className="group relative z-50">
-        <summary className="list-none cursor-pointer rounded-2xl border border-[#1a2438] bg-[#0d1220]/95 px-4 py-2.5 transition hover:bg-[#111b2f]">
-          <div className="flex items-center gap-3">
+        <summary className="list-none cursor-pointer rounded-2xl border border-[#1a2438] bg-[#0d1220]/95 px-3 py-2.5 transition hover:bg-[#111b2f]">
+          <div className="flex max-w-[230px] items-center justify-end gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/10 text-sm font-bold text-[#00ffb4]">
               {(userName || "U").charAt(0).toUpperCase()}
             </div>
-            <div className="leading-tight text-left">
-              <div className="text-sm font-semibold text-white">{userName}</div>
-              <div className="text-[11px] text-[#7a8ba8]">
-                {userEmail || "No email"}
-              </div>
+            <div className="min-w-0 leading-tight text-left">
+              <div className="truncate text-sm font-semibold text-white">{userName}</div>
+              <div className="text-[11px] text-[#7a8ba8]">Profile</div>
             </div>
             <div className="text-sm text-[#7a8ba8] transition group-open:rotate-180">
               ▾
@@ -1620,6 +1628,10 @@ function HeaderDropdown({
         </summary>
 
         <div className="absolute right-0 top-full z-[220] mt-2 w-52 rounded-2xl border border-[#1a2438] bg-[#0d1220]/98 p-2 shadow-[0_18px_50px_rgba(0,0,0,0.35)] backdrop-blur-xl">
+          <div className="mb-1 border-b border-[#1a2438] px-4 py-2 text-[11px] leading-5 text-[#7a8ba8]">
+            <div className="truncate font-semibold text-white">{userName}</div>
+            <div className="truncate">{userEmail || "No email"}</div>
+          </div>
           <button
             onClick={() => setIsSettingsOpen(true)}
             className="w-full rounded-xl px-4 py-2 text-left text-sm text-[#dbe6f5] transition hover:bg-white/5"
@@ -1784,9 +1796,9 @@ function Sidebar({
               "transition hover:bg-white/[0.07]",
               open ? "w-full px-5 py-3 text-sm" : "h-10 w-10 text-sm",
             ].join(" ")}
-            title="Restart Scene"
+            title="Reset Scene"
           >
-            {open ? "Restart Scene" : "↺"}
+            {open ? "Reset Scene" : "↺"}
           </button>
         </div>
       </div>
@@ -2076,6 +2088,7 @@ export default function Module3AssemblyINTEL({
   const [validationMessage, setValidationMessage] = useState(
     "Begin with the CPU. Click it once to activate Y-level assist, then guide it across the green target plane. The normal magnet will assist only when it is close to the target. In a real build, this step also includes the CPU seating area, thermal paste preparation, and the CPU power cable connection."
   );
+  const [achievementToast, setAchievementToast] = useState(null);
 
   const [aiOpen, setAiOpen] = useState(false);
   const [aiMessages, setAiMessages] = useState([
@@ -2192,6 +2205,9 @@ export default function Module3AssemblyINTEL({
         },
         { merge: true }
       );
+      const achievement = await unlockAchievement(firebaseUser.uid, "module3", { platform: "Intel" });
+      setAchievementToast(achievement);
+      window.setTimeout(() => setAchievementToast(null), 4200);
     } catch (error) {
       console.error(
         "Error saving final Module 3 (INTEL) completion:",
@@ -2368,6 +2384,7 @@ export default function Module3AssemblyINTEL({
     <div className="fixed inset-0 h-screen w-screen overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased">
       <div className="relative h-full w-full overflow-hidden">
         <ModuleBackground />
+        <AchievementToast achievement={achievementToast} onClose={() => setAchievementToast(null)} />
 
         {showIntro ? (
           <ModuleIntroCard
@@ -2407,8 +2424,8 @@ export default function Module3AssemblyINTEL({
             </div>
 
             <div className="relative z-[120] mt-3 px-6 md:px-10">
-              <div className="flex w-full items-center justify-between gap-4 rounded-[22px] border border-[#1a2438] bg-[#0b1220]/86 px-6 py-4 shadow-[0_18px_60px_rgba(0,0,0,0.30)] backdrop-blur-xl">
-                <div className="flex items-center gap-3">
+              <div className="flex w-full flex-wrap items-center justify-between gap-4 rounded-[22px] border border-[#1a2438] bg-[#0b1220]/86 px-6 py-4 shadow-[0_18px_60px_rgba(0,0,0,0.30)] backdrop-blur-xl">
+                <div className="flex flex-wrap items-center justify-end gap-3">
                   <img
                     src="/PNG/Articton.png"
                     alt="Articton Logo"
@@ -2424,7 +2441,7 @@ export default function Module3AssemblyINTEL({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center justify-end gap-3">
                   {validationMessage ? (
                     <div className="max-w-[540px] rounded-2xl border border-[#00ffb4]/20 bg-[#00ffb4]/8 px-4 py-2 text-xs font-semibold text-[#dffef5]">
                       {validationMessage}
@@ -2477,6 +2494,8 @@ export default function Module3AssemblyINTEL({
                 </div>
               </div>
             </div>
+
+            <ModuleDetailCard moduleNumber="3" mode="assembly" platform="Intel" currentStep={step} />
 
             <div className="min-h-0 flex-1 px-4 py-4 md:px-8 md:py-5">
               <div className="relative h-full overflow-hidden rounded-[24px] border border-[#1a2438] bg-[#0d1220]/78 shadow-[0_28px_90px_rgba(0,0,0,0.45)] backdrop-blur-xl">
@@ -2602,3 +2621,7 @@ export default function Module3AssemblyINTEL({
 
 /* Preload the table, case, and every assembly component. */
 PART_MODELS.forEach((part) => useGLTF.preload(encodeURI(part.path)));
+
+
+
+
