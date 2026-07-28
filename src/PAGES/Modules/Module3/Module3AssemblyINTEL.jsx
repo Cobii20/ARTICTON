@@ -10,11 +10,13 @@ import * as THREE from "three";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Html, OrbitControls, useGLTF } from "@react-three/drei";
 import Settings from "../../../Components/Settings";
-import ModuleDetailCard from "../../../Components/ModuleDetailCard";
-import { auth, db } from "../../../firebase.js";
+import ProcedureAssistantBubble from "../../../Components/ProcedureAssistantBubble";
+import { auth, db, functions } from "../../../firebase.js";
 import { onAuthStateChanged } from "firebase/auth";
+import { httpsCallable } from "firebase/functions";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { AchievementToast, unlockAchievement } from "../../../utils/achievements.jsx";
+import { formatTutorReply } from "../../../utils/tutorReply.js";
 
 /* ------------------------------------------------------------------ */
 /* Module 3 ordered assembly configuration (INTEL platform)     */
@@ -2317,32 +2319,33 @@ export default function Module3AssemblyINTEL({
     setAiLoading(true);
 
     try {
-      const response = await fetch("http://127.0.0.1:5000/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: aiInput,
-          context: {
-            module: "assembly",
-            moduleNumber: 3,
-            platform: "intel",
-            currentStep: currentStep?.name,
-            activeComponent: activePartLabel,
-            completedParts,
-          },
-        }),
+      const askModuleTutor = httpsCallable(functions, "askModuleTutor");
+      const response = await askModuleTutor({
+        message: aiInput,
+        context: {
+          mode: "assembly",
+          moduleNumber: 3,
+          platform: "intel",
+          currentStep: currentStep?.name,
+          activeComponent: activePartLabel,
+          completedParts,
+        },
       });
 
-      const data = await response.json();
       setAiMessages((previous) => [
         ...previous,
-        { role: "assistant", content: data.reply },
+        { role: "assistant", content: formatTutorReply(response.data) },
       ]);
     } catch (error) {
       console.error(error);
       setAiMessages((previous) => [
         ...previous,
-        { role: "assistant", content: "AI server error occurred." },
+        {
+          role: "assistant",
+          content:
+            error.message ||
+            "The AI tutor could not answer right now, but the procedure guide still shows this step's notes.",
+        },
       ]);
     }
 
@@ -2495,8 +2498,6 @@ export default function Module3AssemblyINTEL({
               </div>
             </div>
 
-            <ModuleDetailCard moduleNumber="3" mode="assembly" platform="Intel" currentStep={step} />
-
             <div className="min-h-0 flex-1 px-4 py-4 md:px-8 md:py-5">
               <div className="relative h-full overflow-hidden rounded-[24px] border border-[#1a2438] bg-[#0d1220]/78 shadow-[0_28px_90px_rgba(0,0,0,0.45)] backdrop-blur-xl">
                 <Sidebar
@@ -2527,7 +2528,21 @@ export default function Module3AssemblyINTEL({
                     onInteractionMessage={setValidationMessage}
                   />
 
-                  <div className="absolute right-5 top-5 z-[500] flex flex-col items-end">
+                  <ProcedureAssistantBubble
+                    mode="assembly"
+                    platform="INTEL"
+                    currentStep={currentStep?.name}
+                    activeComponent={activePartLabel}
+                    open={aiOpen}
+                    messages={aiMessages}
+                    input={aiInput}
+                    loading={aiLoading}
+                    onToggle={() => setAiOpen((value) => !value)}
+                    onInputChange={setAiInput}
+                    onSend={askAI}
+                  />
+
+                  <div className="hidden">
                     {!aiOpen ? (
                       <button
                         type="button"

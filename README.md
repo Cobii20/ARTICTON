@@ -22,16 +22,23 @@ npm install -D tailwindcss
 
 # AI Setup
 
-## Install Ollama
-https://ollama.com/download
+The AI tutor runs through Firebase Cloud Functions using Gemini.
 
-## Download model
-ollama run llama3
+## Set Gemini Secret
 
-## Run backend
-cd server
-node index.js
+```bash
+npx -y firebase-tools@latest functions:secrets:set GEMINI_API_KEY
+```
 
-## Run frontend
+## Deploy Functions
+
+```bash
+npx -y firebase-tools@latest deploy --only functions
+```
+
+## Run Frontend
+
+```bash
 npm run dev
+```
 

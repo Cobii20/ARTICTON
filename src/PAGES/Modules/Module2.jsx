@@ -7,8 +7,10 @@ import PSUtoCaseScene from "./module2-scenes/PSUtoCase";
 import FullAssemblyScene from "./module2-scenes/FullAssembly";
 import React, { useEffect, useRef, useState } from "react";
 import Settings from "../../Components/Settings";
-import { auth, db } from "../../firebase.js";
+import { auth, db, functions } from "../../firebase.js";
 import { onAuthStateChanged } from "firebase/auth";
+import { httpsCallable } from "firebase/functions";
+import { formatTutorReply } from "../../utils/tutorReply.js";
 import {
   doc,
   getDoc,
@@ -369,38 +371,26 @@ const askAI = async () => {
   setAiLoading(true);
 
   try {
-    const response = await fetch(
-      "http://localhost:5000/api/chat",
-      {
-        method: "POST",
-
-        headers: {
-          "Content-Type": "application/json",
-        },
-
-        body: JSON.stringify({
-          message: aiInput,
-
-          context: {
-            currentStep:
-              module2Steps[step]?.name,
-
-            completedSteps:
-              localCompletedSteps,
-
-            currentStepCompleted,
-          },
-        }),
-      }
-    );
-
-    const data = await response.json();
+    const askModuleTutor = httpsCallable(functions, "askModuleTutor");
+    const response = await askModuleTutor({
+      message: aiInput,
+      context: {
+        mode: "assembly",
+        moduleNumber: 2,
+        platform: "general",
+        currentStep: module2Steps[step]?.name,
+        completedParts: Object.keys(localCompletedSteps).filter(
+          (key) => localCompletedSteps[key]
+        ),
+        currentStepCompleted,
+      },
+    });
 
     setAiMessages((prev) => [
       ...prev,
       {
         role: "assistant",
-        content: data.reply,
+        content: formatTutorReply(response.data),
       },
     ]);
   } catch (err) {
@@ -411,7 +401,8 @@ const askAI = async () => {
       {
         role: "assistant",
         content:
-          "AI server error occurred.",
+          err.message ||
+          "The AI tutor could not answer right now. Try again after the Functions emulator is running.",
       },
     ]);
   }

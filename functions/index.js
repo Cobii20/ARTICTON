@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const nodemailer = require("nodemailer");
+const { PROCEDURE_DETAILS, getProcedureText } = require("./procedureNotes");
 
 if (admin.apps.length === 0) {
   admin.initializeApp();
@@ -14,6 +15,8 @@ const OTP_TTL_MS = 5 * 60 * 1000;
 const OTP_SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 const OTP_RESEND_COOLDOWN_MS = 60 * 1000;
 const OTP_MAX_ATTEMPTS = 5;
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+const GEMINI_TUTOR_ENABLED = process.env.GEMINI_TUTOR_ENABLED === "true";
 
 function requireEnv(name, message) {
   const value = String(process.env[name] || "").trim();
@@ -64,7 +67,7 @@ function requireAuthenticatedUser(request) {
   return { uid, email, authTime };
 }
 
-function hashOtp({ uid, authTime, otp }) {
+function hashOtp({ uid, email, authTime, otp }) {
   const secret = process.env.OTP_HASH_SECRET;
 
   if (!secret) {
@@ -74,9 +77,11 @@ function hashOtp({ uid, authTime, otp }) {
     );
   }
 
+  const scope = email || authTime;
+
   return crypto
     .createHmac("sha256", secret)
-    .update(`${uid}:${authTime}:${otp}`)
+    .update(`${uid}:${scope}:${otp}`)
     .digest("hex");
 }
 
@@ -151,46 +156,356 @@ function requireNonEmptyString(value, fieldName) {
   return cleanValue;
 }
 
+function cleanTutorMode(value) {
+  const mode = String(value || "").trim().toLowerCase();
+
+  if (mode !== "assembly" && mode !== "disassembly") {
+    throw new HttpsError("invalid-argument", "A valid module mode is required.");
+  }
+
+  return mode;
+}
+
+function buildTutorPrompt({ message, context, procedureText }) {
+  return [
+    "You are the official AI tutor for the Articton PC hardware simulator.",
+    "Use only the provided procedure notes and current simulator context.",
+    "If the student asks outside the module, redirect them back to the current module.",
+    "Be concise, specific, and student-friendly. Mention safety cautions when relevant.",
+    "",
+    "MODULE CONTEXT",
+    `Module: ${context.moduleNumber || "Unknown"}`,
+    `Mode: ${context.mode}`,
+    `Platform: ${context.platform || "Unknown"}`,
+    `Current step: ${context.currentStep || "Unknown"}`,
+    `Active component: ${context.activeComponent || "None"}`,
+    `Completed parts: ${(context.completedParts || []).join(", ") || "None"}`,
+    "",
+    "PROCEDURE NOTES",
+    procedureText,
+    "",
+    "STUDENT QUESTION",
+    message,
+  ].join("\n");
+}
+
+function buildFallbackTutorReply({ message, context, procedureText }) {
+  const activeComponent = String(context.activeComponent || "").trim();
+  const currentStep = String(context.currentStep || "").trim();
+  const stepLabel = currentStep || activeComponent || `this ${context.mode} step`;
+  const lowerMessage = String(message || "").toLowerCase();
+  const notes = PROCEDURE_DETAILS[context.mode] || [];
+  const isGreeting = /^(hi|hello|hey|good\s+(morning|afternoon|evening))[\s!.]*$/i.test(
+    String(message || "").trim()
+  );
+  const wantsBefore = /\b(before|prior|prepare|preparation|first|start|begin)\b/.test(lowerMessage);
+  const wantsAfter = /\b(after|next|then|following|finish|done)\b/.test(lowerMessage);
+  const wantsWhy = /\b(why|reason|purpose|important)\b/.test(lowerMessage);
+  const wantsHow = /\b(how|what should i do|what do i do|steps?|remove|install|detach|attach)\b/.test(lowerMessage);
+  const wantsSafety = /\b(safe|safety|power|unplug|shutdown|shut down|static|antistatic|damage)\b/.test(lowerMessage);
+  const wantsOrder = /\b(order|sequence|which first|what first|correct order)\b/.test(lowerMessage);
+
+  const normalize = (value) =>
+    String(value || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+
+  const componentAliases = [
+    ["gpu", "graphics", "graphics processing"],
+    ["ssd", "solid state", "m 2", "nvme"],
+    ["hdd", "hard disk", "hard drive"],
+    ["ram", "memory", "dimm"],
+    ["cpu", "processor", "central processing"],
+    ["psu", "power supply"],
+    ["motherboard", "mainboard", "board"],
+    ["case", "side panel", "external"],
+  ];
+
+  const findNote = () => {
+    const haystacks = [activeComponent, currentStep, message].map(normalize);
+
+    for (const note of notes) {
+      const noteText = normalize(`${note.title} ${note.text}`);
+      if (haystacks.some((haystack) => haystack && noteText.includes(haystack))) {
+        return note;
+      }
+    }
+
+    for (const aliases of componentAliases) {
+      if (!haystacks.some((haystack) => aliases.some((alias) => haystack.includes(alias)))) {
+        continue;
+      }
+
+      const note = notes.find((item) => {
+        const noteText = normalize(`${item.title} ${item.text}`);
+        return aliases.some((alias) => noteText.includes(alias));
+      });
+
+      if (note) return note;
+    }
+
+    return notes[0];
+  };
+
+  const note = findNote();
+  const noteIndex = Math.max(0, notes.indexOf(note));
+  const previousNotes = notes.slice(0, noteIndex);
+  const nextNote = notes[noteIndex + 1];
+  const safetyNote =
+    notes.find((item) => /prepare|shut down|unplug|antistatic/i.test(`${item.title} ${item.text}`)) ||
+    notes[0];
+  const completedParts = Array.isArray(context.completedParts)
+    ? context.completedParts.filter(Boolean)
+    : [];
+  const orderText = notes.map((item) => item.title).join(" -> ");
+
+  if (isGreeting) {
+    return [
+      `Hi. I am here for ${stepLabel}.`,
+      `Current focus: ${note?.title || stepLabel}.`,
+      "You can ask what to do, why it matters, what comes before or after, or what safety check to make.",
+    ].join("\n");
+  }
+
+  if (wantsOrder) {
+    return [
+      `The ${context.mode} sequence is: ${orderText}.`,
+      completedParts.length
+        ? `Already completed: ${completedParts.join(", ")}.`
+        : `Start with ${notes[0]?.title || "the preparation step"}.`,
+      `Current focus: ${note?.title || stepLabel}.`,
+    ].join("\n");
+  }
+
+  if (wantsBefore) {
+    const beforeText = previousNotes.length
+      ? previousNotes.map((item) => `${item.title}: ${item.text}`).join("\n")
+      : `${safetyNote?.title || "Safety check"}: ${safetyNote?.text || "Shut down and unplug the system before handling parts."}`;
+
+    return [
+      `Before ${note?.title || stepLabel}, make sure these are done:`,
+      beforeText,
+      "If any cable or screw is still attached, stop and release it before lifting the part.",
+    ].join("\n");
+  }
+
+  if (wantsAfter) {
+    return nextNote
+      ? [
+          `After ${note.title}, continue with ${nextNote.title}.`,
+          nextNote.text,
+          "Keep removed parts organized so the next step is easier to verify.",
+        ].join("\n")
+      : `After ${note?.title || stepLabel}, review the full system, confirm all required parts are placed correctly, and finish the module.`;
+  }
+
+  if (wantsSafety) {
+    return [
+      "Safety check first:",
+      safetyNote?.text || "Shut down the system, unplug AC power, and discharge leftover power before touching components.",
+      `For ${note?.title || stepLabel}, hold components by their edges and avoid forcing clips, sockets, or connectors.`,
+    ].join("\n");
+  }
+
+  if (wantsWhy) {
+    return [
+      `${note?.title || stepLabel} matters because forcing or skipping this step can damage connectors, slots, screws, or the component itself.`,
+      "The simulator expects you to release power, screws, latches, and cables before moving the highlighted part.",
+      `Relevant note: ${note?.text || procedureText}`,
+    ].join("\n");
+  }
+
+  if (wantsHow || note) {
+    return [
+      `For ${note?.title || stepLabel}:`,
+      note?.text || "Follow the highlighted component and the current procedure guide.",
+      "Move slowly, check for attached cables or clips, and only place the part when it is fully released.",
+    ].join("\n");
+  }
+
+  return `I can help with ${stepLabel}. Ask about the correct order, safety checks, what to do before this step, or how to handle the highlighted component.`;
+}
+
+async function generateTutorReply({ message, context, procedureText }) {
+  const apiKey = String(process.env.GEMINI_API_KEY || "").trim();
+
+  if (!GEMINI_TUTOR_ENABLED) {
+    return {
+      reply: buildFallbackTutorReply({ message, context, procedureText }),
+      source: "procedure-fallback",
+    };
+  }
+
+  if (!apiKey || apiKey === "replace_with_your_gemini_api_key") {
+    console.warn("Gemini tutor fallback: GEMINI_API_KEY is missing or placeholder.");
+    return {
+      reply: buildFallbackTutorReply({ message, context, procedureText }),
+      source: "procedure-fallback",
+      setupIssue: "missing-gemini-key",
+    };
+  }
+
+  let response;
+
+  try {
+    response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [
+            {
+              role: "user",
+              parts: [{ text: buildTutorPrompt({ message, context, procedureText }) }],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.25,
+            maxOutputTokens: 320,
+          },
+        }),
+      }
+    );
+  } catch (error) {
+    console.error("Gemini tutor network error:", error);
+    return {
+      reply: buildFallbackTutorReply({ message, context, procedureText }),
+      setupIssue: "gemini-network-error",
+    };
+  }
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error("Gemini tutor error:", response.status, errorText);
+    const setupIssue =
+      response.status === 429 && /prepayment credits are depleted|RESOURCE_EXHAUSTED/i.test(errorText)
+        ? "gemini-credits-depleted"
+        : "gemini-request-failed";
+
+    return {
+      reply: buildFallbackTutorReply({ message, context, procedureText }),
+      setupIssue,
+    };
+  }
+
+  const data = await response.json();
+  const reply = data.candidates?.[0]?.content?.parts
+    ?.map((part) => part.text || "")
+    .join("")
+    .trim();
+
+  if (!reply) {
+    throw new HttpsError("internal", "The AI tutor returned an empty answer.");
+  }
+
+  return { reply };
+}
+
+exports.askModuleTutor = onCall(
+  { secrets: ["GEMINI_API_KEY"] },
+  async (request) => {
+    if (process.env.FUNCTIONS_EMULATOR !== "true") {
+      await assertOtpVerified(request);
+    }
+
+    const message = requireNonEmptyString(request.data?.message, "message");
+    const rawContext = request.data?.context || {};
+    const mode = cleanTutorMode(rawContext.mode || rawContext.module);
+    const context = {
+      mode,
+      moduleNumber: rawContext.moduleNumber,
+      platform: String(rawContext.platform || "").trim(),
+      currentStep: String(rawContext.currentStep || "").trim(),
+      activeComponent: String(rawContext.activeComponent || "").trim(),
+      completedParts: Array.isArray(rawContext.completedParts)
+        ? rawContext.completedParts.map((part) => String(part)).slice(0, 12)
+        : [],
+    };
+    const procedureText = getProcedureText(mode);
+
+    if (!procedureText) {
+      throw new HttpsError("failed-precondition", "Procedure notes are missing.");
+    }
+
+    const tutorResult = await generateTutorReply({ message, context, procedureText });
+
+    return tutorResult;
+  }
+);
+
 exports.sendEmailOtp = onCall(
   { secrets: ["GMAIL_USER", "GMAIL_APP_PASSWORD", "OTP_HASH_SECRET"] },
   async (request) => {
-    const { uid, email, authTime } = requireAuthenticatedUser(request);
+    const { uid, email } = requireAuthenticatedUser(request);
     const now = Date.now();
     const otp = crypto.randomInt(100000, 1000000).toString();
     const challengeId = crypto.randomUUID();
     const challengeRef = db.doc(`otp_challenges/${uid}`);
     const sessionRef = db.doc(`otp_sessions/${uid}`);
+    const expiresAt = admin.firestore.Timestamp.fromMillis(now + OTP_TTL_MS);
+    const resendAvailableAt = admin.firestore.Timestamp.fromMillis(
+      now + OTP_RESEND_COOLDOWN_MS
+    );
 
-    await db.runTransaction(async (transaction) => {
+    const delivery = await db.runTransaction(async (transaction) => {
       const currentSnapshot = await transaction.get(challengeRef);
 
       if (currentSnapshot.exists) {
-        const resendAvailableAt = currentSnapshot.data().resendAvailableAt;
+        const currentChallenge = currentSnapshot.data();
+        const currentExpiresAt = currentChallenge.expiresAt;
+        const currentResendAvailableAt = currentChallenge.resendAvailableAt;
+        const hasActiveChallenge =
+          currentChallenge.uid === uid &&
+          currentChallenge.email === email &&
+          currentExpiresAt &&
+          typeof currentExpiresAt.toMillis === "function" &&
+          currentExpiresAt.toMillis() > now;
 
-        if (resendAvailableAt && resendAvailableAt.toMillis() > now) {
-          throw new HttpsError(
-            "resource-exhausted",
-            "Please wait before requesting another OTP."
-          );
+        if (
+          hasActiveChallenge &&
+          currentResendAvailableAt &&
+          currentResendAvailableAt.toMillis() > now
+        ) {
+          transaction.delete(sessionRef);
+
+          return {
+            shouldSend: false,
+            alreadySent: true,
+            expiresAt: currentExpiresAt.toDate().toISOString(),
+            resendAvailableAt: currentResendAvailableAt.toDate().toISOString(),
+          };
         }
       }
 
       transaction.set(challengeRef, {
         uid,
         email,
-        authTime,
         challengeId,
-        otpHash: hashOtp({ uid, authTime, otp }),
+        otpHash: hashOtp({ uid, email, otp }),
         attempts: 0,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        expiresAt: admin.firestore.Timestamp.fromMillis(now + OTP_TTL_MS),
-        resendAvailableAt: admin.firestore.Timestamp.fromMillis(
-          now + OTP_RESEND_COOLDOWN_MS
-        ),
+        expiresAt,
+        resendAvailableAt,
       });
 
       transaction.delete(sessionRef);
+
+      return {
+        shouldSend: true,
+        alreadySent: false,
+        expiresAt: expiresAt.toDate().toISOString(),
+        resendAvailableAt: resendAvailableAt.toDate().toISOString(),
+      };
     });
+
+    if (!delivery.shouldSend) {
+      return {
+        sent: false,
+        ...delivery,
+      };
+    }
 
     try {
       const gmailUser = requireEnv("GMAIL_USER", "The email sender is not configured.");
@@ -223,7 +538,10 @@ exports.sendEmailOtp = onCall(
       throw new HttpsError("internal", "The verification email could not be sent.");
     }
 
-    return { sent: true };
+    return {
+      sent: true,
+      ...delivery,
+    };
   }
 );
 
@@ -253,18 +571,17 @@ exports.verifyEmailOtp = onCall(
       }
 
       const challenge = challengeSnapshot.data();
-      const sameLoginSession =
+      const sameAccount =
         challenge.uid === uid &&
-        challenge.email === email &&
-        Number(challenge.authTime) === authTime;
+        challenge.email === email;
 
-      if (!sameLoginSession) {
+      if (!sameAccount) {
         transaction.delete(challengeRef);
 
         return {
           ok: false,
           code: "failed-precondition",
-          message: "This code belongs to an older login session. Request a new code.",
+          message: "This code belongs to another account. Request a new code.",
         };
       }
 
@@ -290,9 +607,15 @@ exports.verifyEmailOtp = onCall(
         };
       }
 
-      const submittedHash = hashOtp({ uid, authTime, otp });
+      const submittedHash = hashOtp({ uid, email, otp });
+      const legacySubmittedHash = Number.isFinite(Number(challenge.authTime))
+        ? hashOtp({ uid, authTime: Number(challenge.authTime), otp })
+        : "";
 
-      if (!hashesMatch(challenge.otpHash, submittedHash)) {
+      if (
+        !hashesMatch(challenge.otpHash, submittedHash) &&
+        !hashesMatch(challenge.otpHash, legacySubmittedHash)
+      ) {
         const nextAttempts = attempts + 1;
 
         if (nextAttempts >= OTP_MAX_ATTEMPTS) {

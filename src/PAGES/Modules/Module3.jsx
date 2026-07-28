@@ -7,7 +7,7 @@ import DisassemblyPSU from "./module3-scenes/DisassemblyPSU";
 import DisassemblyCPU from "./module3-scenes/DisassemblyCPU";
 import DisassemblyMB from "./module3-scenes/DisassemblyMB";
 import FullDisassembly from "./module3-scenes/FullDisassembly";
-import { auth, db } from "../../firebase";
+import { auth, db, functions } from "../../firebase";
 import {
   doc,
   getDoc,
@@ -15,6 +15,8 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
+import { httpsCallable } from "firebase/functions";
+import { formatTutorReply } from "../../utils/tutorReply.js";
 
 function HeaderDropdown({
   userName,
@@ -510,40 +512,26 @@ const askAI = async () => {
   setAiLoading(true);
 
   try {
-    const response = await fetch(
-      "http://127.0.0.1:5000/api/chat",
-      {
-        method: "POST",
-
-        headers: {
-          "Content-Type": "application/json",
-        },
-
-        body: JSON.stringify({
-          message: aiInput,
-
-          context: {
-            module: "disassembly",
-
-            currentStep:
-              module3Steps[step]?.name,
-
-            completedSteps:
-              localCompletedSteps,
-
-            currentStepCompleted,
-          },
-        }),
-      }
-    );
-
-    const data = await response.json();
+    const askModuleTutor = httpsCallable(functions, "askModuleTutor");
+    const response = await askModuleTutor({
+      message: aiInput,
+      context: {
+        mode: "disassembly",
+        moduleNumber: 3,
+        platform: "general",
+        currentStep: module3Steps[step]?.name,
+        completedParts: Object.keys(localCompletedSteps).filter(
+          (key) => localCompletedSteps[key]
+        ),
+        currentStepCompleted,
+      },
+    });
 
     setAiMessages((prev) => [
       ...prev,
       {
         role: "assistant",
-        content: data.reply,
+        content: formatTutorReply(response.data),
       },
     ]);
   } catch (err) {
@@ -554,7 +542,8 @@ const askAI = async () => {
       {
         role: "assistant",
         content:
-          "AI server error occurred.",
+          err.message ||
+          "The AI tutor could not answer right now. Try again after the Functions emulator is running.",
       },
     ]);
   }
