@@ -22,6 +22,7 @@ import {
   getDownloadURL,
 } from "firebase/storage";
 import { fetchMobileScoreDocs, mergeMobileScoresIntoProfile } from "../utils/mobileScores";
+import { ACHIEVEMENTS } from "../utils/achievements.jsx";
 
 const storage = getStorage();
 
@@ -455,10 +456,38 @@ const assemblyPracticalUnlocked =
       },
     ];
 
+    const savedAchievements = Object.values(profile?.accountAchievements || {})
+      .filter((achievement) => achievement?.unlocked)
+      .map((achievement) => ({
+        id: achievement.id,
+        icon: achievement.id?.includes("exam") ? "badge" : "trophy",
+        title: achievement.title,
+        subtitle: achievement.subtitle,
+      }));
+
+    const progressAchievements = [
+      module2Done ? ACHIEVEMENTS.module2 : null,
+      module3Done ? ACHIEVEMENTS.module3 : null,
+      practicalTests.amdAssembly ? ACHIEVEMENTS.amdAssembly : null,
+      practicalTests.amdDisassembly ? ACHIEVEMENTS.amdDisassembly : null,
+      practicalTests.intelAssembly ? ACHIEVEMENTS.intelAssembly : null,
+      practicalTests.intelDisassembly ? ACHIEVEMENTS.intelDisassembly : null,
+    ]
+      .filter(Boolean)
+      .map((achievement) => ({
+        ...achievement,
+        icon: achievement.id?.includes("exam") ? "badge" : "trophy",
+      }));
+
     const achievements = [
       { id: "first-steps", icon: "trophy", title: "First Steps", subtitle: "Complete Intro Lesson" },
       { id: "hands-on", icon: "badge", title: "Hands-On", subtitle: "Pass 1 Practical Test" },
-    ];
+      ...progressAchievements,
+      ...savedAchievements,
+    ].filter(
+      (achievement, index, list) =>
+        index === list.findIndex((item) => item.id === achievement.id)
+    );
 
     const tests = [
   {
@@ -601,8 +630,16 @@ const assemblyPracticalUnlocked =
     return { completed, inProgress, notStarted, overall, nextUp };
   }, [allModules]);
 
+  const isFullPracticalSection = [
+    "AMD Full Assembly Practical",
+    "AMD Full Disassembly Practical",
+    "INTEL Full Assembly Practical",
+    "INTEL Full Disassembly Practical",
+  ].includes(section);
   const sectionLabel =
-    section === "Full Assembly Practical" || section === "Full Disassembly Practical"
+    isFullPracticalSection ||
+    section === "Full Assembly Practical" ||
+    section === "Full Disassembly Practical"
       ? "Practice Tests"
       : section;
 
@@ -652,6 +689,7 @@ const assemblyPracticalUnlocked =
                     <SideItem label="Dashboard" active={sectionLabel} onClick={() => setSection("Dashboard")} icon="home" />
                     <SideItem label="3D Modules" active={sectionLabel} onClick={() => setSection("Modules")} icon="modules" />
                     <SideItem label="Practice Tests" active={sectionLabel} onClick={() => setSection("Practice Tests")} icon="tests" />
+                    <SideItem label="Achievements" active={sectionLabel} onClick={() => setSection("Achievements")} icon="trophy" />
                     <SideItem label="Profile" active={sectionLabel} onClick={() => setSection("Profile")} icon="profile" />
                   </div>
 
@@ -677,10 +715,22 @@ const assemblyPracticalUnlocked =
               </aside>
 
               <main className="h-full overflow-hidden">
-                <div className="grid h-full grid-rows-[auto_1fr] gap-4 overflow-hidden p-6 lg:p-8">
-                  <HeaderBar section={section} sectionLabel={sectionLabel} user={user} onSettings={() => setIsSettingsOpen(true)} onLogout={onLogout} />
+                <div
+                  className={[
+                    "grid h-full gap-4 overflow-hidden p-6 lg:p-8",
+                    isFullPracticalSection ? "grid-rows-[1fr]" : "grid-rows-[auto_1fr]",
+                  ].join(" ")}
+                >
+                  {isFullPracticalSection ? null : (
+                    <HeaderBar section={section} sectionLabel={sectionLabel} user={user} onSettings={() => setIsSettingsOpen(true)} onLogout={onLogout} />
+                  )}
 
-                  <div className="scrollArea min-h-0 overflow-auto pr-1">
+                  <div
+                    className={[
+                      "scrollArea min-h-0 overflow-auto pr-1",
+                      isFullPracticalSection ? "h-full overflow-hidden pr-0" : "",
+                    ].join(" ")}
+                  >
                     {isLoading ? (
                       <LoadingState />
                     ) : error ? (
@@ -699,6 +749,7 @@ const assemblyPracticalUnlocked =
                               stats={stats}
                               achievements={data.achievements}
                               activity={data.activity}
+                              onAchievements={() => setSection("Achievements")}
                               tests={data.tests}
                               mobileLearning={data.mobileLearning}
                             />
@@ -721,26 +772,32 @@ const assemblyPracticalUnlocked =
                           </PageMotion>
                         ) : null}
 
+                        {section === "Achievements" ? (
+                          <PageMotion keyName="achievements" reduce={reduce}>
+                            <AchievementsPage achievements={data.achievements} tests={data.tests} modules={allModules} />
+                          </PageMotion>
+                        ) : null}
+
                         {section === "AMD Full Assembly Practical" ? (
-                          <PageMotion keyName="amd-full-assembly" reduce={reduce}>
+                          <PageMotion keyName="amd-full-assembly" reduce={reduce} className="relative h-full min-h-[680px] overflow-hidden">
                             <AMDFullAssemblyPracticalTest onBack={backToPracticeTests} />
                           </PageMotion>
                         ) : null}
 
                         {section === "AMD Full Disassembly Practical" ? (
-                          <PageMotion keyName="amd-full-disassembly" reduce={reduce}>
+                          <PageMotion keyName="amd-full-disassembly" reduce={reduce} className="relative h-full min-h-[680px] overflow-hidden">
                             <AMDFullDisassemblyPracticalTest onBack={backToPracticeTests} />
                           </PageMotion>
                         ) : null}
 
                         {section === "INTEL Full Assembly Practical" ? (
-                          <PageMotion keyName="intel-full-assembly" reduce={reduce}>
+                          <PageMotion keyName="intel-full-assembly" reduce={reduce} className="relative h-full min-h-[680px] overflow-hidden">
                             <INTELFullAssemblyPracticalTest onBack={backToPracticeTests} />
                           </PageMotion>
                         ) : null}
 
                         {section === "INTEL Full Disassembly Practical" ? (
-                          <PageMotion keyName="intel-full-disassembly" reduce={reduce}>
+                          <PageMotion keyName="intel-full-disassembly" reduce={reduce} className="relative h-full min-h-[680px] overflow-hidden">
                             <INTELFullDisassemblyPracticalTest onBack={backToPracticeTests} />
                           </PageMotion>
                         ) : null}
@@ -788,10 +845,11 @@ const assemblyPracticalUnlocked =
   );
 }
 
-function PageMotion({ keyName, reduce, children }) {
+function PageMotion({ keyName, reduce, children, className = "" }) {
   return (
     <motion.div
       key={keyName}
+      className={className}
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -8 }}
@@ -1154,6 +1212,7 @@ function HomeOverview({
   achievements,
   activity,
   openModule,
+  onAchievements,
   tests = [],
   mobileLearning,
 }) {
@@ -1179,7 +1238,7 @@ function HomeOverview({
 
       <div className="grid min-h-0 grid-cols-1 gap-6 xl:grid-cols-[1.6fr_0.9fr]">
         <ProgressCardFillHeight overall={overall} modules={modules} onModuleClick={(id) => openModule(id)} />
-        <RightColumnFill achievements={achievements} activity={activity} />
+        <RightColumnFill achievements={achievements} activity={activity} onAchievements={onAchievements} />
       </div>
 
       <MobileLearningSummaryCard mobileLearning={mobileLearning} />
@@ -1806,10 +1865,10 @@ function ProfileAvatar({ image, fallback, large = false }) {
   );
 }
 
-function RightColumnFill({ achievements, activity }) {
+function RightColumnFill({ achievements, activity, onAchievements }) {
   return (
     <div className="flex h-full min-h-0 flex-col gap-6">
-      <AchievementsCardCompact achievements={achievements} onClick={(id) => console.log(id)} />
+      <AchievementsCardCompact achievements={achievements} onClick={onAchievements} />
       <RecentActivityFill items={activity} onClick={(id) => console.log(id)} />
     </div>
   );
@@ -2012,16 +2071,50 @@ function AchievementsCardCompact({ achievements, onClick }) {
   return (
     <div className="overflow-hidden rounded-[28px] border border-[#1a2438] bg-[#0d1220] shadow-[0_30px_90px_rgba(0,0,0,0.42)]">
       <div className="p-7">
-        <div className="text-lg font-bold tracking-tight text-[#e8ecf4]">Achievements</div>
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-lg font-bold tracking-tight text-[#e8ecf4]">Achievements</div>
+          <button type="button" onClick={onClick} className="rounded-xl border border-[#1a2438] bg-white/[0.03] px-3 py-1.5 text-[11px] font-semibold text-[#9fb0c9] transition hover:bg-white/[0.06]">
+            View all
+          </button>
+        </div>
         <div className="mt-5 space-y-3">
           {achievements.slice(0, 2).map((a) => (
-            <AchievementRow key={a.id} icon={a.icon} title={a.title} subtitle={a.subtitle} onClick={() => onClick?.(a.id)} />
+            <AchievementRow key={a.id} icon={a.icon} title={a.title} subtitle={a.subtitle} onClick={onClick} />
           ))}
         </div>
         <div className="mt-4 text-right">
-          <span className="inline-flex rounded-full border border-[#1a2438] bg-white/[0.03] px-3 py-1.5 text-[11px] text-[#7a8ba8]">
+          <button type="button" onClick={onClick} className="inline-flex rounded-full border border-[#1a2438] bg-white/[0.03] px-3 py-1.5 text-[11px] text-[#7a8ba8] transition hover:bg-white/[0.06]">
             +{Math.max(0, achievements.length - 2)} more…
-          </span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AchievementsPage({ achievements = [], tests = [], modules = [] }) {
+  const passedTests = tests.filter((test) => test.completed && Number(test.progress?.score ?? 0) >= 75).length;
+  const completedModules = modules.filter((module) => module.progress >= 100).length;
+
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-4 md:grid-cols-3">
+        <StatCard title="Achievements" value={`${achievements.length}`} hint="Unlocked badges" />
+        <StatCard title="Practical Passes" value={`${passedTests}`} hint="Scores at 75 or higher" />
+        <StatCard title="Modules Done" value={`${completedModules}`} hint="Completed lessons" />
+      </div>
+
+      <div className="rounded-[28px] border border-[#1a2438] bg-[#0d1220] p-7 shadow-[0_30px_90px_rgba(0,0,0,0.42)]">
+        <div className="text-lg font-bold tracking-tight text-[#e8ecf4]">All Achievements</div>
+        <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {achievements.map((achievement) => (
+            <AchievementRow
+              key={achievement.id}
+              icon={achievement.icon}
+              title={achievement.title}
+              subtitle={achievement.subtitle}
+            />
+          ))}
         </div>
       </div>
     </div>

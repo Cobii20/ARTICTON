@@ -10,9 +10,11 @@ import * as THREE from "three";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, useGLTF, Html } from "@react-three/drei";
 import Settings from "../../../Components/Settings";
+import ModuleDetailCard from "../../../Components/ModuleDetailCard";
 import { auth, db } from "../../../firebase.js";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { AchievementToast, unlockAchievement } from "../../../utils/achievements.jsx";
 
 /* ------------------------------------------------------------------ */
 /* Ordered disassembly configuration (AMD platform)          */
@@ -50,13 +52,13 @@ const REMOVAL_SEQUENCE = steps
 const MOVABLE_COMPONENT_KEYS = new Set(REMOVAL_SEQUENCE);
 
 const COMPONENT_LABELS = {
-  gpu: "GPU",
-  ssd: "SSD",
-  hdd: "HDD",
-  ram1: "RAM 1",
-  ram2: "RAM 2",
-  cpu: "CPU",
-  psu: "PSU",
+  gpu: "GPU (Graphics Processing Unit)",
+  ssd: "SSD (Solid State Drive)",
+  hdd: "HDD (Hard Disk Drive)",
+  ram1: "RAM (Random Access Memory) 1",
+  ram2: "RAM (Random Access Memory) 2",
+  cpu: "CPU (Central Processing Unit)",
+  psu: "PSU (Power Supply Unit)",
   motherboard: "Motherboard",
 };
 
@@ -1474,6 +1476,7 @@ function AssembledPC({
   activePartKey,
   activePhase,
   completedParts,
+  guidesEnabled = true,
   onPartCompleted,
   onLockedPartClick,
   onInteractionMessage,
@@ -1499,14 +1502,14 @@ function AssembledPC({
         />
       ))}
 
-      {activePart && activePhase === "installed" ? (
+      {guidesEnabled && activePart && activePhase === "installed" ? (
         <SourcePartGuide
           key={`source-${activePart.key}`}
           part={activePart}
         />
       ) : null}
 
-      {activePart && PLACEMENT_TARGETS[activePart.key]?.position ? (
+      {guidesEnabled && activePart && PLACEMENT_TARGETS[activePart.key]?.position ? (
         <PlacementTargetGuide
           key={`target-${activePart.key}`}
           part={activePart}
@@ -1611,6 +1614,7 @@ function ModelViewer({
   parts,
   activePartKey,
   completedParts,
+  guidesEnabled = true,
   onPartCompleted,
   onLockedPartClick,
   onInteractionMessage,
@@ -1751,6 +1755,7 @@ function ModelViewer({
               activePartKey={activePartKey}
               activePhase={activePhase}
               completedParts={completedParts}
+              guidesEnabled={guidesEnabled}
               onPartCompleted={onPartCompleted}
               onLockedPartClick={onLockedPartClick}
               onInteractionMessage={onInteractionMessage}
@@ -1795,17 +1800,8 @@ function ModelViewer({
           disabled={isDraggingPart}
           className="rounded-xl border border-[#00ffb4]/30 bg-[#0b1220]/92 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#7dffdc] shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl transition hover:bg-[#00ffb4]/12 disabled:cursor-not-allowed disabled:opacity-45"
         >
-          Reset Overview
+          Reset Camera View
         </button>
-        <button
-          type="button"
-          onClick={() => setOverviewRequest((value) => value + 1)}
-          disabled={isDraggingPart}
-          className="rounded-xl border border-[#00ffb4]/30 bg-[#00ffb4]/12 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#7dffdc] shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl transition hover:bg-[#00ffb4]/20 disabled:cursor-not-allowed disabled:opacity-45"
-        >
-          Show Whole Table
-        </button>
-
         <button
           type="button"
           onClick={toggleFullscreen}
@@ -1816,9 +1812,6 @@ function ModelViewer({
         >
           {isFullscreen ? "Exit Full Screen" : "Full Screen"}
         </button>
-        <div className="pointer-events-none rounded-xl border border-white/10 bg-[#0b1220]/86 px-3 py-2 text-[10px] font-semibold text-[#9fb0ca] backdrop-blur-xl">
-          Full-table overview stays active when parts change or detach. Use the button to recenter the entire workspace.
-        </div>
       </div>
 
       {telemetry ? (
@@ -1844,7 +1837,9 @@ function ModelViewer({
 
           <div className="mt-1 text-[10px] text-[#7a8ba8]">
             {telemetry.phase === "installed"
-              ? "Click the amber X-ray highlight to detach the correct part."
+              ? guidesEnabled
+                ? "Click the amber X-ray highlight to detach the correct part."
+                : "Click the correct component to detach it — no highlight this time."
               : telemetry.yTransitioning
               ? "The component is moving safely toward its table-seat height."
               : telemetry.yLocked
@@ -1867,30 +1862,34 @@ function HeaderDropdown({ userName, userEmail = "", onBack, onLogout, setIsSetti
   };
 
   return (
-    <div className="flex items-center gap-4">
+    <div className="relative flex flex-wrap items-center justify-end gap-3">
       <button
         type="button"
         onClick={handleBack}
-        className="rounded-2xl border border-[#1a2438] bg-white/[0.03] px-4 py-2.5 text-[13px] font-semibold text-[#dbe6f5] transition hover:bg-white/[0.06]"
+        className="relative z-[70] rounded-2xl border border-[#1a2438] bg-white/[0.03] px-4 py-2.5 text-[13px] font-semibold text-[#dbe6f5] transition hover:bg-white/[0.06]"
       >
         Go back to Dashboard
       </button>
 
       <details className="group relative z-50">
-        <summary className="list-none cursor-pointer rounded-2xl border border-[#1a2438] bg-[#0d1220]/95 px-4 py-2.5 transition hover:bg-[#111b2f]">
-          <div className="flex items-center gap-3">
+        <summary className="list-none cursor-pointer rounded-2xl border border-[#1a2438] bg-[#0d1220]/95 px-3 py-2.5 transition hover:bg-[#111b2f]">
+          <div className="flex max-w-[230px] items-center justify-end gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/10 text-sm font-bold text-[#00ffb4]">
               {(userName || "U").charAt(0).toUpperCase()}
             </div>
-            <div className="leading-tight text-left">
-              <div className="text-sm font-semibold text-white">{userName}</div>
-              <div className="text-[11px] text-[#7a8ba8]">{userEmail || "No email"}</div>
+            <div className="min-w-0 leading-tight text-left">
+              <div className="truncate text-sm font-semibold text-white">{userName}</div>
+              <div className="text-[11px] text-[#7a8ba8]">Profile</div>
             </div>
             <div className="text-sm text-[#7a8ba8] transition group-open:rotate-180">▾</div>
           </div>
         </summary>
 
         <div className="absolute right-0 top-full mt-2 z-[220] w-52 rounded-2xl border border-[#1a2438] bg-[#0d1220]/98 p-2 shadow-[0_18px_50px_rgba(0,0,0,0.35)] backdrop-blur-xl">
+          <div className="mb-1 border-b border-[#1a2438] px-4 py-2 text-[11px] leading-5 text-[#7a8ba8]">
+            <div className="truncate font-semibold text-white">{userName}</div>
+            <div className="truncate">{userEmail || "No email"}</div>
+          </div>
           <button
             onClick={() => setIsSettingsOpen(true)}
             className="w-full rounded-xl px-4 py-2 text-left text-sm text-[#dbe6f5] transition hover:bg-white/5"
@@ -2059,9 +2058,9 @@ function Sidebar({
               "transition hover:bg-white/[0.07]",
               open ? "w-full px-5 py-3 text-sm" : "h-10 w-10 text-sm",
             ].join(" ")}
-            title="Restart Scene"
+            title="Reset Scene"
           >
-            {open ? "Restart Scene" : "↺"}
+            {open ? "Reset Scene" : "↺"}
           </button>
         </div>
       </div>
@@ -2085,8 +2084,8 @@ function ModuleIntroCard({ platform, moduleType, onStart }) {
           </h2>
           <p className="mt-3 max-w-xl text-sm leading-7 text-[#9fb0ca]">
             {isAssembly
-              ? "Install each component in order using the bird’s-eye workspace, exact target-height assistance, and normal magnetic snap."
-              : "Remove each component in order. The camera first identifies the installed part, then opens to the table workspace after detachment."}
+              ? "Install each component in order using the bird's-eye workspace, exact target-height assistance, and normal magnetic snap."
+              : "Remove each component in order. The camera first identifies the installed part, then opens to the table workspace after detachment. Once every component is removed once, you'll repeat the full sequence one more time with no guides before your certificate unlocks."}
           </p>
 
           <div className="mt-6 grid gap-3 sm:grid-cols-3">
@@ -2138,7 +2137,6 @@ function StepCompletionCard({
   nextLabel,
   isFinal,
   onContinue,
-  onCertificate,
 }) {
   const isAssembly = moduleType === "Assembly";
   const actionWord = isAssembly ? "installed" : "removed and seated";
@@ -2199,44 +2197,23 @@ function StepCompletionCard({
             <div className="rounded-2xl border border-[#1a2438] bg-white/[0.035] p-4">
               <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#00ffb4]">Next</div>
               <div className="mt-2 truncate text-sm font-bold text-white">
-                {isFinal ? `Full ${moduleType}` : nextLabel}
+                {nextLabel}
               </div>
             </div>
           </div>
 
           <div className="mt-7 rounded-2xl border border-[#00ffb4]/18 bg-[#00ffb4]/6 px-4 py-3 text-xs leading-6 text-[#b7c6dd]">
-            {isFinal
-              ? `All required ${moduleType.toLowerCase()} steps are complete. You may review the finished scene or open your certificate.`
-              : `The next component remains locked until you continue, so the sequence stays clear and controlled.`}
+            The next component remains locked until you continue, so the sequence stays clear and controlled.
           </div>
 
           <div className="mt-7 flex flex-wrap justify-end gap-3">
-            {isFinal ? (
-              <>
-                <button
-                  type="button"
-                  onClick={onContinue}
-                  className="rounded-2xl border border-[#1a2438] bg-white/[0.04] px-5 py-3 text-sm font-semibold text-[#dbe6f5] transition hover:bg-white/[0.08]"
-                >
-                  Review Full {moduleType}
-                </button>
-                <button
-                  type="button"
-                  onClick={onCertificate}
-                  className="rounded-2xl bg-[#00ffb4] px-6 py-3 text-sm font-black text-[#07111d] shadow-[0_16px_45px_rgba(0,255,180,0.18)] transition hover:scale-[1.02]"
-                >
-                  View Certificate →
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                onClick={onContinue}
-                className="rounded-2xl bg-[#00ffb4] px-6 py-3 text-sm font-black text-[#07111d] shadow-[0_16px_45px_rgba(0,255,180,0.18)] transition hover:scale-[1.02]"
-              >
-                Continue to {nextLabel} →
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={onContinue}
+              className="rounded-2xl bg-[#00ffb4] px-6 py-3 text-sm font-black text-[#07111d] shadow-[0_16px_45px_rgba(0,255,180,0.18)] transition hover:scale-[1.02]"
+            >
+              Continue to {nextLabel} →
+            </button>
           </div>
         </div>
       </div>
@@ -2335,6 +2312,7 @@ function CompletionCertificate({
 export default function Module2DisassemblyAMD({ onFinish, onBack, onLogout, onSwitchPlatform }) {
   const [step, setStep] = useState(0);
   const [completedParts, setCompletedParts] = useState([]);
+  const [finalRoundCompletedParts, setFinalRoundCompletedParts] = useState([]);
   const [sceneRevision, setSceneRevision] = useState(0);
   const [firebaseUser, setFirebaseUser] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -2346,6 +2324,7 @@ export default function Module2DisassemblyAMD({ onFinish, onBack, onLogout, onSw
   const [validationMessage, setValidationMessage] = useState(
     "Begin with the GPU. Detach it, grab it, then move it into the highlighted table seat."
   );
+  const [achievementToast, setAchievementToast] = useState(null);
 
   const [aiOpen, setAiOpen] = useState(false);
   const [aiMessages, setAiMessages] = useState([
@@ -2356,9 +2335,25 @@ export default function Module2DisassemblyAMD({ onFinish, onBack, onLogout, onSw
   const [settings, setSettings] = useState({ sound: true, animations: true, darkMode: true });
 
   const currentStep = steps[step];
-  const activePartKey = currentStep?.partKey || null;
+  const isFinalRound = currentStep?.key === "final";
+
+  // During the final round the learner repeats the entire removal sequence
+  // with no guide highlights. The "active" part is simply the next one in
+  // REMOVAL_SEQUENCE that hasn't been redone yet in this round.
+  const nextFinalRoundPartKey =
+    REMOVAL_SEQUENCE.find((key) => !finalRoundCompletedParts.includes(key)) ?? null;
+  const activePartKey = isFinalRound ? nextFinalRoundPartKey : currentStep?.partKey || null;
   const activePartLabel = activePartKey ? COMPONENT_LABELS[activePartKey] : null;
-  const allComponentsRemoved = completedParts.length === REMOVAL_SEQUENCE.length;
+
+  const finalRoundComplete =
+    finalRoundCompletedParts.length === REMOVAL_SEQUENCE.length;
+
+  // The 3D viewer needs to know which parts are "already completed" so it can
+  // keep them interactable/locked correctly. During the guided phase that's
+  // completedParts; during the unguided final round it's finalRoundCompletedParts.
+  const modelViewerCompletedParts = isFinalRound
+    ? finalRoundCompletedParts
+    : completedParts;
 
   const effectiveCompletedSteps = useMemo(() => {
     return Object.fromEntries(
@@ -2366,13 +2361,12 @@ export default function Module2DisassemblyAMD({ onFinish, onBack, onLogout, onSw
         item.key,
         item.partKey
           ? completedParts.includes(item.partKey)
-          : allComponentsRemoved,
+          : finalRoundComplete,
       ])
     );
-  }, [allComponentsRemoved, completedParts]);
+  }, [finalRoundComplete, completedParts]);
 
-  const currentStepCompleted =
-    currentStep?.key === "final" && allComponentsRemoved;
+  const currentStepCompleted = currentStep?.key === "final" && finalRoundComplete;
 
   const canSelectStep = useCallback(
     (index) => index <= step,
@@ -2386,6 +2380,7 @@ export default function Module2DisassemblyAMD({ onFinish, onBack, onLogout, onSw
   const resetScene = useCallback(() => {
     LEGACY_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
     setCompletedParts([]);
+    setFinalRoundCompletedParts([]);
     setStep(0);
     setSceneRevision((value) => value + 1);
     setShowCertificate(false);
@@ -2453,6 +2448,9 @@ export default function Module2DisassemblyAMD({ onFinish, onBack, onLogout, onSw
         },
         { merge: true }
       );
+      const achievement = await unlockAchievement(firebaseUser.uid, "module2", { platform: "AMD" });
+      setAchievementToast(achievement);
+      window.setTimeout(() => setAchievementToast(null), 4200);
     } catch (error) {
       console.error("Error saving final Module 2 (AMD) completion:", error);
     }
@@ -2460,6 +2458,38 @@ export default function Module2DisassemblyAMD({ onFinish, onBack, onLogout, onSw
 
   const handlePartCompleted = useCallback(
     (partKey) => {
+      const isFinalRoundNow = steps[step]?.key === "final";
+
+      if (isFinalRoundNow) {
+        // Unguided repeat pass: no completion card, no certificate button
+        // here. We just track progress and, once everything is redone,
+        // unlock the certificate.
+        setFinalRoundCompletedParts((prev) => {
+          if (prev.includes(partKey)) return prev;
+          const next = [...prev, partKey];
+          const practiceDone = next.length === REMOVAL_SEQUENCE.length;
+
+          playCompletionSound(settings.sound, practiceDone);
+
+          if (practiceDone) {
+            setValidationMessage(
+              "Full disassembly complete — every component removed correctly with no guides. Your certificate is ready."
+            );
+            void saveFinalCompletion();
+          } else {
+            const upcomingPartKey = REMOVAL_SEQUENCE.find(
+              (key) => !next.includes(key)
+            );
+            setValidationMessage(
+              `${COMPONENT_LABELS[partKey]} removed correctly. Continue with the ${COMPONENT_LABELS[upcomingPartKey]}.`
+            );
+          }
+
+          return next;
+        });
+        return;
+      }
+
       if (
         pendingStepCompletion ||
         partKey !== activePartKey ||
@@ -2469,15 +2499,15 @@ export default function Module2DisassemblyAMD({ onFinish, onBack, onLogout, onSw
       }
 
       const nextCompletedParts = [...completedParts, partKey];
-      const finished = nextCompletedParts.length === REMOVAL_SEQUENCE.length;
-      const nextStepIndex = finished ? steps.length - 1 : step + 1;
-      const nextPartKey = finished ? null : steps[nextStepIndex]?.partKey;
+      const guidedPhaseFinished = nextCompletedParts.length === REMOVAL_SEQUENCE.length;
+      const nextStepIndex = guidedPhaseFinished ? steps.length - 1 : step + 1;
+      const nextPartKey = guidedPhaseFinished ? null : steps[nextStepIndex]?.partKey;
 
       setCompletedParts(nextCompletedParts);
-      playCompletionSound(settings.sound, finished);
+      playCompletionSound(settings.sound, false);
       setValidationMessage(
-        finished
-          ? `${COMPONENT_LABELS[partKey]} completed. Full disassembly is now complete.`
+        guidedPhaseFinished
+          ? `${COMPONENT_LABELS[partKey]} completed. One final unguided pass is next — confirm below to begin.`
           : `${COMPONENT_LABELS[partKey]} seated correctly. Confirm the completion card to continue.`
       );
       setPendingStepCompletion({
@@ -2485,11 +2515,9 @@ export default function Module2DisassemblyAMD({ onFinish, onBack, onLogout, onSw
         label: COMPONENT_LABELS[partKey],
         completedStepIndex: step,
         nextStepIndex,
-        nextLabel: finished ? "Full Disassembly" : COMPONENT_LABELS[nextPartKey],
-        isFinal: finished,
+        nextLabel: guidedPhaseFinished ? "Full Disassembly" : COMPONENT_LABELS[nextPartKey],
+        entersFinalRound: guidedPhaseFinished,
       });
-
-      if (finished) void saveFinalCompletion();
     },
     [
       activePartKey,
@@ -2501,28 +2529,28 @@ export default function Module2DisassemblyAMD({ onFinish, onBack, onLogout, onSw
     ]
   );
 
-  const handleContinueAfterStep = useCallback(
-    (openCertificate = false) => {
-      if (!pendingStepCompletion) return;
+  const handleContinueAfterStep = useCallback(() => {
+    if (!pendingStepCompletion) return;
 
-      const completed = pendingStepCompletion;
-      setPendingStepCompletion(null);
-      setStep(completed.nextStepIndex);
+    const completed = pendingStepCompletion;
+    setPendingStepCompletion(null);
+    setStep(completed.nextStepIndex);
 
-      if (completed.isFinal) {
-        setValidationMessage(
-          "Full disassembly complete. Every required component has been removed and seated in order."
-        );
-        if (openCertificate) setShowCertificate(true);
-        return;
-      }
-
+    if (completed.entersFinalRound) {
+      // Reinstall every part and drop the guides — the learner now repeats
+      // the whole sequence solo before the certificate unlocks.
+      setFinalRoundCompletedParts([]);
+      setSceneRevision((value) => value + 1);
       setValidationMessage(
-        `${completed.label} complete. Next: ${completed.nextLabel}.`
+        "Final round: disassemble every component once more, in order — no guide highlights this time."
       );
-    },
-    [pendingStepCompletion]
-  );
+      return;
+    }
+
+    setValidationMessage(
+      `${completed.label} complete. Next: ${completed.nextLabel}.`
+    );
+  }, [pendingStepCompletion]);
 
   const handleLockedPartClick = useCallback(
     (partKey) => {
@@ -2609,7 +2637,7 @@ export default function Module2DisassemblyAMD({ onFinish, onBack, onLogout, onSw
         platform="AMD"
         moduleNumber="2"
         moduleType="Disassembly"
-        description="You completed the ordered removal of the GPU, SSD, HDD, both RAM modules, CPU, PSU, and motherboard."
+        description="You completed the ordered removal of the GPU, SSD, HDD, both RAM modules, CPU, PSU, and motherboard — including a full unguided repeat pass."
         userName={user.name}
         onBack={handleBackToDashboard}
         onSwitchPlatform={() => {
@@ -2624,6 +2652,7 @@ export default function Module2DisassemblyAMD({ onFinish, onBack, onLogout, onSw
     <div className="fixed inset-0 h-screen w-screen overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased">
       <div className="relative h-full w-full overflow-hidden">
         <ModuleBackground />
+        <AchievementToast achievement={achievementToast} onClose={() => setAchievementToast(null)} />
 
         {showIntro ? (
           <ModuleIntroCard
@@ -2641,9 +2670,7 @@ export default function Module2DisassemblyAMD({ onFinish, onBack, onLogout, onSw
             totalSteps={REMOVAL_SEQUENCE.length}
             label={pendingStepCompletion.label}
             nextLabel={pendingStepCompletion.nextLabel}
-            isFinal={pendingStepCompletion.isFinal}
-            onContinue={() => handleContinueAfterStep(false)}
-            onCertificate={() => handleContinueAfterStep(true)}
+            onContinue={handleContinueAfterStep}
           />
         ) : null}
 
@@ -2663,8 +2690,8 @@ export default function Module2DisassemblyAMD({ onFinish, onBack, onLogout, onSw
             </div>
 
             <div className="relative z-[120] mt-3 px-6 md:px-10">
-              <div className="flex w-full items-center justify-between gap-4 rounded-[22px] border border-[#1a2438] bg-[#0b1220]/86 px-6 py-4 shadow-[0_18px_60px_rgba(0,0,0,0.30)] backdrop-blur-xl">
-                <div className="flex items-center gap-3">
+              <div className="flex w-full flex-wrap items-center justify-between gap-4 rounded-[22px] border border-[#1a2438] bg-[#0b1220]/86 px-6 py-4 shadow-[0_18px_60px_rgba(0,0,0,0.30)] backdrop-blur-xl">
+                <div className="flex flex-wrap items-center justify-end gap-3">
                   <img src="/PNG/Articton.png" alt="Articton Logo" className="h-10 w-10 scale-300 object-contain ml-4" />
                   <div>
                     <div className="text-base font-bold tracking-wide text-white">Articton</div>
@@ -2672,7 +2699,7 @@ export default function Module2DisassemblyAMD({ onFinish, onBack, onLogout, onSw
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center justify-end gap-3">
                   {validationMessage && (
                     <div className="max-w-[520px] rounded-2xl border border-[#00ffb4]/20 bg-[#00ffb4]/8 px-4 py-2 text-xs font-semibold text-[#dffef5]">
                       {validationMessage}
@@ -2702,7 +2729,11 @@ export default function Module2DisassemblyAMD({ onFinish, onBack, onLogout, onSw
                 <div>
                   <div className="text-sm font-semibold text-white">{currentStep?.name}</div>
                   <div className="text-[11px] uppercase tracking-[0.14em] text-[#7a8ba8]">
-                    {activePartLabel
+                    {isFinalRound
+                      ? activePartLabel
+                        ? `Unguided pass • remove the ${activePartLabel} • ${finalRoundCompletedParts.length}/${REMOVAL_SEQUENCE.length} done`
+                        : "Unguided pass complete • open your certificate from the sidebar"
+                      : activePartLabel
                       ? `1st click: detach ${activePartLabel} • 2nd click: grab • move mouse • 3rd click: release`
                       : "Sequence complete • review the result or open the certificate"}
                   </div>
@@ -2723,6 +2754,8 @@ export default function Module2DisassemblyAMD({ onFinish, onBack, onLogout, onSw
                 </div>
               </div>
             </div>
+
+            <ModuleDetailCard moduleNumber="2" mode="disassembly" platform="AMD" currentStep={step} />
 
             <div className="min-h-0 flex-1 px-4 py-4 md:px-8 md:py-5">
               <div className="relative h-full overflow-hidden rounded-[24px] border border-[#1a2438] bg-[#0d1220]/78 shadow-[0_28px_90px_rgba(0,0,0,0.45)] backdrop-blur-xl">
@@ -2749,7 +2782,8 @@ export default function Module2DisassemblyAMD({ onFinish, onBack, onLogout, onSw
                     key={sceneRevision}
                     parts={PART_MODELS}
                     activePartKey={activePartKey}
-                    completedParts={completedParts}
+                    completedParts={modelViewerCompletedParts}
+                    guidesEnabled={!isFinalRound}
                     onPartCompleted={handlePartCompleted}
                     onLockedPartClick={handleLockedPartClick}
                     onInteractionMessage={setValidationMessage}
@@ -2847,3 +2881,7 @@ export default function Module2DisassemblyAMD({ onFinish, onBack, onLogout, onSw
 
 /* Preload the AMD table and every component model up front */
 PART_MODELS.forEach((part) => useGLTF.preload(encodeURI(part.path)));
+
+
+
+
