@@ -438,7 +438,7 @@ exports.askModuleTutor = onCall(
 exports.sendEmailOtp = onCall(
   { secrets: ["GMAIL_USER", "GMAIL_APP_PASSWORD", "OTP_HASH_SECRET"] },
   async (request) => {
-    const { uid, email } = requireAuthenticatedUser(request);
+    const { uid, email, authTime } = requireAuthenticatedUser(request);
     const now = Date.now();
     const otp = crypto.randomInt(100000, 1000000).toString();
     const challengeId = crypto.randomUUID();
@@ -482,8 +482,9 @@ exports.sendEmailOtp = onCall(
       transaction.set(challengeRef, {
         uid,
         email,
+        authTime,
         challengeId,
-        otpHash: hashOtp({ uid, email, otp }),
+        otpHash: hashOtp({ uid, authTime, otp }),
         attempts: 0,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         expiresAt,
@@ -573,7 +574,8 @@ exports.verifyEmailOtp = onCall(
       const challenge = challengeSnapshot.data();
       const sameAccount =
         challenge.uid === uid &&
-        challenge.email === email;
+        challenge.email === email &&
+        Number(challenge.authTime) === authTime;
 
       if (!sameAccount) {
         transaction.delete(challengeRef);
@@ -607,15 +609,9 @@ exports.verifyEmailOtp = onCall(
         };
       }
 
-      const submittedHash = hashOtp({ uid, email, otp });
-      const legacySubmittedHash = Number.isFinite(Number(challenge.authTime))
-        ? hashOtp({ uid, authTime: Number(challenge.authTime), otp })
-        : "";
+      const submittedHash = hashOtp({ uid, authTime, otp });
 
-      if (
-        !hashesMatch(challenge.otpHash, submittedHash) &&
-        !hashesMatch(challenge.otpHash, legacySubmittedHash)
-      ) {
+      if (!hashesMatch(challenge.otpHash, submittedHash)) {
         const nextAttempts = attempts + 1;
 
         if (nextAttempts >= OTP_MAX_ATTEMPTS) {
