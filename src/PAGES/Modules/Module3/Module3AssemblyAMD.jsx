@@ -15,6 +15,7 @@ import { auth, db } from "../../../firebase.js";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { AchievementToast, unlockAchievement } from "../../../utils/achievements.jsx";
+import { getUserSettings } from "../../../utils/userSettings";
 
 /* ------------------------------------------------------------------ */
 /* Module 3 ordered assembly configuration (AMD platform)     */
@@ -1612,6 +1613,7 @@ function ModelViewer({
 function HeaderDropdown({
   userName,
   userEmail = "",
+  avatarUrl = "",
   onBack,
   onLogout,
   setIsSettingsOpen,
@@ -1633,8 +1635,12 @@ function HeaderDropdown({
       <details className="group relative z-50">
         <summary className="list-none cursor-pointer rounded-2xl border border-[#1a2438] bg-[#0d1220]/95 px-3 py-2.5 transition hover:bg-[#111b2f]">
           <div className="flex max-w-[230px] items-center justify-end gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/10 text-sm font-bold text-[#00ffb4]">
-              {(userName || "U").charAt(0).toUpperCase()}
+            <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/10 text-sm font-bold text-[#00ffb4]">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="Profile" className="h-full w-full object-cover" />
+              ) : (
+                (userName || "U").charAt(0).toUpperCase()
+              )}
             </div>
             <div className="min-w-0 leading-tight text-left">
               <div className="truncate text-sm font-semibold text-white">{userName}</div>
@@ -2119,11 +2125,7 @@ export default function Module3AssemblyAMD({
   ]);
   const [aiInput, setAiInput] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
-  const [settings, setSettings] = useState({
-    sound: true,
-    animations: true,
-    darkMode: true,
-  });
+  const [settings, setSettings] = useState(getUserSettings);
 
   const currentStep = steps[step];
   const activePartKey = finalAssemblyRun ? null : currentStep?.partKey || null;
@@ -2200,6 +2202,7 @@ export default function Module3AssemblyAMD({
         "User"
       : "Loading...",
     email: firebaseUser?.email || "No email",
+    avatarUrl: profile?.avatarUrl || "",
   };
 
   const saveFinalCompletion = useCallback(async () => {
@@ -2491,6 +2494,7 @@ export default function Module3AssemblyAMD({
                   <HeaderDropdown
                     userName={user.name}
                     userEmail={user.email}
+                    avatarUrl={user.avatarUrl}
                     onBack={onBack}
                     onLogout={onLogout}
                     setIsSettingsOpen={setIsSettingsOpen}

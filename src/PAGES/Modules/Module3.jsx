@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import Settings from "../../Components/Settings";
+import { getUserSettings } from "../../utils/userSettings";
 import DisassemblyRAM from "./module3-scenes/DisassemblyRAM";
 import DisassemblyHDD from "./module3-scenes/DisassemblyHDD";
 import DisassemblySSD from "./module3-scenes/DisassemblySSD";
@@ -19,6 +20,7 @@ import { onAuthStateChanged } from "firebase/auth";
 function HeaderDropdown({
   userName,
   userEmail = "",
+  avatarUrl = "",
   onBack,
   onLogout,
   setIsSettingsOpen,
@@ -40,8 +42,12 @@ function HeaderDropdown({
       <details className="group relative z-50">
         <summary className="list-none cursor-pointer rounded-2xl border border-[#1a2438] bg-[#0d1220]/95 px-4 py-2.5 transition hover:bg-[#111b2f]">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/10 text-sm font-bold text-[#00ffb4]">
-              {(userName || "U").charAt(0).toUpperCase()}
+            <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/10 text-sm font-bold text-[#00ffb4]">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="Profile" className="h-full w-full object-cover" />
+              ) : (
+                (userName || "U").charAt(0).toUpperCase()
+              )}
             </div>
 
             <div className="leading-tight text-left">
@@ -155,6 +161,7 @@ function Module3PlatformChoice({
             <HeaderDropdown
               userName={user.name}
               userEmail={user.email}
+              avatarUrl={user.avatarUrl}
               onBack={onBack}
               onLogout={onLogout}
               setIsSettingsOpen={setIsSettingsOpen}
@@ -432,11 +439,7 @@ const [aiInput, setAiInput] = useState("");
 
 const [aiLoading, setAiLoading] = useState(false);
 
-  const [settings, setSettings] = useState({
-    sound: true,
-    animations: true,
-    darkMode: true,
-  });
+  const [settings, setSettings] = useState(getUserSettings);
 
   const [localCompletedSteps, setLocalCompletedSteps] = useState(() => {
     const saved = localStorage.getItem("module3CompletedSteps");
@@ -642,6 +645,7 @@ const askAI = async () => {
       : "Loading...",
 
     email: firebaseUser?.email || "No email",
+    avatarUrl: profile?.avatarUrl || "",
   };
 
   const sharedProps = { placementApi };
@@ -951,6 +955,7 @@ const askAI = async () => {
                     <HeaderDropdown
                       userName={user.name}
                       userEmail={user.email}
+                      avatarUrl={user.avatarUrl}
                       onBack={onBack}
                       onLogout={onLogout}
                       setIsSettingsOpen={setIsSettingsOpen}

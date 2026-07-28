@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 // Main pages
 import ArtictonLandingPage from "./PAGES/LandingPage";
@@ -20,12 +20,35 @@ import Module2DisassemblyINTEL from "./PAGES/Modules/Module2/Module2DisassmblyIN
 import Module3AssemblyAMD from "./PAGES/Modules/Module3/Module3AssemblyAMD";
 import Module3AssemblyINTEL from "./PAGES/Modules/Module3/Module3AssemblyINTEL";
 import FacultyPage from "./PAGES/FacultyPage";
+import {
+  applyThemeSettings,
+  getUserSettings,
+  subscribeEditProfileRequests,
+  subscribeUserSettings,
+} from "./utils/userSettings";
 
 export default function App() {
   const [page, setPage] = useState("landing");
   const [userProfile, setUserProfile] = useState(null);
   const [activeTestId, setActiveTestId] = useState(null);
   const [dashboardSection, setDashboardSection] = useState("Dashboard");
+  const [profileEditRequestId, setProfileEditRequestId] = useState(0);
+
+  useEffect(() => {
+    applyThemeSettings(getUserSettings());
+
+    const unsubscribeSettings = subscribeUserSettings(applyThemeSettings);
+    const unsubscribeProfileRequests = subscribeEditProfileRequests(() => {
+      setDashboardSection("Profile");
+      setProfileEditRequestId((requestId) => requestId + 1);
+      setPage("dashboard");
+    });
+
+    return () => {
+      unsubscribeSettings();
+      unsubscribeProfileRequests();
+    };
+  }, []);
 
   const handleLogin = (profile) => {
     setUserProfile(profile || null);
@@ -57,9 +80,13 @@ export default function App() {
     if (
       target === "Modules" ||
       target === "Profile" ||
+      target === "Edit Profile" ||
       target === "Practice Tests"
     ) {
-      setDashboardSection(target);
+      setDashboardSection(target === "Edit Profile" ? "Profile" : target);
+      if (target === "Edit Profile") {
+        setProfileEditRequestId((requestId) => requestId + 1);
+      }
       setPage("dashboard");
       return;
     }
@@ -181,6 +208,7 @@ export default function App() {
   return (
     <Dashboard
       initialSection={dashboardSection}
+      profileEditRequestId={profileEditRequestId}
       onLogout={handleLogout}
       onOpenModule={(module) => {
         const id = typeof module === "object" ? module.id : module;

@@ -5,7 +5,7 @@ import AMDFullAssemblyPracticalTest from "./PracticalTests/AMD/AMDFullAssemblyPr
 import AMDFullDisassemblyPracticalTest from "./PracticalTests/AMD/AMDFullDisassemblyPracticalTest.jsx";
 import INTELFullAssemblyPracticalTest from "./PracticalTests/INTEL/INTELFullAssemblyPracticalTest.jsx";
 import INTELFullDisassemblyPracticalTest from "./PracticalTests/INTEL/INTELFullDisassemblyPracticalTest.jsx";
-import { auth, db } from "../firebase.js";
+import { auth, db, storage } from "../firebase.js";
 import { onAuthStateChanged } from "firebase/auth";
 import {
   doc,
@@ -16,26 +16,114 @@ import {
   collection,
 } from "firebase/firestore";
 import {
-  getStorage,
   ref,
   uploadBytes,
   getDownloadURL,
 } from "firebase/storage";
 import { fetchMobileScoreDocs, mergeMobileScoresIntoProfile } from "../utils/mobileScores";
 import { ACHIEVEMENTS } from "../utils/achievements.jsx";
-
-const storage = getStorage();
-
-export { auth, db, storage };
+import { getUserSettings } from "../utils/userSettings";
+import { createProfileImageDataUrl, validateProfileImage } from "../utils/profileImages";
 
 function isCompletedProgress(progress) {
   return !!progress?.completed || !!progress?.finished || (progress?.percent || 0) >= 100;
+}
+
+const MOBILE_MODULE_LABELS = {
+  module1: "Module 1",
+  module2: "Module 2",
+  module3: "Module 3",
+  module4: "Module 4",
+};
+
+const PRACTICAL_ACHIEVEMENT_LABELS = {
+  amdDisassembly: {
+    title: "AMD Disassembly Practical",
+    subtitle: "Completed the AMD full disassembly practical.",
+  },
+  intelDisassembly: {
+    title: "Intel Disassembly Practical",
+    subtitle: "Completed the Intel full disassembly practical.",
+  },
+  amdAssembly: {
+    title: "AMD Assembly Practical",
+    subtitle: "Completed the AMD full assembly practical.",
+  },
+  intelAssembly: {
+    title: "Intel Assembly Practical",
+    subtitle: "Completed the Intel full assembly practical.",
+  },
+  fullDisassembly: {
+    title: "Full Disassembly Practical",
+    subtitle: "Completed the full disassembly practical.",
+  },
+  fullAssembly: {
+    title: "Full Assembly Practical",
+    subtitle: "Completed the full assembly practical.",
+  },
+  practiceExam1: {
+    title: "Mobile Disassembly Exam",
+    subtitle: "Completed the mobile disassembly exam.",
+  },
+  practiceExam2: {
+    title: "Mobile Assembly Exam",
+    subtitle: "Completed the mobile assembly exam.",
+  },
+};
+
+const MOBILE_ASSESSMENT_LABELS = {
+  Content: "Content",
+  Pre: "Pre-test",
+  Post: "Post-test",
+};
+
+function formatAchievementScore(result) {
+  const scorePercent = Number(result?.scorePercent ?? result?.percent ?? result?.percentage ?? result?.score);
+  return Number.isFinite(scorePercent) ? `${Math.round(scorePercent)}%` : "";
+}
+
+function getAchievementStatus(result, passingPercent = 60) {
+  const scorePercent = Number(result?.scorePercent ?? result?.percent ?? result?.percentage ?? result?.score);
+  const completed =
+    !!result?.completed ||
+    !!result?.finished ||
+    !!result?.unlocked ||
+    !!result?.completedAt ||
+    !!result?.timestamp ||
+    Number.isFinite(scorePercent);
+  const passed =
+    result?.passed === true ||
+    (completed && Number.isFinite(scorePercent) && scorePercent >= passingPercent);
+
+  return {
+    completed,
+    passed,
+    scoreText: Number.isFinite(scorePercent) ? `${Math.round(scorePercent)}%` : "",
+    statusText: passed ? "Passed" : completed ? "Completed" : "Not started",
+  };
+}
+
+function makeAchievement({ id, icon = "badge", title, subtitle, result, category = "Achievement", passingPercent = 60 }) {
+  const status = getAchievementStatus(result, passingPercent);
+  if (result && !status.completed) return null;
+
+  return {
+    id,
+    icon,
+    title,
+    subtitle,
+    category,
+    scoreText: status.scoreText,
+    statusText: status.statusText,
+    passed: status.passed,
+  };
 }
 
 export default function Dashboard({
   onLogout,
   onOpenModule,
   initialSection = "Dashboard",
+  profileEditRequestId = 0,
 }) {
   const [section, setSection] = useState(initialSection);
   const [isLoading, setIsLoading] = useState(true);
@@ -45,13 +133,10 @@ export default function Dashboard({
   const [isFaqOpen, setIsFaqOpen] = useState(false);
   const [isSupportOpen, setIsSupportOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isProfileEditOpen, setIsProfileEditOpen] = useState(false);
 
 
-  const [settings, setSettings] = useState({
-    sound: true,
-    animations: true,
-    darkMode: true,
-  });
+  const [settings, setSettings] = useState(getUserSettings);
 
   const reduce = useReducedMotion();
   const navigate = useOptionalNavigate();
@@ -86,6 +171,13 @@ export default function Dashboard({
   useEffect(() => {
     setSection(initialSection);
   }, [initialSection]);
+
+  useEffect(() => {
+    if (profileEditRequestId > 0) {
+      setSection("Profile");
+      setIsProfileEditOpen(true);
+    }
+  }, [profileEditRequestId]);
 
   useEffect(() => {
     const prevHtml = document.documentElement.style.overflow;
@@ -351,6 +443,7 @@ const openModule = (id, platform)=>{
 const practicalTests = profile?.practicalTests || {};
 const mobileModuleScores = profile?.mobileModuleScores || {};
 const mobilePracticeScores = profile?.mobilePracticeScores || {};
+const mobileSpecificAssessments = profile?.mobileSpecificAssessments || {};
 
 const getScorePercent = (result) => {
   if (!result) return null;
@@ -458,31 +551,168 @@ const assemblyPracticalUnlocked =
 
     const savedAchievements = Object.values(profile?.accountAchievements || {})
       .filter((achievement) => achievement?.unlocked)
-      .map((achievement) => ({
-        id: achievement.id,
-        icon: achievement.id?.includes("exam") ? "badge" : "trophy",
-        title: achievement.title,
-        subtitle: achievement.subtitle,
-      }));
+      .map((achievement) =>
+        makeAchievement({
+          id: achievement.id,
+          icon: achievement.id?.includes("exam") || achievement.id?.includes("practical") ? "badge" : "trophy",
+          title: achievement.title,
+          subtitle: achievement.subtitle,
+          result: achievement,
+          category: achievement.platform ? `${achievement.platform} Path` : "Saved",
+          passingPercent: 75,
+        })
+      )
+      .filter(Boolean);
 
-    const progressAchievements = [
-      module2Done ? ACHIEVEMENTS.module2 : null,
-      module3Done ? ACHIEVEMENTS.module3 : null,
-      practicalTests.amdAssembly ? ACHIEVEMENTS.amdAssembly : null,
-      practicalTests.amdDisassembly ? ACHIEVEMENTS.amdDisassembly : null,
-      practicalTests.intelAssembly ? ACHIEVEMENTS.intelAssembly : null,
-      practicalTests.intelDisassembly ? ACHIEVEMENTS.intelDisassembly : null,
-    ]
-      .filter(Boolean)
-      .map((achievement) => ({
-        ...achievement,
-        icon: achievement.id?.includes("exam") ? "badge" : "trophy",
-      }));
+    const moduleAchievements = [
+      module2AMDProgress?.finished || module2AMDProgress?.completedSteps
+        ? makeAchievement({
+            id: "module-2-amd-disassembly-complete",
+            icon: "trophy",
+            title: "AMD Disassembly Module",
+            subtitle: "Completed Module 2 on the AMD disassembly path.",
+            result: { ...module2AMDProgress, completed: true },
+            category: "Module",
+          })
+        : null,
+      module2INTELProgress?.finished || module2INTELProgress?.completedSteps
+        ? makeAchievement({
+            id: "module-2-intel-disassembly-complete",
+            icon: "trophy",
+            title: "Intel Disassembly Module",
+            subtitle: "Completed Module 2 on the Intel disassembly path.",
+            result: { ...module2INTELProgress, completed: true },
+            category: "Module",
+          })
+        : null,
+      module3AMDProgress?.finished || module3AMDProgress?.completedSteps
+        ? makeAchievement({
+            id: "module-3-amd-assembly-complete",
+            icon: "trophy",
+            title: "AMD Assembly Module",
+            subtitle: "Completed Module 3 on the AMD assembly path.",
+            result: { ...module3AMDProgress, completed: true },
+            category: "Module",
+          })
+        : null,
+      module3INTELProgress?.finished || module3INTELProgress?.completedSteps
+        ? makeAchievement({
+            id: "module-3-intel-assembly-complete",
+            icon: "trophy",
+            title: "Intel Assembly Module",
+            subtitle: "Completed Module 3 on the Intel assembly path.",
+            result: { ...module3INTELProgress, completed: true },
+            category: "Module",
+          })
+        : null,
+      module2Done
+        ? makeAchievement({
+            id: ACHIEVEMENTS.module2.id,
+            icon: "trophy",
+            title: ACHIEVEMENTS.module2.title,
+            subtitle: ACHIEVEMENTS.module2.subtitle,
+            result: { ...(module2Progress || {}), completed: true },
+            category: "Module",
+          })
+        : null,
+      module3Done
+        ? makeAchievement({
+            id: ACHIEVEMENTS.module3.id,
+            icon: "trophy",
+            title: ACHIEVEMENTS.module3.title,
+            subtitle: ACHIEVEMENTS.module3.subtitle,
+            result: { ...(module3Progress || {}), completed: true },
+            category: "Module",
+          })
+        : null,
+    ].filter(Boolean);
+
+    const mobileModuleAchievements = Object.entries(MOBILE_MODULE_LABELS).flatMap(([moduleKey, moduleLabel]) =>
+      Object.entries(MOBILE_ASSESSMENT_LABELS)
+        .map(([activityKey, activityLabel]) => {
+          const result = mobileModuleScores[`${moduleKey}${activityKey}`];
+          if (!result) return null;
+
+          const score = formatAchievementScore(result);
+          return makeAchievement({
+            id: `mobile-${moduleKey}-${activityKey.toLowerCase()}`,
+            icon: activityKey === "Content" ? "mobile" : activityKey === "Pre" ? "pre" : "post",
+            title: `${moduleLabel} ${activityLabel}`,
+            subtitle: `${score ? `${score} on ` : ""}${moduleLabel} mobile ${activityLabel.toLowerCase()}.`,
+            result,
+            category: "Mobile",
+          });
+        })
+        .filter(Boolean)
+    );
+
+    const mobileSpecificAchievements = Object.entries(mobileSpecificAssessments).flatMap(([assessmentKey, result]) =>
+      Object.entries(MOBILE_ASSESSMENT_LABELS)
+        .map(([activityKey, activityLabel]) => {
+          if (!assessmentKey.endsWith(activityKey)) return null;
+
+          const baseKey = assessmentKey.slice(0, -activityKey.length);
+          const labels = PRACTICAL_ACHIEVEMENT_LABELS[baseKey];
+          if (!labels) return null;
+
+          const score = formatAchievementScore(result);
+          return makeAchievement({
+            id: `mobile-${baseKey}-${activityKey.toLowerCase()}`,
+            icon: activityKey === "Pre" ? "pre" : "post",
+            title: `${labels.title} ${activityLabel}`,
+            subtitle: `${score ? `${score} on ` : ""}${labels.title} mobile ${activityLabel.toLowerCase()}.`,
+            result,
+            category: "Mobile",
+          });
+        })
+        .filter(Boolean)
+    );
+
+    const mobilePracticeAchievements = Object.entries(mobilePracticeScores)
+      .map(([practiceKey, result]) => {
+        const labels = PRACTICAL_ACHIEVEMENT_LABELS[practiceKey];
+        if (!labels) return null;
+
+        const score = formatAchievementScore(result);
+        return makeAchievement({
+          id: `mobile-${practiceKey}`,
+          icon: "mobile",
+          title: labels.title,
+          subtitle: `${score ? `${score} on ` : ""}${labels.subtitle}`,
+          result,
+          category: "Mobile Exam",
+        });
+      })
+      .filter(Boolean);
+
+    const practicalAchievements = Object.entries(PRACTICAL_ACHIEVEMENT_LABELS)
+      .map(([testKey, labels]) => {
+        const result = practicalTests[testKey];
+        if (!result) return null;
+
+        const score = formatAchievementScore(result);
+        return makeAchievement({
+          id: `${testKey}-practical-achievement`,
+          icon: "badge",
+          title: labels.title,
+          subtitle: `${score ? `${score} on ` : ""}${labels.subtitle}`,
+          result,
+          category: testKey.toLowerCase().includes("amd")
+            ? "AMD"
+            : testKey.toLowerCase().includes("intel")
+            ? "Intel"
+            : "Practical",
+          passingPercent: 75,
+        });
+      })
+      .filter(Boolean);
 
     const achievements = [
-      { id: "first-steps", icon: "trophy", title: "First Steps", subtitle: "Complete Intro Lesson" },
-      { id: "hands-on", icon: "badge", title: "Hands-On", subtitle: "Pass 1 Practical Test" },
-      ...progressAchievements,
+      ...moduleAchievements,
+      ...mobileModuleAchievements,
+      ...mobileSpecificAchievements,
+      ...mobilePracticeAchievements,
+      ...practicalAchievements,
       ...savedAchievements,
     ].filter(
       (achievement, index, list) =>
@@ -812,6 +1042,8 @@ const assemblyPracticalUnlocked =
                               mobileLearning={data.mobileLearning}
                               firebaseUser={firebaseUser}
                               setProfile={setProfile}
+                              isEditOpen={isProfileEditOpen}
+                              onEditOpenChange={setIsProfileEditOpen}
                             />
                           </PageMotion>
                         ) : null}
@@ -898,8 +1130,12 @@ function HeaderBar({ section, sectionLabel, user, onSettings, onLogout }) {
         <details className="group">
           <summary className="list-none cursor-pointer rounded-2xl border border-[#1a2438] bg-[#0d1220]/95 px-4 py-3 transition hover:bg-[#111b2f]">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/10 text-sm font-bold text-[#00ffb4]">
-                {(user.name || "U").charAt(0).toUpperCase()}
+              <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/10 text-sm font-bold text-[#00ffb4]">
+                {user.avatarUrl ? (
+                  <img src={user.avatarUrl} alt="Profile" className="h-full w-full object-cover" />
+                ) : (
+                  (user.name || "U").charAt(0).toUpperCase()
+                )}
               </div>
 
               <div className="leading-tight text-left">
@@ -1686,12 +1922,27 @@ function ComingSoonAssessment({ title, onBack }) {
   );
 }
 
-function ProfilePage({ user, stats, achievements, tests = [], mobileLearning, firebaseUser, setProfile }) {
-  const [isEditOpen, setIsEditOpen] = useState(false);
+function ProfilePage({
+  user,
+  stats,
+  achievements,
+  tests = [],
+  mobileLearning,
+  firebaseUser,
+  setProfile,
+  isEditOpen: controlledIsEditOpen,
+  onEditOpenChange,
+}) {
+  const [localIsEditOpen, setLocalIsEditOpen] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [mi, setMi] = useState("");
   const [previewImage, setPreviewImage] = useState(user.avatarUrl || "");
+  const [selectedImageFile, setSelectedImageFile] = useState(null);
+  const [profileError, setProfileError] = useState("");
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const isEditOpen = typeof controlledIsEditOpen === "boolean" ? controlledIsEditOpen : localIsEditOpen;
+  const setIsEditOpen = typeof onEditOpenChange === "function" ? onEditOpenChange : setLocalIsEditOpen;
 
   useEffect(() => {
     const parts = (user.name || "").trim().split(" ");
@@ -1700,6 +1951,8 @@ function ProfilePage({ user, stats, achievements, tests = [], mobileLearning, fi
     setLastName(parts.length > 1 ? parts[parts.length - 1] : "");
     setMi(user.middleInitial || "");
     setPreviewImage(user.avatarUrl || "");
+    setSelectedImageFile(null);
+    setProfileError("");
   }, [user.name, user.avatarUrl, user.middleInitial]);
 
   const fullName = `${firstName} ${mi ? mi + "." : ""} ${lastName}`.trim();
@@ -1707,12 +1960,21 @@ function ProfilePage({ user, stats, achievements, tests = [], mobileLearning, fi
   const handleImageChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    const validationError = validateProfileImage(file);
+    if (validationError) {
+      setProfileError(validationError);
+      return;
+    }
+
+    setProfileError("");
+    setSelectedImageFile(file);
     setPreviewImage(URL.createObjectURL(file));
   };
 
   const handleSave = async () => {
     if (!firebaseUser?.uid) {
-      console.error("No logged-in user found.");
+      setProfileError("No logged-in user found.");
       return;
     }
 
@@ -1720,13 +1982,43 @@ function ProfilePage({ user, stats, achievements, tests = [], mobileLearning, fi
     const cleanLastName = lastName.trim();
     const cleanMi = mi.trim().toUpperCase();
 
+    if (!cleanFirstName || !cleanLastName) {
+      setProfileError("First name and last name are required.");
+      return;
+    }
+
+    setIsSavingProfile(true);
+    setProfileError("");
+
     try {
+      let avatarUrl = user.avatarUrl || "";
+
+      if (selectedImageFile) {
+        const fallbackAvatarUrl = await createProfileImageDataUrl(selectedImageFile);
+        const safeFileName = selectedImageFile.name.replace(/[^a-zA-Z0-9.-]/g, "_");
+        const imageRef = ref(
+          storage,
+          `profile-photos/${firebaseUser.uid}/${Date.now()}-${safeFileName}`
+        );
+
+        try {
+          await uploadBytes(imageRef, selectedImageFile, {
+            contentType: selectedImageFile.type,
+          });
+          avatarUrl = await getDownloadURL(imageRef);
+        } catch (uploadError) {
+          console.warn("Profile photo storage upload failed; saving compressed image to Firestore instead.", uploadError);
+          avatarUrl = fallbackAvatarUrl;
+        }
+      }
+
       const userRef = doc(db, "users", firebaseUser.uid);
 
       await updateDoc(userRef, {
         firstName: cleanFirstName,
         lastName: cleanLastName,
         middleInitial: cleanMi,
+        avatarUrl,
         updatedAt: serverTimestamp(),
       });
 
@@ -1735,60 +2027,120 @@ function ProfilePage({ user, stats, achievements, tests = [], mobileLearning, fi
         firstName: cleanFirstName,
         lastName: cleanLastName,
         middleInitial: cleanMi,
+        avatarUrl,
       }));
 
+      setPreviewImage(avatarUrl);
+      setSelectedImageFile(null);
       setIsEditOpen(false);
     } catch (err) {
       console.error("Error updating profile:", err);
+      setProfileError(err?.code === "permission-denied"
+        ? "You do not have permission to update this profile."
+        : "Could not save your profile. Please try again.");
+    } finally {
+      setIsSavingProfile(false);
     }
   };
 
   return (
     <>
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-        <div className="overflow-hidden rounded-[28px] border border-[#1a2438] bg-[#0d1220] shadow-[0_30px_90px_rgba(0,0,0,0.42)]">
-          <div className="p-8">
-            <div className="text-lg font-bold tracking-tight text-[#e8ecf4]">My Profile</div>
+      <div className="w-full">
+        <div className="relative min-h-[280px] w-full overflow-hidden rounded-[28px] border border-[#1a2438] bg-[#0d1220] shadow-[0_26px_80px_rgba(0,0,0,0.38)]">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_8%_0%,rgba(0,255,180,0.09),transparent_34%)]" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_92%_15%,rgba(0,180,255,0.04),transparent_30%)]" />
 
-            <div className="mt-6 flex items-center gap-4">
-              <ProfileAvatar image={previewImage} fallback={(firstName || user.name || "U").charAt(0).toUpperCase()} />
+          <div className="relative grid min-h-[280px] grid-cols-1 xl:grid-cols-[380px_minmax(0,1fr)]">
+            <section className="flex h-full flex-col p-6 lg:p-8 xl:border-r xl:border-[#1a2438]">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-lg font-bold tracking-tight text-[#e8ecf4]">
+                    My Profile
+                  </div>
+                  <div className="mt-1 text-xs text-[#7a8ba8]">
+                    Account and learning overview
+                  </div>
+                </div>
 
-              <div>
-                <div className="text-base font-semibold text-white">{fullName || user.name}</div>
-                <div className="text-sm text-[#7a8ba8]">{user.email}</div>
-              </div>
-            </div>
-
-            <div className="mt-7 grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <MiniStat title="Completed" value={`${stats.completed}`} />
-              <MiniStat title="Overall" value={`${stats.overall}%`} />
-              <MiniStat title="Focus" value={stats.nextUp?.title || "No module yet"} />
-            </div>
-
-            <div className="mt-7 rounded-2xl border border-[#1a2438] bg-white/[0.03] p-6">
-              <div className="text-sm font-semibold text-white">Quick actions</div>
-
-              <div className="mt-4 flex flex-wrap gap-3">
-                <button type="button" onClick={() => setIsEditOpen(true)} className="rounded-xl border border-[#1a2438] bg-white/[0.03] px-4 py-2.5 text-sm font-semibold text-[#dbe6f5] transition hover:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-[#00ffb4]/25">
-                  Edit profile
-                </button>
-
-                <button type="button" onClick={() => console.log("View achievements")} className="rounded-xl border border-[#1a2438] bg-white/[0.03] px-4 py-2.5 text-sm font-semibold text-[#dbe6f5] transition hover:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-[#00ffb4]/25">
-                  View achievements
+                <button
+                  type="button"
+                  onClick={() => setIsEditOpen(true)}
+                  className="rounded-xl border border-[#00ffb4]/25 bg-[#00ffb4]/10 px-3.5 py-2 text-xs font-semibold text-[#00ffb4] transition hover:bg-[#00ffb4]/16 focus:outline-none focus:ring-2 focus:ring-[#00ffb4]/25"
+                >
+                  Edit Profile
                 </button>
               </div>
-            </div>
-          </div>
-        </div>
 
-        <div className="overflow-hidden rounded-[28px] border border-[#1a2438] bg-[#0d1220] shadow-[0_30px_90px_rgba(0,0,0,0.42)]">
-          <div className="p-7">
-            <div className="text-lg font-bold tracking-tight text-[#e8ecf4]">Badges</div>
-            <div className="mt-5 space-y-3">
-              {achievements.map((a) => (
-                <AchievementRow key={a.id} icon={a.icon} title={a.title} subtitle={a.subtitle} onClick={() => console.log(a.id)} />
-              ))}
-            </div>
+              <div className="mt-6 flex items-center gap-4">
+                <ProfileAvatar
+                  image={previewImage}
+                  fallback={(firstName || user.name || "U").charAt(0).toUpperCase()}
+                  large
+                />
+
+                <div className="min-w-0">
+                  <div className="truncate text-lg font-semibold text-white">
+                    {fullName || user.name}
+                  </div>
+                  <div className="mt-1 truncate text-sm text-[#7a8ba8]">
+                    {user.email}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-auto grid grid-cols-2 gap-3 pt-6">
+                <MiniStat title="Completed" value={`${stats.completed}`} />
+                <MiniStat title="Overall" value={`${stats.overall}%`} />
+
+                <div className="col-span-2">
+                  <MiniStat
+                    title="Current Focus"
+                    value={stats.nextUp?.title || "No module yet"}
+                  />
+                </div>
+              </div>
+            </section>
+
+            <section className="flex min-w-0 flex-col p-6 lg:p-8">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div className="text-lg font-bold tracking-tight text-[#e8ecf4]">
+                    Badges
+                  </div>
+                  <div className="mt-1 text-xs text-[#7a8ba8]">
+                    Your latest unlocked achievements
+                  </div>
+                </div>
+
+                <span className="rounded-full border border-[#00ffb4]/20 bg-[#00ffb4]/10 px-3 py-1.5 text-xs font-semibold text-[#00ffb4]">
+                  {achievements.length} unlocked
+                </span>
+              </div>
+
+              <div className="mt-5 grid flex-1 auto-rows-fr gap-3 md:grid-cols-2 2xl:grid-cols-4">
+                {achievements.length ? (
+                  achievements.slice(0, 4).map((achievement) => (
+                    <AchievementRow
+                      key={achievement.id}
+                      {...achievement}
+                      onClick={() => console.log(achievement.id)}
+                    />
+                  ))
+                ) : (
+                  <div className="md:col-span-2 2xl:col-span-4">
+                    <EmptyBadgeState />
+                  </div>
+                )}
+              </div>
+
+              {achievements.length > 4 ? (
+                <div className="mt-auto pt-4 text-right text-xs text-[#7a8ba8]">
+                  +{achievements.length - 4} more badge
+                  {achievements.length - 4 === 1 ? "" : "s"} available on the
+                  Achievements page
+                </div>
+              ) : null}
+            </section>
           </div>
         </div>
       </div>
@@ -1805,7 +2157,7 @@ function ProfilePage({ user, stats, achievements, tests = [], mobileLearning, fi
               <div className="flex items-center justify-between border-b border-[#1a2438] px-6 py-5">
                 <div>
                   <div className="text-lg font-bold text-white">Edit Profile</div>
-                  <div className="text-xs text-[#7a8ba8]">Front-end preview only</div>
+                  <div className="text-xs text-[#7a8ba8]">Update your saved profile</div>
                 </div>
 
                 <button type="button" onClick={() => setIsEditOpen(false)} className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#1a2438] bg-white/[0.03] text-white/70 transition hover:bg-white/[0.06]">
@@ -1820,11 +2172,17 @@ function ProfilePage({ user, stats, achievements, tests = [], mobileLearning, fi
                   <div>
                     <label className="inline-flex cursor-pointer rounded-xl border border-[#00ffb4]/30 bg-[#00ffb4]/12 px-4 py-2.5 text-sm font-semibold text-[#00ffb4] transition hover:bg-[#00ffb4]/18">
                       Upload picture
-                      <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
+                      <input type="file" accept="image/*" onChange={handleImageChange} disabled={isSavingProfile} className="hidden" />
                     </label>
-                    <div className="mt-2 text-xs text-[#7a8ba8]">Preview only for now. Firebase upload can be added later.</div>
+                    <div className="mt-2 text-xs text-[#7a8ba8]">JPG, PNG, or WebP up to 5MB.</div>
                   </div>
                 </div>
+
+                {profileError ? (
+                  <div className="mt-5 rounded-2xl border border-red-400/25 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-200">
+                    {profileError}
+                  </div>
+                ) : null}
 
                 <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <FormField label="First Name" value={firstName} onChange={setFirstName} placeholder="First name" />
@@ -1840,12 +2198,12 @@ function ProfilePage({ user, stats, achievements, tests = [], mobileLearning, fi
                 </div>
 
                 <div className="mt-7 flex justify-end gap-3">
-                  <button type="button" onClick={() => setIsEditOpen(false)} className="rounded-xl border border-[#1a2438] bg-white/[0.03] px-5 py-2.5 text-sm font-semibold text-[#dbe6f5] transition hover:bg-white/[0.06]">
+                  <button type="button" onClick={() => setIsEditOpen(false)} disabled={isSavingProfile} className="rounded-xl border border-[#1a2438] bg-white/[0.03] px-5 py-2.5 text-sm font-semibold text-[#dbe6f5] transition hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-60">
                     Cancel
                   </button>
 
-                  <button type="button" onClick={handleSave} className="rounded-xl bg-[#00ffb4] px-5 py-2.5 text-sm font-bold text-[#0a0e17] transition hover:scale-[1.02]">
-                    Save changes
+                  <button type="button" onClick={handleSave} disabled={isSavingProfile} className="rounded-xl bg-[#00ffb4] px-5 py-2.5 text-sm font-bold text-[#0a0e17] transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:scale-100">
+                    {isSavingProfile ? "Saving..." : "Save changes"}
                   </button>
                 </div>
               </div>
@@ -1859,7 +2217,7 @@ function ProfilePage({ user, stats, achievements, tests = [], mobileLearning, fi
 
 function ProfileAvatar({ image, fallback, large = false }) {
   return (
-    <div className={`${large ? "h-20 w-20 text-2xl" : "h-14 w-14 text-lg"} flex items-center justify-center overflow-hidden rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/10 font-bold text-[#00ffb4]`}>
+    <div className={`${large ? "h-20 w-20 text-2xl" : "h-12 w-12 text-base"} flex items-center justify-center overflow-hidden rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/10 font-bold text-[#00ffb4]`}>
       {image ? <img src={image} alt="Profile" className="h-full w-full object-cover" /> : fallback}
     </div>
   );
@@ -2078,13 +2436,17 @@ function AchievementsCardCompact({ achievements, onClick }) {
           </button>
         </div>
         <div className="mt-5 space-y-3">
-          {achievements.slice(0, 2).map((a) => (
-            <AchievementRow key={a.id} icon={a.icon} title={a.title} subtitle={a.subtitle} onClick={onClick} />
-          ))}
+          {achievements.length ? (
+            achievements.slice(0, 3).map((achievement) => (
+              <AchievementRow key={achievement.id} {...achievement} onClick={onClick} />
+            ))
+          ) : (
+            <EmptyBadgeState compact />
+          )}
         </div>
         <div className="mt-4 text-right">
           <button type="button" onClick={onClick} className="inline-flex rounded-full border border-[#1a2438] bg-white/[0.03] px-3 py-1.5 text-[11px] text-[#7a8ba8] transition hover:bg-white/[0.06]">
-            +{Math.max(0, achievements.length - 2)} more…
+            +{Math.max(0, achievements.length - 3)} more
           </button>
         </div>
       </div>
@@ -2095,45 +2457,88 @@ function AchievementsCardCompact({ achievements, onClick }) {
 function AchievementsPage({ achievements = [], tests = [], modules = [] }) {
   const passedTests = tests.filter((test) => test.completed && Number(test.progress?.score ?? 0) >= 75).length;
   const completedModules = modules.filter((module) => module.progress >= 100).length;
+  const mobileBadges = achievements.filter((achievement) => achievement.category?.includes("Mobile")).length;
+  const prePostBadges = achievements.filter((achievement) => achievement.icon === "pre" || achievement.icon === "post").length;
 
   return (
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-3">
         <StatCard title="Achievements" value={`${achievements.length}`} hint="Unlocked badges" />
-        <StatCard title="Practical Passes" value={`${passedTests}`} hint="Scores at 75 or higher" />
-        <StatCard title="Modules Done" value={`${completedModules}`} hint="Completed lessons" />
+        <StatCard title="Mobile Badges" value={`${mobileBadges}`} hint="Pre-tests, post-tests, and exams" />
+        <StatCard title="Pre/Post Tests" value={`${prePostBadges}`} hint="Specific assessment badges" />
       </div>
 
       <div className="rounded-[28px] border border-[#1a2438] bg-[#0d1220] p-7 shadow-[0_30px_90px_rgba(0,0,0,0.42)]">
-        <div className="text-lg font-bold tracking-tight text-[#e8ecf4]">All Achievements</div>
+        <div>
+          <div className="text-lg font-bold tracking-tight text-[#e8ecf4]">All Achievements</div>
+          <div className="mt-1 text-sm text-[#7a8ba8]">
+            {completedModules} modules complete, {passedTests} practical passes
+          </div>
+        </div>
         <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {achievements.map((achievement) => (
-            <AchievementRow
-              key={achievement.id}
-              icon={achievement.icon}
-              title={achievement.title}
-              subtitle={achievement.subtitle}
-            />
-          ))}
+          {achievements.length ? (
+            achievements.map((achievement) => (
+              <AchievementRow key={achievement.id} {...achievement} />
+            ))
+          ) : (
+            <div className="md:col-span-2 xl:col-span-3">
+              <EmptyBadgeState />
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-function AchievementRow({ icon, title, subtitle, onClick }) {
+function AchievementRow({
+  icon,
+  title,
+  subtitle,
+  category = "Achievement",
+  scoreText = "",
+  statusText = "",
+  passed = false,
+  onClick,
+}) {
   const motionPreset = useCardMotion();
+  const interactive = typeof onClick === "function";
 
   return (
-    <motion.button type="button" onClick={onClick} {...motionPreset} className="flex w-full items-center gap-4 rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4 text-left focus:outline-none focus:ring-2 focus:ring-[#00ffb4]/25" aria-label={`Open achievement ${title}`}>
+    <motion.button type="button" onClick={onClick} {...motionPreset} className="flex h-full w-full items-start gap-4 rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4 text-left focus:outline-none focus:ring-2 focus:ring-[#00ffb4]/25 disabled:cursor-default" aria-label={`Open achievement ${title}`} disabled={!interactive}>
       <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[#00ffb4]/18 bg-[#00ffb4]/10">
         <Icon kind={icon} active />
       </div>
-      <div>
-        <div className="text-sm font-semibold text-white">{title}</div>
-        <div className="text-[12px] text-[#7a8ba8]">{subtitle}</div>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="min-w-0 text-sm font-semibold text-white">{title}</div>
+          <span className="rounded-full border border-[#00ffb4]/20 bg-[#00ffb4]/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-[#00ffb4]">
+            {category}
+          </span>
+        </div>
+        <div className="mt-1 text-[12px] leading-5 text-[#7a8ba8]">{subtitle}</div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {statusText ? (
+            <span className={passed ? "rounded-full bg-[#00ffb4]/10 px-2 py-1 text-[11px] font-bold text-[#00ffb4]" : "rounded-full bg-yellow-300/10 px-2 py-1 text-[11px] font-bold text-yellow-200"}>
+              {statusText}
+            </span>
+          ) : null}
+          {scoreText ? (
+            <span className="rounded-full border border-white/10 bg-white/[0.03] px-2 py-1 text-[11px] font-bold text-[#dbe6f5]">
+              {scoreText}
+            </span>
+          ) : null}
+        </div>
       </div>
     </motion.button>
+  );
+}
+
+function EmptyBadgeState({ compact = false }) {
+  return (
+    <div className={compact ? "rounded-2xl border border-dashed border-[#1a2438] bg-white/[0.02] p-4 text-sm text-[#7a8ba8]" : "rounded-2xl border border-dashed border-[#1a2438] bg-white/[0.02] p-5 text-sm text-[#7a8ba8]"}>
+      No achievements unlocked yet.
+    </div>
   );
 }
 
@@ -2221,9 +2626,9 @@ function StatCard({ title, value, hint }) {
 
 function MiniStat({ title, value }) {
   return (
-    <div className="rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4">
-      <div className="text-[12px] text-[#7a8ba8]">{title}</div>
-      <div className="mt-2 text-lg font-extrabold text-white">{value}</div>
+    <div className="rounded-2xl border border-[#1a2438] bg-white/[0.03] px-4 py-3">
+      <div className="text-[11px] text-[#7a8ba8]">{title}</div>
+      <div className="mt-1 text-base font-extrabold text-white">{value}</div>
     </div>
   );
 }
@@ -2300,6 +2705,10 @@ function Icon({ kind, active = false }) {
   if (kind === "support") return <div className="text-sm font-black text-[#00ffb4]">CS</div>;
   if (kind === "trophy") return <div className="text-sm font-black text-[#00ffb4]">★</div>;
   if (kind === "badge") return <div className="text-sm font-black text-[#00ffb4]">✓</div>;
+
+  if (kind === "mobile") return <div className="text-xs font-black text-[#00ffb4]">MB</div>;
+  if (kind === "pre") return <div className="text-[10px] font-black text-[#00ffb4]">PRE</div>;
+  if (kind === "post") return <div className="text-[9px] font-black text-[#00ffb4]">POST</div>;
 
   return <div className={`h-4 w-4 rounded ${fill}`} />;
 }

@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "../firebase";
 import { fetchMobileScoreDocs, mergeMobileScoresIntoProfile } from "../utils/mobileScores";
 import ModuleContentWorkspace from "../Components/ModuleContentWorkspace";
+import AccountProfileModal from "../Components/AccountProfileModal";
 
 const PASSING_PERCENT = 60;
 const MODULE_ACTIVITY_GROUPS = [
@@ -140,6 +141,17 @@ function getFullName(data) {
   return fullName || data.name || data.displayName || "No Name";
 }
 
+function getProfilePhotoUrl(data) {
+  return (
+    data.avatarUrl ||
+    data.photoURL ||
+    data.profilePhotoUrl ||
+    data.profilePictureUrl ||
+    data.imageUrl ||
+    ""
+  );
+}
+
 function buildStudentRecord(docSnap, mobileScoreDocs = []) {
   const data = mergeMobileScoresIntoProfile(docSnap.data(), mobileScoreDocs);
   const quizProgress = data.quizProgress || {};
@@ -197,6 +209,7 @@ function buildStudentRecord(docSnap, mobileScoreDocs = []) {
 
   const completedCount = resultItems.filter((item) => item.completed).length;
   const passedCount = resultItems.filter((item) => item.passed).length;
+  const avatarUrl = getProfilePhotoUrl(data);
 
   return {
     id: docSnap.id,
@@ -204,6 +217,7 @@ function buildStudentRecord(docSnap, mobileScoreDocs = []) {
     name: getFullName(data),
     firstName: data.firstName || "",
     lastName: data.lastName || "",
+    avatarUrl,
     email: data.email || "No email",
     role: data.role || "student",
     studentId: data.studentId || data.studentID || data.schoolId || "",
@@ -251,17 +265,31 @@ export default function FacultyPage({ onLogout }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [user, setUser] = useState(null);
+  const [facultyProfile, setFacultyProfile] = useState(null);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("progress");
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
 
       if (currentUser) {
+        try {
+          const profileSnap = await getDoc(doc(db, "users", currentUser.uid));
+          setFacultyProfile(
+            profileSnap.exists()
+              ? { uid: currentUser.uid, email: currentUser.email, ...profileSnap.data() }
+              : { uid: currentUser.uid, email: currentUser.email, role: "faculty" }
+          );
+        } catch (profileError) {
+          console.error("Error loading faculty profile:", profileError);
+          setFacultyProfile({ uid: currentUser.uid, email: currentUser.email, role: "faculty" });
+        }
         fetchStudents();
       } else {
         setStudents([]);
         setSelectedStudentId(null);
+        setFacultyProfile(null);
         setLoading(false);
       }
     });
@@ -386,9 +414,24 @@ export default function FacultyPage({ onLogout }) {
                 Module Content
               </button>
             </div>
-            <div className="rounded-2xl border border-[#1a2438] bg-[#0d1220] px-4 py-3 text-sm text-[#dbe6f5]">
-              {user?.email || "Faculty"}
-            </div>
+            <button
+              type="button"
+              onClick={() => setIsProfileOpen(true)}
+              className="flex items-center gap-3 rounded-2xl border border-[#1a2438] bg-[#0d1220] px-4 py-3 text-sm text-[#dbe6f5] transition hover:bg-white/[0.04]"
+            >
+              <span className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-xl border border-[#00ffb4]/25 bg-[#00ffb4]/10 text-sm font-bold uppercase text-[#00ffb4]">
+                {facultyProfile?.avatarUrl ? (
+                  <img src={facultyProfile.avatarUrl} alt="Faculty profile" className="h-full w-full object-cover" />
+                ) : (
+                  (facultyProfile?.firstName || user?.email || "F").charAt(0).toUpperCase()
+                )}
+              </span>
+              <span className="max-w-[220px] truncate">
+                {facultyProfile?.firstName || facultyProfile?.lastName
+                  ? `${facultyProfile?.firstName || ""} ${facultyProfile?.lastName || ""}`.trim()
+                  : user?.email || "Faculty"}
+              </span>
+            </button>
             <button
               type="button"
               onClick={onLogout}
@@ -457,10 +500,19 @@ export default function FacultyPage({ onLogout }) {
                           : "hover:bg-white/5"
                       }`}
                     >
-                      <div>
-                        <div className="font-semibold text-white">{student.name}</div>
-                        <div className="text-xs text-[#7a8ba8] mt-1">
-                          {student.studentId ? `ID: ${student.studentId}` : student.section}
+                      <div className="flex min-w-0 items-center gap-3">
+                        <StudentAvatar student={student} />
+
+                        <div className="min-w-0">
+                          <div className="truncate font-semibold text-white">
+                            {student.name}
+                          </div>
+
+                          <div className="mt-1 truncate text-xs text-[#7a8ba8]">
+                            {student.studentId
+                              ? `ID: ${student.studentId}`
+                              : student.section || "No section assigned"}
+                          </div>
                         </div>
                       </div>
 
@@ -492,22 +544,62 @@ export default function FacultyPage({ onLogout }) {
           </div>
 
           <div className="space-y-4">
-            <div className="rounded-[28px] border border-[#1a2438] bg-[#0d1220] p-6 shadow-[0_25px_80px_rgba(0,0,0,0.25)]">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <div className="text-sm uppercase tracking-[0.28em] text-[#00ffb4]/70">Student profile</div>
-                  <div className="mt-3 text-2xl font-bold text-white">{selectedStudent?.name || "Select a student"}</div>
-                </div>
+            <div className="relative overflow-hidden rounded-[28px] border border-[#1a2438] bg-[#0d1220] p-6 shadow-[0_25px_80px_rgba(0,0,0,0.25)]">
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_8%_0%,rgba(0,255,180,0.11),transparent_34%)]" />
+              <div className="pointer-events-none absolute right-0 top-0 h-40 w-40 rounded-full bg-[#00ffb4]/5 blur-3xl" />
+
+              <div className="relative">
+                {selectedStudent ? (
+                  <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex min-w-0 items-center gap-5">
+                      <StudentAvatar student={selectedStudent} size="xl" />
+
+                      <div className="min-w-0">
+                        <div className="text-sm uppercase tracking-[0.28em] text-[#00ffb4]/70">
+                          Student profile
+                        </div>
+
+                        <div className="mt-2 truncate text-2xl font-bold text-white">
+                          {selectedStudent.name}
+                        </div>
+
+                        <div className="mt-1 truncate text-sm text-[#9fb0c9]">
+                          {selectedStudent.email}
+                        </div>
+
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {selectedStudent.studentId ? (
+                            <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-[#c8d4e6]">
+                              ID: {selectedStudent.studentId}
+                            </span>
+                          ) : null}
+
+                          {selectedStudent.section ? (
+                            <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-[#c8d4e6]">
+                              {selectedStudent.section}
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="self-start rounded-2xl border border-[#00ffb4]/20 bg-[#00ffb4]/10 px-4 py-2 text-sm capitalize text-[#b7fff0] sm:self-center">
+                      {selectedStudent.role}
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="text-sm uppercase tracking-[0.28em] text-[#00ffb4]/70">
+                      Student profile
+                    </div>
+                    <div className="mt-3 text-2xl font-bold text-white">
+                      Select a student
+                    </div>
+                  </div>
+                )}
 
                 {selectedStudent ? (
-                  <div className="rounded-2xl border border-[#00ffb4]/20 bg-[#00ffb4]/10 px-4 py-2 text-sm text-[#b7fff0]">
-                    {selectedStudent.role}
-                  </div>
-                ) : null}
-              </div>
-
-              {selectedStudent ? (
-                <div className="mt-6 space-y-5">
+                  <div className="mt-7 space-y-5">
                   <div className="grid gap-3 sm:grid-cols-2">
                     <DetailCard label="Email" value={selectedStudent.email} />
                     <DetailCard label="Section / Program" value={selectedStudent.section || "Not set"} />
@@ -543,15 +635,22 @@ export default function FacultyPage({ onLogout }) {
                     </div>
                   </div>
                 </div>
-              ) : (
-                <div className="mt-6 rounded-2xl border border-[#1a2438] bg-white/[0.03] p-6 text-sm text-[#9fb0c9]">
-                  Select a student from the list to view their profile and progress details.
-                </div>
-              )}
+                ) : (
+                  <div className="mt-6 rounded-2xl border border-[#1a2438] bg-white/[0.03] p-6 text-sm text-[#9fb0c9]">
+                    Select a student from the list to view their profile and progress details.
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
         )}
+        <AccountProfileModal
+          isOpen={isProfileOpen}
+          onClose={() => setIsProfileOpen(false)}
+          profile={facultyProfile}
+          onProfileUpdated={setFacultyProfile}
+        />
       </div>
     </div>
   );
@@ -563,6 +662,44 @@ function MetricCard({ label, value, subtext }) {
       <div className="text-sm uppercase tracking-[0.25em] text-[#7a8ba8]">{label}</div>
       <div className="mt-4 text-3xl font-black text-white">{value}</div>
       {subtext ? <div className="mt-2 text-sm text-[#9fb0c9]">{subtext}</div> : null}
+    </div>
+  );
+}
+
+function StudentAvatar({ student, size = "md" }) {
+  const [imageFailed, setImageFailed] = useState(false);
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [student?.avatarUrl]);
+
+  const dimension =
+    size === "xl"
+      ? "h-24 w-24 text-3xl ring-4 ring-[#00ffb4]/10"
+      : size === "lg"
+      ? "h-16 w-16 text-xl"
+      : "h-11 w-11 text-sm";
+
+  const fallback = (student?.name || student?.email || "S")
+    .charAt(0)
+    .toUpperCase();
+
+  const showImage = !!student?.avatarUrl && !imageFailed;
+
+  return (
+    <div
+      className={`${dimension} flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-[#00ffb4]/30 bg-[#00ffb4]/10 font-bold text-[#00ffb4] shadow-[0_12px_34px_rgba(0,0,0,0.28)]`}
+    >
+      {showImage ? (
+        <img
+          src={student.avatarUrl}
+          alt={`${student.name || "Student"} profile`}
+          className="h-full w-full object-cover"
+          onError={() => setImageFailed(true)}
+        />
+      ) : (
+        fallback
+      )}
     </div>
   );
 }
