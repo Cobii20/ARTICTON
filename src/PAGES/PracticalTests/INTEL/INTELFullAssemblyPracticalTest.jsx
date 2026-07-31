@@ -27,9 +27,8 @@ import { getUserSettings } from "../../../utils/userSettings";
 /*   - No pulsing green/teal install-target ghost, no wireframe        */
 /*     highlight, no floating "Install X here" callout. Only a neutral */
 /*     cursor change signals a part can be grabbed.                    */
-/*   - Every click and release is scored: installing a part whose      */
-/*     prerequisites are not met, or repeatedly releasing far from the */
-/*     target, counts against the final grade.                        */
+/*   - Only meaningful failed placement attempts are counted live.      */
+/*     Sequence errors and confirmed placement errors reduce the grade. */
 /*   - A results screen replaces the certificate, with score, grade,   */
 /*     time, and a mistake breakdown.                                  */
 /* ================================================================== */
@@ -101,16 +100,34 @@ const TABLE_STARTS = Object.freeze({
 
 const DEFAULT_SNAP_DISTANCE = 1;
 const DEFAULT_MAGNET_DISTANCE = 7;
-const DEFAULT_MAGNET_STRENGTH = 0.18;
-const MOVEMENT_SMOOTHING = 0.72;
-const ROTATION_SMOOTHING = 0.18;
+const MAGNETIC_SNAP_MIN_DURATION_MS = 620;
+const MAGNETIC_SNAP_MAX_DURATION_MS = 1800;
+const MAGNETIC_FIELD_CAPTURE_THRESHOLD = 0.12;
+const MAGNETIC_FIELD_AUTO_CAPTURE_THRESHOLD = 0.46;
+const MAGNETIC_FIELD_MIN_POINTER_TRAVEL_PX = 12;
+const MAGNETIC_FIELD_MIN_PULL = 0.08;
+const MAGNETIC_FIELD_MAX_PULL = 0.72;
+const MAGNETIC_ROUTE_CAPTURE_RATIO = 0.42;
+const HOST_FIELD_PADDING_RATIO = 0.3;
+const HOST_FIELD_FEATHER_RATIO = 0.58;
+const DRAG_FOLLOW_SPEED = 22;
+const ROTATION_FOLLOW_SPEED = 10;
 const TELEMETRY_FRAME_INTERVAL = 3;
-const TELEMETRY_IDLE_FRAME_INTERVAL = 18;
+const TELEMETRY_IDLE_FRAME_INTERVAL = 16;
+const CAMERA_FOCUS_DURATION_MS = 760;
+const CASE_GROUND_CLEARANCE = 0.025;
+const CASE_COMPONENT_CLEARANCE_MIN = 0.75;
+const BOARD_COMPONENT_CLEARANCE_MIN = 0.28;
+const FINAL_SEAT_CLEARANCE = 0.1;
+const CPU_SEAT_DEPTH_RATIO = 0.34;
+const CASE_STAND_TRANSITION_DURATION_MS = 2100;
+const CASE_STAND_CARD_DELAY_MS = CASE_STAND_TRANSITION_DURATION_MS + 300;
+const ASSEMBLY_UX_VERSION = "Safe-Path Magnet v6 + Verified Live Scoring";
 
 /* -------------------------- Grading rubric ------------------------- */
 const PENALTY_WRONG_ORDER_CLICK = 6;
 const PENALTY_FUMBLE = 3;
-const FUMBLE_THRESHOLD_PER_PART = 2;
+const ORDER_MISTAKE_DEBOUNCE_MS = 650;
 const TIME_PAR_SECONDS = 480;
 const PENALTY_PER_OVER_PAR_MINUTE = 2;
 
@@ -126,6 +143,28 @@ function formatDuration(totalSeconds) {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = Math.floor(totalSeconds % 60);
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+function calculateScore(wrongOrderCount, fumbleCount, elapsedSeconds) {
+  const safeElapsedSeconds = Math.max(0, Number(elapsedSeconds) || 0);
+  const overParMinutes = Math.max(
+    0,
+    Math.ceil((safeElapsedSeconds - TIME_PAR_SECONDS) / 60)
+  );
+  const orderPenaltyPoints = Math.max(0, wrongOrderCount) * PENALTY_WRONG_ORDER_CLICK;
+  const fumblePenaltyPoints = Math.max(0, fumbleCount) * PENALTY_FUMBLE;
+  const timePenaltyPoints = overParMinutes * PENALTY_PER_OVER_PAR_MINUTE;
+  const totalPenaltyPoints =
+    orderPenaltyPoints + fumblePenaltyPoints + timePenaltyPoints;
+
+  return {
+    score: Math.max(0, Math.min(100, Math.round(100 - totalPenaltyPoints))),
+    overParMinutes,
+    orderPenaltyPoints,
+    fumblePenaltyPoints,
+    timePenaltyPoints,
+    totalPenaltyPoints,
+  };
 }
 
 
@@ -234,6 +273,7 @@ function getModelBounds(scene) {
   return {
     center: bounds.getCenter(new THREE.Vector3()),
     size: bounds.getSize(new THREE.Vector3()),
+    box: bounds.clone(),
   };
 }
 
@@ -249,6 +289,109 @@ function getAutomaticLayFlatQuaternion(modelSize) {
   }
 
   return new THREE.Quaternion().setFromEuler(euler);
+}
+
+function getCaseLayFlatCandidates(modelSize) {
+  const dimensions = [modelSize.x, modelSize.y, modelSize.z];
+  const thinnestAxis = dimensions.indexOf(Math.min(...dimensions));
+
+  if (thinnestAxis === 0) {
+    return [
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, Math.PI / 2)),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, -Math.PI / 2)),
+    ];
+  }
+
+  if (thinnestAxis === 2) {
+    return [
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0)),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0)),
+    ];
+  }
+
+  return [new THREE.Quaternion()];
+}
+
+function chooseOpenSideUpCaseQuaternion(modelSize, caseCenter, targetCenters) {
+  const candidates = getCaseLayFlatCandidates(modelSize);
+  if (candidates.length === 1 || !targetCenters.length) return candidates[0];
+
+  /*
+   * The authored AMD/Intel case meshes expose their removable side panel on
+   * the opposite local normal from the component target origins. Choosing the
+   * candidate that puts those target origins lowest therefore leaves the open
+   * cavity facing upward. The previous max-score test selected the closed
+   * underside and made the case appear face-down.
+   */
+  let bestCandidate = candidates[0];
+  let bestScore = Infinity;
+
+  candidates.forEach((candidate) => {
+    const score = targetCenters.reduce((total, targetCenter) => {
+      const rotatedOffset = targetCenter
+        .clone()
+        .sub(caseCenter)
+        .applyQuaternion(candidate);
+      return total + rotatedOffset.y;
+    }, 0);
+
+    if (score < bestScore) {
+      bestScore = score;
+      bestCandidate = candidate;
+    }
+  });
+
+  return bestCandidate.clone();
+}
+
+function getCpuSeatCorrectionLocal(motherboardScene, cpuScene) {
+  const motherboardBounds = getModelBounds(motherboardScene);
+  const cpuBounds = getModelBounds(cpuScene);
+  const motherboardDimensions = [
+    motherboardBounds.size.x,
+    motherboardBounds.size.y,
+    motherboardBounds.size.z,
+  ];
+  const boardNormalAxis = motherboardDimensions.indexOf(
+    Math.min(...motherboardDimensions)
+  );
+
+  const centerDelta =
+    cpuBounds.center.getComponent(boardNormalAxis) -
+    motherboardBounds.center.getComponent(boardNormalAxis);
+  const outwardDirection = Math.sign(centerDelta) || 1;
+  const cpuNormalThickness = Math.max(
+    cpuBounds.size.getComponent(boardNormalAxis),
+    Math.min(cpuBounds.size.x, cpuBounds.size.y, cpuBounds.size.z),
+    0.001
+  );
+
+  // Move the CPU toward the motherboard plane by a controlled fraction of
+  // its thickness. This removes the authored visual gap without burying the
+  // package inside the socket and works at both AMD and Intel model scales.
+  const seatDepth = cpuNormalThickness * CPU_SEAT_DEPTH_RATIO;
+  const offset = new THREE.Vector3();
+  offset.setComponent(boardNormalAxis, -outwardDirection * seatDepth);
+  return offset;
+}
+
+function getGroundedRotationOffsetY(bounds, pivot, quaternion) {
+  const rotatedBounds = new THREE.Box3();
+  const { min, max } = bounds;
+
+  for (const x of [min.x, max.x]) {
+    for (const y of [min.y, max.y]) {
+      for (const z of [min.z, max.z]) {
+        const corner = new THREE.Vector3(x, y, z)
+          .sub(pivot)
+          .applyQuaternion(quaternion)
+          .add(pivot);
+        rotatedBounds.expandByPoint(corner);
+      }
+    }
+  }
+
+  return bounds.min.y - rotatedBounds.min.y + CASE_GROUND_CLEARANCE;
 }
 
 function StaticAuthoredModel({ part, disableRaycast = true }) {
@@ -280,11 +423,15 @@ function InteractiveCenteredObject({
   modelSize,
   startConfig,
   targetFrameRef = null,
-  isReachable,
-  isCompleted,
+  magnetFieldRef = null,
+  targetSeatOffsetLocal = null,
+  isActive,
   testActive,
+  isFullRun = false,
+  showGuides = true,
+  isCompleted,
   onPartCompleted,
-  onInvalidClick,
+  onLockedPartClick,
   onFumble,
   onInteractionMessage,
   onDragStateChange,
@@ -295,30 +442,53 @@ function InteractiveCenteredObject({
   const { camera, gl } = useThree();
   const groupRef = useRef(null);
   const rotationRef = useRef(null);
+  const tetherRef = useRef(null);
+  const tetherMaterialRef = useRef(null);
+  const captureRingRef = useRef(null);
+  const captureRingMaterialRef = useRef(null);
+
   const phaseRef = useRef("ready");
   const [phase, setPhase] = useState("ready");
   const grabbingRef = useRef(false);
   const completionReportedRef = useRef(false);
-  const grabStartedAtRef = useRef(0);
   const frameCounterRef = useRef(0);
-  const initialHorizontalDistanceRef = useRef(1);
   const fumbleCountRef = useRef(0);
+  const initialDistanceRef = useRef(1);
+  const magnetStateRef = useRef("Move toward host field");
+  const magnetNoticeRef = useRef(false);
 
-  const mouseRef = useRef(new THREE.Vector2());
-  const raycasterRef = useRef(new THREE.Raycaster());
-  const dragPlaneRef = useRef(new THREE.Plane());
-  const dragOffsetRef = useRef(new THREE.Vector3());
-  const hitPointRef = useRef(new THREE.Vector3());
+  const snapStartedAtRef = useRef(0);
+  const snapDurationRef = useRef(MAGNETIC_SNAP_MIN_DURATION_MS);
+  const snapStartPositionRef = useRef(new THREE.Vector3());
+  const snapStartQuaternionRef = useRef(new THREE.Quaternion());
+  const snapLiftPositionRef = useRef(new THREE.Vector3());
+  const snapHoverPositionRef = useRef(new THREE.Vector3());
+  const snapPreSeatPositionRef = useRef(new THREE.Vector3());
+  const routeGoalRef = useRef(new THREE.Vector3());
+  const routeWorldPointRef = useRef(new THREE.Vector3());
+
+  const pointerClientRef = useRef(new THREE.Vector2());
+  const pointerStartRef = useRef(new THREE.Vector2());
+  const dragStartCenterWorldRef = useRef(new THREE.Vector3());
+  const dragRightWorldRef = useRef(new THREE.Vector3(1, 0, 0));
+  const dragUpWorldRef = useRef(new THREE.Vector3(0, 0, 1));
+  const worldUnitsPerPixelRef = useRef(0.02);
+  const safeCarryYRef = useRef(0);
+  const dragStartYRef = useRef(0);
+  const dragCurrentYRef = useRef(0);
+
   const desiredCenterWorldRef = useRef(new THREE.Vector3());
   const desiredCenterLocalRef = useRef(new THREE.Vector3());
   const desiredGroupLocalRef = useRef(new THREE.Vector3());
+  const assistedGoalRef = useRef(new THREE.Vector3());
+  const desiredVisualCenterWorldRef = useRef(new THREE.Vector3());
   const currentCenterLocalRef = useRef(new THREE.Vector3());
-  const currentCenterWorldRef = useRef(new THREE.Vector3());
-  const cameraDirectionRef = useRef(new THREE.Vector3());
-  const worldUpRef = useRef(new THREE.Vector3(0, 1, 0));
   const targetCenterLocalRef = useRef(new THREE.Vector3());
+  const currentCenterWorldRef = useRef(new THREE.Vector3());
   const targetCenterWorldRef = useRef(new THREE.Vector3());
-  const lockedTargetYRef = useRef(0);
+  const cameraForwardRef = useRef(new THREE.Vector3());
+  const cameraRightRef = useRef(new THREE.Vector3());
+  const cameraUpRef = useRef(new THREE.Vector3());
 
   const targetPositionRef = useRef(new THREE.Vector3());
   const targetQuaternionRef = useRef(new THREE.Quaternion());
@@ -326,11 +496,25 @@ function InteractiveCenteredObject({
   const authoredCenterLocalRef = useRef(new THREE.Vector3());
   const targetWorldQuaternionRef = useRef(new THREE.Quaternion());
   const parentWorldQuaternionRef = useRef(new THREE.Quaternion());
+  const seatOffsetParentLocalRef = useRef(new THREE.Vector3());
+
+  const hostBoundsRef = useRef(new THREE.Box3());
+  const expandedHostBoundsRef = useRef(new THREE.Box3());
+  const closestHostPointRef = useRef(new THREE.Vector3());
+  const hostSizeRef = useRef(new THREE.Vector3());
+  const lineStartRef = useRef(new THREE.Vector3());
+  const lineEndRef = useRef(new THREE.Vector3());
 
   const isMovablePart = MOVABLE_COMPONENT_KEYS.has(partKey);
-  const canInteract = isMovablePart && testActive && !isCompleted;
+  const canInteract = isMovablePart && testActive && isActive && !isCompleted;
+  const shouldShowGuides = showGuides && isActive;
 
   const installedQuaternion = useMemo(() => new THREE.Quaternion(), []);
+  const targetSeatOffsetVector = useMemo(() => {
+    if (!targetSeatOffsetLocal) return new THREE.Vector3();
+    if (targetSeatOffsetLocal.isVector3) return targetSeatOffsetLocal.clone();
+    return new THREE.Vector3().fromArray(targetSeatOffsetLocal);
+  }, [targetSeatOffsetLocal]);
   const tableQuaternion = useMemo(() => {
     if (startConfig?.preserveTableRotation) return installedQuaternion.clone();
     return getAutomaticLayFlatQuaternion(modelSize);
@@ -339,20 +523,24 @@ function InteractiveCenteredObject({
   const startPosition = startConfig?.position || [0, 0, 0];
   const snapDistance = startConfig?.snapDistance ?? DEFAULT_SNAP_DISTANCE;
   const magnetDistance = startConfig?.magnetDistance ?? DEFAULT_MAGNET_DISTANCE;
+  const modelRadius = useMemo(
+    () => Math.max(modelSize.length() * 0.5, 0.35),
+    [modelSize]
+  );
+  const captureRingRadius = THREE.MathUtils.clamp(
+    Math.max(snapDistance * 1.6, modelRadius * 0.25),
+    0.55,
+    4.5
+  );
 
   const setPhaseSafely = useCallback((nextPhase) => {
     phaseRef.current = nextPhase;
     setPhase(nextPhase);
   }, []);
 
-  const updateMouse = useCallback(
-    (event) => {
-      const rect = gl.domElement.getBoundingClientRect();
-      mouseRef.current.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-      mouseRef.current.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-    },
-    [gl]
-  );
+  const updatePointer = useCallback((event) => {
+    pointerClientRef.current.set(event.clientX, event.clientY);
+  }, []);
 
   const computeInstallationTarget = useCallback(() => {
     const parent = groupRef.current?.parent || null;
@@ -360,11 +548,16 @@ function InteractiveCenteredObject({
     if (!targetFrameRef?.current) {
       targetPositionRef.current.set(0, 0, 0);
       targetQuaternionRef.current.identity();
-      return { position: targetPositionRef.current, quaternion: targetQuaternionRef.current };
+      return {
+        position: targetPositionRef.current,
+        quaternion: targetQuaternionRef.current,
+      };
     }
 
     targetFrameRef.current.updateWorldMatrix(true, false);
-    authoredCenterWorldRef.current.copy(modelCenter).applyMatrix4(targetFrameRef.current.matrixWorld);
+    authoredCenterWorldRef.current
+      .copy(modelCenter)
+      .applyMatrix4(targetFrameRef.current.matrixWorld);
 
     authoredCenterLocalRef.current.copy(authoredCenterWorldRef.current);
     if (parent) {
@@ -372,27 +565,67 @@ function InteractiveCenteredObject({
       parent.worldToLocal(authoredCenterLocalRef.current);
     }
 
-    targetPositionRef.current.copy(authoredCenterLocalRef.current).sub(modelCenter);
+    targetPositionRef.current
+      .copy(authoredCenterLocalRef.current)
+      .sub(modelCenter);
+
     targetFrameRef.current.getWorldQuaternion(targetWorldQuaternionRef.current);
+    seatOffsetParentLocalRef.current
+      .copy(targetSeatOffsetVector)
+      .applyQuaternion(targetWorldQuaternionRef.current);
 
     if (parent) {
       parent.getWorldQuaternion(parentWorldQuaternionRef.current);
+      parentWorldQuaternionRef.current.invert();
+      seatOffsetParentLocalRef.current.applyQuaternion(
+        parentWorldQuaternionRef.current
+      );
+      targetPositionRef.current.add(seatOffsetParentLocalRef.current);
       targetQuaternionRef.current
         .copy(parentWorldQuaternionRef.current)
-        .invert()
         .multiply(targetWorldQuaternionRef.current);
     } else {
+      targetPositionRef.current.add(seatOffsetParentLocalRef.current);
       targetQuaternionRef.current.copy(targetWorldQuaternionRef.current);
     }
 
-    return { position: targetPositionRef.current, quaternion: targetQuaternionRef.current };
-  }, [modelCenter, targetFrameRef]);
+    return {
+      position: targetPositionRef.current,
+      quaternion: targetQuaternionRef.current,
+    };
+  }, [modelCenter, targetFrameRef, targetSeatOffsetVector]);
+
+  const localGroupCenterToWorld = useCallback(
+    (groupPosition, output) => {
+      output.copy(groupPosition).add(modelCenter);
+      const parent = groupRef.current?.parent;
+      if (parent) {
+        parent.updateWorldMatrix(true, false);
+        parent.localToWorld(output);
+      }
+      return output;
+    },
+    [modelCenter]
+  );
+
+  const worldCenterToLocalGroupPosition = useCallback(
+    (worldCenter, output) => {
+      output.copy(worldCenter);
+      const parent = groupRef.current?.parent;
+      if (parent) {
+        parent.updateWorldMatrix(true, false);
+        parent.worldToLocal(output);
+      }
+      output.sub(modelCenter);
+      return output;
+    },
+    [modelCenter]
+  );
 
   const getVisualCenters = useCallback(
     (installationTarget) => {
       currentCenterLocalRef.current.copy(groupRef.current.position).add(modelCenter);
       targetCenterLocalRef.current.copy(installationTarget.position).add(modelCenter);
-
       currentCenterWorldRef.current.copy(currentCenterLocalRef.current);
       targetCenterWorldRef.current.copy(targetCenterLocalRef.current);
 
@@ -413,46 +646,214 @@ function InteractiveCenteredObject({
     [modelCenter]
   );
 
+  const getHostFieldInfo = useCallback(
+    (worldPosition, targetWorldPosition) => {
+      const host = magnetFieldRef?.current;
+      if (!host) {
+        const distance = worldPosition.distanceTo(targetWorldPosition);
+        const radius = Math.max(magnetDistance * 1.6, modelRadius * 2.2);
+        return {
+          inside: distance <= radius * 0.45,
+          strength: THREE.MathUtils.clamp(1 - distance / radius, 0, 1),
+          outsideDistance: distance,
+        };
+      }
+
+      host.updateWorldMatrix(true, true);
+      hostBoundsRef.current.setFromObject(host);
+      if (hostBoundsRef.current.isEmpty()) {
+        const distance = worldPosition.distanceTo(targetWorldPosition);
+        const radius = Math.max(magnetDistance * 1.6, modelRadius * 2.2);
+        return {
+          inside: distance <= radius * 0.45,
+          strength: THREE.MathUtils.clamp(1 - distance / radius, 0, 1),
+          outsideDistance: distance,
+        };
+      }
+
+      hostBoundsRef.current.getSize(hostSizeRef.current);
+      const largestHostDimension = Math.max(
+        hostSizeRef.current.x,
+        hostSizeRef.current.y,
+        hostSizeRef.current.z,
+        1
+      );
+      const padding = Math.max(
+        largestHostDimension * HOST_FIELD_PADDING_RATIO,
+        magnetDistance * 0.35,
+        modelRadius * 0.45
+      );
+      const feather = Math.max(
+        largestHostDimension * HOST_FIELD_FEATHER_RATIO,
+        magnetDistance,
+        modelRadius * 1.5
+      );
+
+      expandedHostBoundsRef.current.copy(hostBoundsRef.current).expandByScalar(padding);
+      expandedHostBoundsRef.current.clampPoint(
+        worldPosition,
+        closestHostPointRef.current
+      );
+      const outsideDistance = worldPosition.distanceTo(closestHostPointRef.current);
+      const inside = expandedHostBoundsRef.current.containsPoint(worldPosition);
+      const strength = inside
+        ? 1
+        : THREE.MathUtils.clamp(1 - outsideDistance / feather, 0, 1);
+
+      return { inside, strength, outsideDistance };
+    },
+    [magnetDistance, magnetFieldRef, modelRadius]
+  );
+
+  const computeSafeApproachPlan = useCallback(
+    (installationTarget, centers) => {
+      const host = magnetFieldRef?.current;
+      let hostTopWorldY = Math.max(
+        centers.currentWorld.y,
+        centers.targetWorld.y
+      );
+
+      if (host) {
+        host.updateWorldMatrix(true, true);
+        hostBoundsRef.current.setFromObject(host);
+        if (!hostBoundsRef.current.isEmpty()) {
+          hostTopWorldY = hostBoundsRef.current.max.y;
+        }
+      }
+
+      const isBoardComponent = MOTHERBOARD_CHILD_KEYS.has(partKey);
+      const clearance = isBoardComponent
+        ? THREE.MathUtils.clamp(
+            modelRadius * 0.12,
+            BOARD_COMPONENT_CLEARANCE_MIN,
+            1.35
+          )
+        : THREE.MathUtils.clamp(
+            modelRadius * 0.16,
+            CASE_COMPONENT_CLEARANCE_MIN,
+            4.5
+          );
+      const safeCenterWorldY = Math.max(
+        hostTopWorldY + clearance,
+        centers.currentWorld.y,
+        centers.targetWorld.y + clearance
+      );
+      const finalSeatLift = Math.max(
+        FINAL_SEAT_CLEARANCE,
+        Math.min(clearance * 0.22, 0.45)
+      );
+
+      routeWorldPointRef.current
+        .copy(centers.currentWorld)
+        .setY(safeCenterWorldY);
+      worldCenterToLocalGroupPosition(
+        routeWorldPointRef.current,
+        snapLiftPositionRef.current
+      );
+
+      routeWorldPointRef.current
+        .copy(centers.targetWorld)
+        .setY(safeCenterWorldY);
+      worldCenterToLocalGroupPosition(
+        routeWorldPointRef.current,
+        snapHoverPositionRef.current
+      );
+
+      routeWorldPointRef.current
+        .copy(centers.targetWorld)
+        .setY(centers.targetWorld.y + finalSeatLift);
+      worldCenterToLocalGroupPosition(
+        routeWorldPointRef.current,
+        snapPreSeatPositionRef.current
+      );
+
+      return {
+        target: installationTarget.position,
+        lift: snapLiftPositionRef.current,
+        hover: snapHoverPositionRef.current,
+        preSeat: snapPreSeatPositionRef.current,
+        safeCenterWorldY,
+        clearance,
+      };
+    },
+    [magnetFieldRef, modelRadius, partKey, worldCenterToLocalGroupPosition]
+  );
+
   const publishTelemetry = useCallback(() => {
-    if (!groupRef.current || !isMovablePart || !onTelemetry) return;
+    if (!groupRef.current || !isMovablePart || !onTelemetry || !isActive) return;
 
     const installationTarget = computeInstallationTarget();
     const centers = getVisualCenters(installationTarget);
-    const horizontalDistance = Math.hypot(
-      centers.currentLocal.x - centers.targetLocal.x,
-      centers.currentLocal.z - centers.targetLocal.z
-    );
+    const distance = centers.currentWorld.distanceTo(centers.targetWorld);
     const progress = THREE.MathUtils.clamp(
-      1 - horizontalDistance / Math.max(initialHorizontalDistanceRef.current, 0.001),
+      1 - distance / Math.max(initialDistanceRef.current, 0.001),
       0,
       1
     );
 
-    onTelemetry({ key: partKey, label, phase: phaseRef.current, distance: horizontalDistance, progress });
-  }, [computeInstallationTarget, getVisualCenters, isMovablePart, label, onTelemetry, partKey]);
+    onTelemetry({
+      key: partKey,
+      label,
+      phase: phaseRef.current,
+      position: centers.currentWorld.toArray(),
+      targetPosition: centers.targetWorld.toArray(),
+      distance,
+      captureDistance: Math.max(magnetDistance, initialDistanceRef.current * MAGNETIC_ROUTE_CAPTURE_RATIO),
+      hardSnapDistance: snapDistance,
+      progress,
+      magnetState: magnetStateRef.current,
+      yLocked: false,
+    });
+  }, [
+    computeInstallationTarget,
+    getVisualCenters,
+    isActive,
+    isMovablePart,
+    label,
+    magnetDistance,
+    onTelemetry,
+    partKey,
+    snapDistance,
+  ]);
 
   useEffect(() => {
     if (!groupRef.current || !rotationRef.current) return;
 
     const target = computeInstallationTarget();
-    lockedTargetYRef.current = target.position.y;
+    completionReportedRef.current = false;
+    grabbingRef.current = false;
+    magnetNoticeRef.current = false;
 
-    if (isCompleted || phaseRef.current === "installed") {
+    if (isCompleted) {
       groupRef.current.position.copy(target.position);
       rotationRef.current.quaternion.copy(target.quaternion);
+      magnetStateRef.current = "Installed";
       setPhaseSafely("installed");
     } else {
       groupRef.current.position.set(...startPosition);
       rotationRef.current.quaternion.copy(tableQuaternion);
+      dragCurrentYRef.current = groupRef.current.position.y;
+      magnetStateRef.current = "Move toward host field";
+      setPhaseSafely("ready");
     }
 
     groupRef.current.updateMatrixWorld(true);
-
-    initialHorizontalDistanceRef.current = Math.max(
-      Math.hypot(groupRef.current.position.x - target.position.x, groupRef.current.position.z - target.position.z),
+    initialDistanceRef.current = Math.max(
+      groupRef.current.position.distanceTo(target.position),
+      magnetDistance,
       1
     );
-  }, [computeInstallationTarget, isCompleted, setPhaseSafely, startPosition, tableQuaternion]);
+
+    requestAnimationFrame(() => publishTelemetry());
+  }, [
+    computeInstallationTarget,
+    isCompleted,
+    magnetDistance,
+    publishTelemetry,
+    setPhaseSafely,
+    startPosition,
+    tableQuaternion,
+  ]);
 
   const reportCompletion = useCallback(() => {
     if (completionReportedRef.current || isCompleted) return;
@@ -460,124 +861,256 @@ function InteractiveCenteredObject({
     onPartCompleted(partKey);
   }, [isCompleted, onPartCompleted, partKey]);
 
-  const installObject = useCallback(() => {
+  const finishInstall = useCallback(() => {
     if (!groupRef.current || !rotationRef.current) return;
-
     const target = computeInstallationTarget();
     groupRef.current.position.copy(target.position);
     rotationRef.current.quaternion.copy(target.quaternion);
     groupRef.current.updateMatrixWorld(true);
-
     grabbingRef.current = false;
+    magnetStateRef.current = "Installed";
+    magnetNoticeRef.current = false;
     onDragStateChange(false);
     document.body.style.cursor = "default";
     setPhaseSafely("installed");
-    onInteractionMessage(`${label} installed and locked correctly.`);
+    onInteractionMessage(
+      `${label} was magnetically aligned, animated into its seat, and locked in place.`
+    );
     publishTelemetry();
     reportCompletion();
-  }, [computeInstallationTarget, label, onDragStateChange, onInteractionMessage, publishTelemetry, reportCompletion, setPhaseSafely]);
+  }, [
+    computeInstallationTarget,
+    label,
+    onDragStateChange,
+    onInteractionMessage,
+    publishTelemetry,
+    reportCompletion,
+    setPhaseSafely,
+  ]);
+
+  const seatComponent = useCallback(() => {
+    if (
+      !groupRef.current ||
+      !rotationRef.current ||
+      phaseRef.current === "snapping" ||
+      phaseRef.current === "installed"
+    ) {
+      return;
+    }
+
+    const target = computeInstallationTarget();
+    const centers = getVisualCenters(target);
+    const route = computeSafeApproachPlan(target, centers);
+
+    snapStartPositionRef.current.copy(groupRef.current.position);
+    snapStartQuaternionRef.current.copy(rotationRef.current.quaternion);
+
+    const pathDistance =
+      snapStartPositionRef.current.distanceTo(route.lift) +
+      route.lift.distanceTo(route.hover) +
+      route.hover.distanceTo(route.preSeat) +
+      route.preSeat.distanceTo(target.position);
+
+    snapStartedAtRef.current = performance.now();
+    snapDurationRef.current = THREE.MathUtils.clamp(
+      MAGNETIC_SNAP_MIN_DURATION_MS + pathDistance * 34,
+      MAGNETIC_SNAP_MIN_DURATION_MS,
+      MAGNETIC_SNAP_MAX_DURATION_MS
+    );
+
+    grabbingRef.current = false;
+    magnetStateRef.current = "Safe-path magnetic capture";
+    onDragStateChange(false);
+    document.body.style.cursor = "default";
+    setPhaseSafely("snapping");
+    onInteractionMessage(
+      `The invisible ${MOTHERBOARD_CHILD_KEYS.has(partKey) ? "motherboard" : "case"} field captured ${label}. It will lift, align above the opening, lower vertically, and seat without passing through the chassis.`
+    );
+  }, [
+    computeInstallationTarget,
+    computeSafeApproachPlan,
+    getVisualCenters,
+    label,
+    onDragStateChange,
+    onFumble,
+    onInteractionMessage,
+    partKey,
+    setPhaseSafely,
+  ]);
 
   const beginGrab = useCallback(
     (event) => {
-      if (!groupRef.current) return;
-      updateMouse(event);
+      if (!groupRef.current || !rotationRef.current) return;
+      updatePointer(event);
 
-      const installationTarget = computeInstallationTarget();
-      lockedTargetYRef.current = installationTarget.position.y;
-      groupRef.current.position.y = lockedTargetYRef.current;
-      groupRef.current.updateMatrixWorld(true);
-
-      const centers = getVisualCenters(installationTarget);
-      raycasterRef.current.setFromCamera(mouseRef.current, camera);
-
-      camera.getWorldDirection(cameraDirectionRef.current).normalize();
-      const isNearlyParallel = Math.abs(raycasterRef.current.ray.direction.dot(worldUpRef.current)) < 0.08;
-
-      if (isNearlyParallel) {
-        cameraDirectionRef.current.y = cameraDirectionRef.current.y < 0 ? -0.32 : 0.32;
-        cameraDirectionRef.current.normalize();
-        dragPlaneRef.current.setFromNormalAndCoplanarPoint(cameraDirectionRef.current, centers.targetWorld);
-      } else {
-        dragPlaneRef.current.setFromNormalAndCoplanarPoint(worldUpRef.current, centers.targetWorld);
-      }
-
-      if (raycasterRef.current.ray.intersectPlane(dragPlaneRef.current, hitPointRef.current)) {
-        dragOffsetRef.current.copy(centers.currentWorld).sub(hitPointRef.current);
-        dragOffsetRef.current.y = 0;
-      } else {
-        dragOffsetRef.current.set(0, 0, 0);
-      }
-
-      initialHorizontalDistanceRef.current = Math.max(
-        Math.hypot(
-          groupRef.current.position.x - installationTarget.position.x,
-          groupRef.current.position.z - installationTarget.position.z
-        ),
+      const target = computeInstallationTarget();
+      const centers = getVisualCenters(target);
+      pointerStartRef.current.copy(pointerClientRef.current);
+      dragStartCenterWorldRef.current.copy(centers.currentWorld);
+      dragStartYRef.current = groupRef.current.position.y;
+      dragCurrentYRef.current = groupRef.current.position.y;
+      initialDistanceRef.current = Math.max(
+        groupRef.current.position.distanceTo(target.position),
+        magnetDistance,
         1
+      );
+      const safeRoute = computeSafeApproachPlan(target, centers);
+      safeCarryYRef.current = safeRoute.lift.y;
+
+      cameraRightRef.current.set(1, 0, 0).applyQuaternion(camera.quaternion);
+      cameraUpRef.current.set(0, 1, 0).applyQuaternion(camera.quaternion);
+      camera.getWorldDirection(cameraForwardRef.current);
+
+      dragRightWorldRef.current
+        .copy(cameraRightRef.current)
+        .setY(0);
+      if (dragRightWorldRef.current.lengthSq() < 0.0001) {
+        dragRightWorldRef.current.set(1, 0, 0);
+      } else {
+        dragRightWorldRef.current.normalize();
+      }
+
+      dragUpWorldRef.current.copy(cameraUpRef.current).setY(0);
+      if (dragUpWorldRef.current.lengthSq() < 0.0001) {
+        dragUpWorldRef.current
+          .copy(cameraForwardRef.current)
+          .setY(0)
+          .multiplyScalar(-1);
+      }
+      if (dragUpWorldRef.current.lengthSq() < 0.0001) {
+        dragUpWorldRef.current.set(0, 0, 1);
+      } else {
+        dragUpWorldRef.current.normalize();
+      }
+
+      const distanceToCamera = Math.max(
+        camera.position.distanceTo(centers.currentWorld),
+        1
+      );
+      const visibleHeight =
+        2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * distanceToCamera;
+      worldUnitsPerPixelRef.current = THREE.MathUtils.clamp(
+        visibleHeight / Math.max(gl.domElement.clientHeight, 1),
+        0.002,
+        0.35
       );
 
       grabbingRef.current = true;
-      grabStartedAtRef.current = performance.now();
+      magnetStateRef.current = "Carrying toward host field";
+      magnetNoticeRef.current = false;
       setPhaseSafely("grabbed");
       onDragStateChange(true);
       document.body.style.cursor = "grabbing";
-      onInteractionMessage(`${label} grabbed. Guide it to its socket, then click again to release.`);
+      onInteractionMessage(
+        `${label} grabbed. Drag it toward the ${MOTHERBOARD_CHILD_KEYS.has(partKey) ? "motherboard" : "case"}; entering the invisible field will automatically start the seating animation.`
+      );
       publishTelemetry();
     },
-    [camera, computeInstallationTarget, getVisualCenters, label, onDragStateChange, onInteractionMessage, publishTelemetry, setPhaseSafely, updateMouse]
+    [
+      camera,
+      computeInstallationTarget,
+      computeSafeApproachPlan,
+      getVisualCenters,
+      gl,
+      label,
+      magnetDistance,
+      modelRadius,
+      onDragStateChange,
+      onInteractionMessage,
+      partKey,
+      publishTelemetry,
+      setPhaseSafely,
+      updatePointer,
+    ]
   );
 
   const releaseObject = useCallback(() => {
     if (!grabbingRef.current || !groupRef.current) return;
-
     grabbingRef.current = false;
     onDragStateChange(false);
     document.body.style.cursor = "default";
 
     const target = computeInstallationTarget();
-    const horizontalDistance = Math.hypot(
-      groupRef.current.position.x - target.position.x,
-      groupRef.current.position.z - target.position.z
+    const centers = getVisualCenters(target);
+    const field = getHostFieldInfo(centers.currentWorld, centers.targetWorld);
+    const distance = groupRef.current.position.distanceTo(target.position);
+    const routeCaptureDistance = Math.max(
+      magnetDistance * 1.25,
+      initialDistanceRef.current * MAGNETIC_ROUTE_CAPTURE_RATIO
     );
-    const releaseSnapDistance = snapDistance * 1.25;
 
-    if (horizontalDistance <= releaseSnapDistance) {
-      installObject();
+    if (
+      field.inside ||
+      field.strength >= MAGNETIC_FIELD_CAPTURE_THRESHOLD ||
+      distance <= routeCaptureDistance
+    ) {
+      seatComponent();
       return;
     }
 
-    fumbleCountRef.current += 1;
-    if (fumbleCountRef.current > FUMBLE_THRESHOLD_PER_PART) {
-      onFumble(partKey);
+    const pointerTravel = Math.hypot(
+      pointerClientRef.current.x - pointerStartRef.current.x,
+      pointerClientRef.current.y - pointerStartRef.current.y
+    );
+
+    if (pointerTravel < MAGNETIC_FIELD_MIN_POINTER_TRAVEL_PX) {
+      magnetStateRef.current = "Released without placement attempt";
+      setPhaseSafely("released");
+      onInteractionMessage(
+        `${label} was released without a meaningful drag. No placement error was recorded.`
+      );
+      publishTelemetry();
+      return;
     }
 
+    const nextFumbleCount = fumbleCountRef.current + 1;
+    fumbleCountRef.current = nextFumbleCount;
+    onFumble?.(partKey, { attempt: nextFumbleCount });
+
+    magnetStateRef.current = "Released outside host field";
     setPhaseSafely("released");
-    onInteractionMessage(`${label} released away from its socket. Grab it again and move it closer.`);
+    onInteractionMessage(
+      `${label} was released outside the magnetic field. Drag it closer to the ${MOTHERBOARD_CHILD_KEYS.has(partKey) ? "motherboard" : "case"}; exact placement is not required.`
+    );
     publishTelemetry();
-  }, [computeInstallationTarget, installObject, label, onDragStateChange, onFumble, onInteractionMessage, partKey, publishTelemetry, setPhaseSafely, snapDistance]);
+  }, [
+    computeInstallationTarget,
+    getHostFieldInfo,
+    getVisualCenters,
+    label,
+    magnetDistance,
+    onDragStateChange,
+    onInteractionMessage,
+    partKey,
+    publishTelemetry,
+    seatComponent,
+    setPhaseSafely,
+  ]);
 
   useEffect(() => {
-    const handlePointerMove = (event) => updateMouse(event);
-    gl.domElement.addEventListener("pointermove", handlePointerMove);
-    return () => gl.domElement.removeEventListener("pointermove", handlePointerMove);
-  }, [gl, updateMouse]);
+    const handlePointerMove = (event) => updatePointer(event);
+    window.addEventListener("pointermove", handlePointerMove, { passive: true });
+    return () => window.removeEventListener("pointermove", handlePointerMove);
+  }, [updatePointer]);
 
   useEffect(() => {
     if (phase !== "grabbed") return undefined;
 
-    const handleReleaseClick = (event) => {
+    const handlePointerUp = (event) => {
       if (event.button !== 0) return;
-      if (performance.now() - grabStartedAtRef.current < 140) return;
-
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation?.();
       releaseObject();
     };
+    const handleEscape = (event) => {
+      if (event.key === "Escape") releaseObject();
+    };
 
-    gl.domElement.addEventListener("pointerdown", handleReleaseClick, true);
-    return () => gl.domElement.removeEventListener("pointerdown", handleReleaseClick, true);
-  }, [gl, phase, releaseObject]);
+    window.addEventListener("pointerup", handlePointerUp, true);
+    window.addEventListener("keydown", handleEscape);
+    return () => {
+      window.removeEventListener("pointerup", handlePointerUp, true);
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, [phase, releaseObject]);
 
   useEffect(() => {
     const cancelGrab = () => {
@@ -587,110 +1120,317 @@ function InteractiveCenteredObject({
       document.body.style.cursor = "default";
       setPhaseSafely("released");
     };
-
     window.addEventListener("pointercancel", cancelGrab);
     window.addEventListener("blur", cancelGrab);
     return () => {
       window.removeEventListener("pointercancel", cancelGrab);
       window.removeEventListener("blur", cancelGrab);
-      if (grabbingRef.current) onDragStateChange(false);
       document.body.style.cursor = "default";
     };
   }, [onDragStateChange, setPhaseSafely]);
 
-  useFrame(() => {
+  useFrame(({ clock }, delta) => {
     if (!groupRef.current || !rotationRef.current) return;
+    const safeDelta = Math.min(delta, 0.05);
+    const target = computeInstallationTarget();
+    const centers = getVisualCenters(target);
+    const distance = groupRef.current.position.distanceTo(target.position);
+    const routeCaptureDistance = Math.max(
+      magnetDistance * 1.25,
+      initialDistanceRef.current * MAGNETIC_ROUTE_CAPTURE_RATIO
+    );
+    const proximity = THREE.MathUtils.clamp(
+      1 - distance / Math.max(routeCaptureDistance, 0.001),
+      0,
+      1
+    );
 
-    const installationTarget = computeInstallationTarget();
-
-    if (grabbingRef.current) {
-      lockedTargetYRef.current = installationTarget.position.y;
-      groupRef.current.position.y = lockedTargetYRef.current;
-
-      raycasterRef.current.setFromCamera(mouseRef.current, camera);
-
-      if (raycasterRef.current.ray.intersectPlane(dragPlaneRef.current, hitPointRef.current)) {
-        desiredCenterWorldRef.current.copy(hitPointRef.current).add(dragOffsetRef.current);
-
-        desiredCenterLocalRef.current.copy(desiredCenterWorldRef.current);
-        const parent = groupRef.current.parent;
-        if (parent) parent.worldToLocal(desiredCenterLocalRef.current);
-
-        desiredGroupLocalRef.current.copy(desiredCenterLocalRef.current).sub(modelCenter);
-        desiredGroupLocalRef.current.y = lockedTargetYRef.current;
-
-        const desiredDistance = Math.hypot(
-          desiredGroupLocalRef.current.x - installationTarget.position.x,
-          desiredGroupLocalRef.current.z - installationTarget.position.z
+    if (shouldShowGuides && phaseRef.current !== "installed") {
+      if (tetherRef.current) {
+        lineStartRef.current.copy(centers.currentLocal);
+        lineEndRef.current.copy(centers.targetLocal);
+        tetherRef.current.geometry.setFromPoints([
+          lineStartRef.current,
+          lineEndRef.current,
+        ]);
+        tetherRef.current.visible = true;
+      }
+      if (tetherMaterialRef.current) {
+        tetherMaterialRef.current.opacity = 0.2 + proximity * 0.7;
+      }
+      if (captureRingRef.current) {
+        captureRingRef.current.visible = true;
+        captureRingRef.current.position.copy(centers.targetLocal);
+        captureRingRef.current.scale.setScalar(
+          1 + Math.sin(clock.elapsedTime * 4.5) * 0.055
         );
+      }
+      if (captureRingMaterialRef.current) {
+        captureRingMaterialRef.current.opacity = 0.12 + proximity * 0.3;
+      }
+    } else {
+      if (tetherRef.current) tetherRef.current.visible = false;
+      if (captureRingRef.current) captureRingRef.current.visible = false;
+    }
 
-        if (desiredDistance < magnetDistance) {
-          const normalizedPull = 1 - desiredDistance / magnetDistance;
-          const pull = THREE.MathUtils.clamp(DEFAULT_MAGNET_STRENGTH + normalizedPull * 0.42, 0, 0.68);
+    if (phaseRef.current === "snapping") {
+      const rawProgress = THREE.MathUtils.clamp(
+        (performance.now() - snapStartedAtRef.current) /
+          Math.max(snapDurationRef.current, 1),
+        0,
+        1
+      );
 
-          desiredGroupLocalRef.current.lerp(installationTarget.position, pull);
-          desiredGroupLocalRef.current.y = lockedTargetYRef.current;
-
-          rotationRef.current.quaternion.slerp(installationTarget.quaternion, THREE.MathUtils.clamp(pull + 0.08, 0, 0.76));
-        } else {
-          rotationRef.current.quaternion.slerp(tableQuaternion, ROTATION_SMOOTHING);
-        }
-
-        groupRef.current.position.lerp(desiredGroupLocalRef.current, MOVEMENT_SMOOTHING);
-        groupRef.current.position.y = lockedTargetYRef.current;
-
-        const currentDistance = Math.hypot(
-          groupRef.current.position.x - installationTarget.position.x,
-          groupRef.current.position.z - installationTarget.position.z
+      if (rawProgress < 0.24) {
+        const segmentProgress = THREE.MathUtils.smootherstep(
+          rawProgress,
+          0,
+          0.24
         );
+        groupRef.current.position.lerpVectors(
+          snapStartPositionRef.current,
+          snapLiftPositionRef.current,
+          segmentProgress
+        );
+        magnetStateRef.current = `Lifting clear ${Math.round(segmentProgress * 100)}%`;
+      } else if (rawProgress < 0.64) {
+        const segmentProgress = THREE.MathUtils.smootherstep(
+          rawProgress,
+          0.24,
+          0.64
+        );
+        groupRef.current.position.lerpVectors(
+          snapLiftPositionRef.current,
+          snapHoverPositionRef.current,
+          segmentProgress
+        );
+        magnetStateRef.current = `Aligning above seat ${Math.round(segmentProgress * 100)}%`;
+      } else if (rawProgress < 0.93) {
+        const segmentProgress = THREE.MathUtils.smootherstep(
+          rawProgress,
+          0.64,
+          0.93
+        );
+        groupRef.current.position.lerpVectors(
+          snapHoverPositionRef.current,
+          snapPreSeatPositionRef.current,
+          segmentProgress
+        );
+        magnetStateRef.current = `Lowering vertically ${Math.round(segmentProgress * 100)}%`;
+      } else {
+        const segmentProgress = THREE.MathUtils.smootherstep(
+          rawProgress,
+          0.93,
+          1
+        );
+        groupRef.current.position.lerpVectors(
+          snapPreSeatPositionRef.current,
+          target.position,
+          segmentProgress
+        );
+        magnetStateRef.current = `Final seating ${Math.round(segmentProgress * 100)}%`;
+      }
 
-        if (currentDistance <= snapDistance) {
-          installObject();
-          return;
+      const rotationProgress = THREE.MathUtils.smootherstep(
+        rawProgress,
+        0.18,
+        0.9
+      );
+      rotationRef.current.quaternion.slerpQuaternions(
+        snapStartQuaternionRef.current,
+        target.quaternion,
+        rotationProgress
+      );
+
+      if (rawProgress >= 1) finishInstall();
+    } else if (grabbingRef.current) {
+      const pointerDeltaX = pointerClientRef.current.x - pointerStartRef.current.x;
+      const pointerDeltaY = pointerClientRef.current.y - pointerStartRef.current.y;
+      const pointerTravel = Math.hypot(pointerDeltaX, pointerDeltaY);
+      const dragScale = worldUnitsPerPixelRef.current;
+
+      desiredCenterWorldRef.current
+        .copy(dragStartCenterWorldRef.current)
+        .addScaledVector(dragRightWorldRef.current, pointerDeltaX * dragScale)
+        .addScaledVector(dragUpWorldRef.current, -pointerDeltaY * dragScale);
+
+      desiredCenterLocalRef.current.copy(desiredCenterWorldRef.current);
+      const parent = groupRef.current.parent;
+      if (parent) parent.worldToLocal(desiredCenterLocalRef.current);
+      desiredGroupLocalRef.current
+        .copy(desiredCenterLocalRef.current)
+        .sub(modelCenter);
+
+      const desiredDistance = desiredGroupLocalRef.current.distanceTo(target.position);
+      const liftProgress = THREE.MathUtils.clamp(pointerTravel / 72, 0, 1);
+      const safeY = THREE.MathUtils.lerp(
+        dragStartYRef.current,
+        safeCarryYRef.current,
+        THREE.MathUtils.smootherstep(liftProgress, 0, 1)
+      );
+      dragCurrentYRef.current = THREE.MathUtils.damp(
+        dragCurrentYRef.current,
+        safeY,
+        10,
+        safeDelta
+      );
+      desiredGroupLocalRef.current.y = dragCurrentYRef.current;
+      assistedGoalRef.current.copy(desiredGroupLocalRef.current);
+
+      localGroupCenterToWorld(
+        desiredGroupLocalRef.current,
+        desiredVisualCenterWorldRef.current
+      );
+      const field = getHostFieldInfo(
+        desiredVisualCenterWorldRef.current,
+        centers.targetWorld
+      );
+      const routeStrength = THREE.MathUtils.clamp(
+        1 - desiredDistance / Math.max(routeCaptureDistance, 0.001),
+        0,
+        1
+      );
+      const activeFieldStrength = Math.max(field.strength, routeStrength);
+
+      if (activeFieldStrength > 0) {
+        const easedStrength = THREE.MathUtils.smootherstep(
+          activeFieldStrength,
+          0,
+          1
+        );
+        const safeRoute = computeSafeApproachPlan(target, {
+          currentWorld: desiredVisualCenterWorldRef.current,
+          targetWorld: centers.targetWorld,
+        });
+        const currentCenterHeight = centers.currentWorld.y;
+        const safelyLifted =
+          currentCenterHeight >= safeRoute.safeCenterWorldY - safeRoute.clearance * 0.2;
+        routeGoalRef.current.copy(safelyLifted ? safeRoute.hover : safeRoute.lift);
+        assistedGoalRef.current.lerp(
+          routeGoalRef.current,
+          THREE.MathUtils.lerp(
+            MAGNETIC_FIELD_MIN_PULL,
+            MAGNETIC_FIELD_MAX_PULL,
+            easedStrength
+          )
+        );
+        rotationRef.current.quaternion.slerp(
+          target.quaternion,
+          1 - Math.exp(-(4 + easedStrength * 8) * safeDelta)
+        );
+        magnetStateRef.current = field.inside
+          ? "Inside host magnetic field"
+          : "Host field pulling";
+        if (!magnetNoticeRef.current && activeFieldStrength > 0.15) {
+          magnetNoticeRef.current = true;
+          onInteractionMessage(
+            `${label} entered the magnetic approach zone. The ${MOTHERBOARD_CHILD_KEYS.has(partKey) ? "motherboard" : "case"} is pulling it toward the exact seat.`
+          );
         }
+      } else {
+        magnetStateRef.current = "Move toward host field";
+        magnetNoticeRef.current = false;
+        rotationRef.current.quaternion.slerp(
+          tableQuaternion,
+          1 - Math.exp(-ROTATION_FOLLOW_SPEED * safeDelta)
+        );
+      }
+
+      groupRef.current.position.lerp(
+        assistedGoalRef.current,
+        1 - Math.exp(-DRAG_FOLLOW_SPEED * safeDelta)
+      );
+
+      const currentCenterWorld = localGroupCenterToWorld(
+        groupRef.current.position,
+        currentCenterWorldRef.current
+      );
+      const currentField = getHostFieldInfo(
+        currentCenterWorld,
+        centers.targetWorld
+      );
+      const currentDistance = groupRef.current.position.distanceTo(target.position);
+      const easySnapDistance = Math.max(
+        snapDistance * 2.2,
+        magnetDistance * 0.28,
+        modelRadius * 0.35
+      );
+
+      if (
+        pointerTravel >= MAGNETIC_FIELD_MIN_POINTER_TRAVEL_PX &&
+        (currentField.inside ||
+          activeFieldStrength >= MAGNETIC_FIELD_AUTO_CAPTURE_THRESHOLD ||
+          currentDistance <= easySnapDistance)
+      ) {
+        seatComponent();
+        return;
       }
     } else if (phaseRef.current === "released") {
-      lockedTargetYRef.current = installationTarget.position.y;
-      groupRef.current.position.y = lockedTargetYRef.current;
+      const field = getHostFieldInfo(centers.currentWorld, centers.targetWorld);
+      const routeStrength = THREE.MathUtils.clamp(
+        1 - distance / Math.max(routeCaptureDistance, 0.001),
+        0,
+        1
+      );
+      const strength = Math.max(field.strength, routeStrength);
+      if (strength > 0.02) {
+        magnetStateRef.current = "Safe-path capture starting";
+        seatComponent();
+        return;
+      }
     } else if (phaseRef.current === "installed") {
-      groupRef.current.position.lerp(installationTarget.position, 0.42);
-      rotationRef.current.quaternion.slerp(installationTarget.quaternion, 0.42);
+      // Installed parts become rigid children of their authored host frame.
+      // Directly following the moving target prevents lag or separation while
+      // the completed case rotates from flat to its upright presentation.
+      groupRef.current.position.copy(target.position);
+      rotationRef.current.quaternion.copy(target.quaternion);
     }
 
     frameCounterRef.current += 1;
-    const interval = grabbingRef.current ? TELEMETRY_FRAME_INTERVAL : TELEMETRY_IDLE_FRAME_INTERVAL;
-    if (frameCounterRef.current % interval === 0) publishTelemetry();
+    const interval = grabbingRef.current
+      ? TELEMETRY_FRAME_INTERVAL
+      : TELEMETRY_IDLE_FRAME_INTERVAL;
+    if (isActive && frameCounterRef.current % interval === 0) {
+      publishTelemetry();
+    }
   });
 
   const handlePointerDown = useCallback(
     (event) => {
       if (!isMovablePart || !testActive) return;
       event.stopPropagation();
-
-      if (isCompleted) {
-        onInteractionMessage(`${label} is already installed.`);
+      if (!canInteract) {
+        if (isCompleted || phaseRef.current === "installed") {
+          onInteractionMessage(`${label} is already installed and locked.`);
+        } else {
+          onLockedPartClick(partKey);
+        }
         return;
       }
-
-      if (!isReachable) {
-        onInvalidClick(partKey);
-        return;
-      }
-
       if (phaseRef.current === "ready" || phaseRef.current === "released") {
         beginGrab(event);
       }
     },
-    [beginGrab, isCompleted, isMovablePart, isReachable, label, onInteractionMessage, onInvalidClick, partKey, testActive]
+    [
+      beginGrab,
+      canInteract,
+      isCompleted,
+      isMovablePart,
+      label,
+      onInteractionMessage,
+      onLockedPartClick,
+      partKey,
+      testActive,
+    ]
   );
 
   const handlePointerOver = useCallback(
     (event) => {
-      if (!isMovablePart || !testActive || isCompleted) return;
+      if (!isMovablePart) return;
       event.stopPropagation();
-      document.body.style.cursor = "grab";
+      document.body.style.cursor = canInteract ? "grab" : "not-allowed";
     },
-    [isCompleted, isMovablePart, testActive]
+    [canInteract, isMovablePart]
   );
 
   const handlePointerOut = useCallback(() => {
@@ -698,39 +1438,81 @@ function InteractiveCenteredObject({
   }, []);
 
   return (
-    <group
-      ref={groupRef}
-      position={startPosition}
-      onPointerDown={handlePointerDown}
-      onPointerOver={handlePointerOver}
-      onPointerOut={handlePointerOut}
-    >
-      <group position={[modelCenter.x, modelCenter.y, modelCenter.z]}>
-        <group ref={rotationRef} quaternion={tableQuaternion.toArray()}>
-          <group ref={contentFrameRef} position={[-modelCenter.x, -modelCenter.y, -modelCenter.z]}>
-            {children}
+    <>
+      <group
+        ref={groupRef}
+        position={startPosition}
+        onPointerDown={handlePointerDown}
+        onPointerOver={handlePointerOver}
+        onPointerOut={handlePointerOut}
+      >
+        <group position={[modelCenter.x, modelCenter.y, modelCenter.z]}>
+          <group ref={rotationRef} quaternion={tableQuaternion.toArray()}>
+            <group
+              ref={contentFrameRef}
+              position={[-modelCenter.x, -modelCenter.y, -modelCenter.z]}
+            >
+              {children}
+            </group>
           </group>
         </group>
       </group>
-    </group>
+
+      <line ref={tetherRef} visible={false} renderOrder={1100}>
+        <bufferGeometry />
+        <lineBasicMaterial
+          ref={tetherMaterialRef}
+          color="#00ffb4"
+          transparent
+          opacity={0.45}
+          depthTest={false}
+          depthWrite={false}
+        />
+      </line>
+
+      <mesh
+        ref={captureRingRef}
+        visible={false}
+        rotation={[-Math.PI / 2, 0, 0]}
+        renderOrder={1099}
+      >
+        <ringGeometry args={[captureRingRadius * 0.72, captureRingRadius, 64]} />
+        <meshBasicMaterial
+          ref={captureRingMaterialRef}
+          color="#00ffb4"
+          transparent
+          opacity={0.18}
+          side={THREE.DoubleSide}
+          depthTest={false}
+          depthWrite={false}
+        />
+      </mesh>
+    </>
   );
 }
 
 function AssemblyPart({
   part,
   targetFrameRef,
-  isReachable,
-  isCompleted,
+  magnetFieldRef,
+  targetSeatOffsetLocal = null,
+  isActive,
   testActive,
+  isFullRun = false,
+  showGuides = true,
+  isCompleted,
   onPartCompleted,
-  onInvalidClick,
+  onLockedPartClick,
   onFumble,
   onInteractionMessage,
   onDragStateChange,
   onTelemetry,
 }) {
   const { scene } = useGLTF(encodeURI(part.path));
-  const clone = useMemo(() => cloneSceneForDisplay(scene, { enableShadows: part.key !== "cpu" }), [part.key, scene]);
+  const clone = useMemo(
+    () => cloneSceneForDisplay(scene, { enableShadows: part.key !== "cpu" }),
+    [part.key, scene]
+  );
   const bounds = useMemo(() => getModelBounds(clone), [clone]);
 
   return (
@@ -741,11 +1523,15 @@ function AssemblyPart({
       modelSize={bounds.size}
       startConfig={TABLE_STARTS[part.key]}
       targetFrameRef={targetFrameRef}
-      isReachable={isReachable}
-      isCompleted={isCompleted}
+      magnetFieldRef={magnetFieldRef}
+      targetSeatOffsetLocal={targetSeatOffsetLocal}
+      isActive={isActive}
       testActive={testActive}
+      isFullRun={isFullRun}
+      showGuides={showGuides}
+      isCompleted={isCompleted}
       onPartCompleted={onPartCompleted}
-      onInvalidClick={onInvalidClick}
+      onLockedPartClick={onLockedPartClick}
       onFumble={onFumble}
       onInteractionMessage={onInteractionMessage}
       onDragStateChange={onDragStateChange}
@@ -756,13 +1542,141 @@ function AssemblyPart({
   );
 }
 
+function CaseWorkspace({
+  contentFrameRef,
+  magneticFieldRef,
+  activePartKeys,
+  showGuides,
+  standCase = false,
+}) {
+  const part = PART_BY_KEY.case;
+  const { scene } = useGLTF(encodeURI(part.path));
+  const { scene: motherboardTargetScene } = useGLTF(
+    encodeURI(PART_BY_KEY.motherboard.path)
+  );
+  const { scene: psuTargetScene } = useGLTF(encodeURI(PART_BY_KEY.psu.path));
+  const { scene: hddTargetScene } = useGLTF(encodeURI(PART_BY_KEY.hdd.path));
+  const { scene: gpuTargetScene } = useGLTF(encodeURI(PART_BY_KEY.gpu.path));
+
+  const groundedGroupRef = useRef(null);
+  const caseRotationRef = useRef(null);
+  const transitionStartedAtRef = useRef(0);
+  const transitionFromQuaternionRef = useRef(new THREE.Quaternion());
+  const transitionToQuaternionRef = useRef(new THREE.Quaternion());
+  const transitioningRef = useRef(false);
+
+  const caseClone = useMemo(
+    () => cloneSceneForDisplay(scene, { disableRaycast: true }),
+    [scene]
+  );
+  const bounds = useMemo(() => getModelBounds(caseClone), [caseClone]);
+  const caseTargetCenters = useMemo(
+    () =>
+      [
+        motherboardTargetScene,
+        psuTargetScene,
+        hddTargetScene,
+        gpuTargetScene,
+      ].map((targetScene) => getModelBounds(targetScene).center),
+    [gpuTargetScene, hddTargetScene, motherboardTargetScene, psuTargetScene]
+  );
+  const layFlatQuaternion = useMemo(
+    () =>
+      chooseOpenSideUpCaseQuaternion(
+        bounds.size,
+        bounds.center,
+        caseTargetCenters
+      ),
+    [bounds.center, bounds.size, caseTargetCenters]
+  );
+  const groundOffsetY = useMemo(
+    () =>
+      getGroundedRotationOffsetY(
+        bounds.box,
+        bounds.center,
+        layFlatQuaternion
+      ),
+    [bounds.box, bounds.center, layFlatQuaternion]
+  );
+  const standingQuaternion = useMemo(() => new THREE.Quaternion(), []);
+  const inverseCenter = useMemo(
+    () => bounds.center.clone().multiplyScalar(-1),
+    [bounds.center]
+  );
+  useEffect(() => {
+    const rotationGroup = caseRotationRef.current;
+    if (!rotationGroup) return;
+
+    transitionFromQuaternionRef.current.copy(rotationGroup.quaternion);
+    transitionToQuaternionRef.current.copy(
+      standCase ? standingQuaternion : layFlatQuaternion
+    );
+    transitionStartedAtRef.current = performance.now();
+    transitioningRef.current = true;
+  }, [layFlatQuaternion, standCase, standingQuaternion]);
+
+  useFrame(() => {
+    const groundedGroup = groundedGroupRef.current;
+    const rotationGroup = caseRotationRef.current;
+    if (!groundedGroup || !rotationGroup) return;
+
+    if (transitioningRef.current) {
+      const rawProgress = THREE.MathUtils.clamp(
+        (performance.now() - transitionStartedAtRef.current) /
+          CASE_STAND_TRANSITION_DURATION_MS,
+        0,
+        1
+      );
+      const easedProgress = THREE.MathUtils.smootherstep(rawProgress, 0, 1);
+      rotationGroup.quaternion.slerpQuaternions(
+        transitionFromQuaternionRef.current,
+        transitionToQuaternionRef.current,
+        easedProgress
+      );
+      if (rawProgress >= 1) {
+        rotationGroup.quaternion.copy(transitionToQuaternionRef.current);
+        transitioningRef.current = false;
+      }
+    }
+
+    // Recalculate contact height from the current quaternion every frame so
+    // the chassis rolls smoothly into position without floating or clipping
+    // through the tabletop during the flat-to-standing transition.
+    groundedGroup.position.y = getGroundedRotationOffsetY(
+      bounds.box,
+      bounds.center,
+      rotationGroup.quaternion
+    );
+  });
+
+  return (
+    <group ref={groundedGroupRef} position={[0, groundOffsetY, 0]}>
+      <group position={bounds.center.toArray()}>
+        <group ref={caseRotationRef} quaternion={layFlatQuaternion.toArray()}>
+          <group ref={contentFrameRef} position={inverseCenter.toArray()}>
+            <group ref={magneticFieldRef}>
+              <primitive object={caseClone} dispose={null} />
+            </group>
+          </group>
+        </group>
+      </group>
+    </group>
+  );
+}
+
 function MotherboardUnit({
   contentFrameRef,
-  isReachable,
-  completedParts,
+  magneticFieldRef,
+  targetFrameRef,
+  targetMagnetFieldRef,
+  activePartKeys,
   testActive,
+  isFullRun = false,
+  showGuides = true,
+  completedParts,
+  cpuSeatOffsetLocal,
   onPartCompleted,
-  onInvalidClick,
+  onLockedPartClick,
   onFumble,
   onInteractionMessage,
   onDragStateChange,
@@ -770,8 +1684,18 @@ function MotherboardUnit({
 }) {
   const part = PART_BY_KEY.motherboard;
   const { scene } = useGLTF(encodeURI(part.path));
-  const motherboardClone = useMemo(() => cloneSceneForDisplay(scene), [scene]);
-  const bounds = useMemo(() => getModelBounds(motherboardClone), [motherboardClone]);
+  const motherboardIsActive = activePartKeys.includes("motherboard");
+  const motherboardClone = useMemo(
+    () =>
+      cloneSceneForDisplay(scene, {
+        disableRaycast: !motherboardIsActive,
+      }),
+    [motherboardIsActive, scene]
+  );
+  const bounds = useMemo(
+    () => getModelBounds(motherboardClone),
+    [motherboardClone]
+  );
 
   return (
     <InteractiveCenteredObject
@@ -780,23 +1704,43 @@ function MotherboardUnit({
       modelCenter={bounds.center}
       modelSize={bounds.size}
       startConfig={TABLE_STARTS.motherboard}
-      isReachable={isReachable}
-      isCompleted={completedParts.includes("motherboard")}
+      targetFrameRef={targetFrameRef}
+      magnetFieldRef={targetMagnetFieldRef}
+      isActive={motherboardIsActive}
       testActive={testActive}
+      isFullRun={isFullRun}
+      showGuides={showGuides}
+      isCompleted={completedParts.includes("motherboard")}
       onPartCompleted={onPartCompleted}
-      onInvalidClick={onInvalidClick}
+      onLockedPartClick={onLockedPartClick}
       onFumble={onFumble}
       onInteractionMessage={onInteractionMessage}
       onDragStateChange={onDragStateChange}
       onTelemetry={onTelemetry}
       contentFrameRef={contentFrameRef}
     >
-      <primitive object={motherboardClone} dispose={null} />
+      <group ref={magneticFieldRef}>
+        <primitive object={motherboardClone} dispose={null} />
+      </group>
+
       {["cpu", "ram1", "ram2", "ssd"].map((key) =>
         completedParts.includes(key) ? (
-          <StaticAuthoredModel key={`installed-${key}`} part={PART_BY_KEY[key]} disableRaycast />
+          <group
+            key={`installed-${key}`}
+            position={
+              key === "cpu" && cpuSeatOffsetLocal
+                ? cpuSeatOffsetLocal.toArray()
+                : [0, 0, 0]
+            }
+          >
+            <StaticAuthoredModel
+              part={PART_BY_KEY[key]}
+              disableRaycast
+            />
+          </group>
         ) : null
       )}
+
     </InteractiveCenteredObject>
   );
 }
@@ -857,20 +1801,54 @@ function AssemblyScene({
   onDragStateChange,
   onTelemetry,
 }) {
+  const caseContentRef = useRef(null);
+  const caseMagneticFieldRef = useRef(null);
   const motherboardContentRef = useRef(null);
+  const motherboardMagneticFieldRef = useRef(null);
+  const { scene: motherboardCalibrationScene } = useGLTF(
+    encodeURI(PART_BY_KEY.motherboard.path)
+  );
+  const { scene: cpuCalibrationScene } = useGLTF(
+    encodeURI(PART_BY_KEY.cpu.path)
+  );
+  const cpuSeatOffsetLocal = useMemo(
+    () => getCpuSeatCorrectionLocal(motherboardCalibrationScene, cpuCalibrationScene),
+    [cpuCalibrationScene, motherboardCalibrationScene]
+  );
+  const standCompletedCase = useMemo(
+    () => ["motherboard", "psu", "hdd", "gpu"].every((key) => completedParts.includes(key)),
+    [completedParts]
+  );
+  const activePartKeys = useMemo(
+    () => (testActive ? [...reachableKeys] : []),
+    [reachableKeys, testActive]
+  );
 
   return (
     <group ref={rootRef}>
       <StaticAuthoredModel part={PART_BY_KEY.table} disableRaycast />
-      <StaticAuthoredModel part={PART_BY_KEY.case} disableRaycast />
+
+      <CaseWorkspace
+        contentFrameRef={caseContentRef}
+        magneticFieldRef={caseMagneticFieldRef}
+        activePartKeys={activePartKeys}
+        showGuides={false}
+        standCase={standCompletedCase}
+      />
 
       <MotherboardUnit
         contentFrameRef={motherboardContentRef}
-        isReachable={reachableKeys.has("motherboard")}
-        completedParts={completedParts}
+        magneticFieldRef={motherboardMagneticFieldRef}
+        targetFrameRef={caseContentRef}
+        targetMagnetFieldRef={caseMagneticFieldRef}
+        activePartKeys={activePartKeys}
         testActive={testActive}
+        isFullRun
+        showGuides={false}
+        completedParts={completedParts}
+        cpuSeatOffsetLocal={cpuSeatOffsetLocal}
         onPartCompleted={onPartCompleted}
-        onInvalidClick={onInvalidClick}
+        onLockedPartClick={onInvalidClick}
         onFumble={onFumble}
         onInteractionMessage={onInteractionMessage}
         onDragStateChange={onDragStateChange}
@@ -885,12 +1863,16 @@ function AssemblyScene({
           <AssemblyPart
             key={key}
             part={PART_BY_KEY[key]}
-            targetFrameRef={isMotherboardChild ? motherboardContentRef : null}
-            isReachable={reachableKeys.has(key)}
-            isCompleted={completedParts.includes(key)}
+            targetFrameRef={isMotherboardChild ? motherboardContentRef : caseContentRef}
+            magnetFieldRef={isMotherboardChild ? motherboardMagneticFieldRef : caseMagneticFieldRef}
+            targetSeatOffsetLocal={key === "cpu" ? cpuSeatOffsetLocal : null}
+            isActive={activePartKeys.includes(key)}
             testActive={testActive}
+            isFullRun
+            showGuides={false}
+            isCompleted={completedParts.includes(key)}
             onPartCompleted={onPartCompleted}
-            onInvalidClick={onInvalidClick}
+            onLockedPartClick={onInvalidClick}
             onFumble={onFumble}
             onInteractionMessage={onInteractionMessage}
             onDragStateChange={onDragStateChange}
@@ -1238,7 +2220,7 @@ function TestIntroCard({ onStart }) {
             </div>
             <div className="rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4">
               <div className="text-xs font-black uppercase tracking-[0.16em] text-[#00ffb4]">Scored</div>
-              <div className="mt-2 text-xs leading-5 text-[#9fb0ca]">Wrong-order attempts and fumbled placements cost points.</div>
+              <div className="mt-2 text-xs leading-5 text-[#9fb0ca]">Confirmed sequence errors and failed placement attempts cost points.</div>
             </div>
           </div>
 
@@ -1306,15 +2288,16 @@ function ResultsCard({ result, onRetry, onBackToDashboard }) {
               <div className="mt-2 text-sm font-bold text-white">{result.wrongOrderCount}</div>
             </div>
             <div className="rounded-2xl border border-[#1a2438] bg-white/[0.035] p-4">
-              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#ffd27d]">Fumbles</div>
+              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#ffd27d]">Placement Errors</div>
               <div className="mt-2 text-sm font-bold text-white">{result.fumbleCount}</div>
+              <div className="mt-1 text-[10px] text-[#7a8ba8]">-{result.fumbleCount * PENALTY_FUMBLE} points</div>
             </div>
           </div>
 
           <div className="mt-7 rounded-2xl border border-[#00ffb4]/18 bg-[#00ffb4]/6 px-4 py-3 text-xs leading-6 text-[#b7c6dd]">
-            Score starts at 100. Each out-of-order attempt costs {PENALTY_WRONG_ORDER_CLICK} points, each
-            excess fumble costs {PENALTY_FUMBLE} points, and time beyond {Math.round(TIME_PAR_SECONDS / 60)}{" "}
-            minutes costs {PENALTY_PER_OVER_PAR_MINUTE} points per extra minute. 75+ is a pass.
+            Score starts at 100. Each confirmed sequence error costs {PENALTY_WRONG_ORDER_CLICK} points, each
+            meaningful failed placement costs {PENALTY_FUMBLE} points, and time beyond {Math.round(TIME_PAR_SECONDS / 60)}{" "}
+            minutes costs {PENALTY_PER_OVER_PAR_MINUTE} points per extra minute. Click-release actions without a real drag are ignored. 75+ is a pass.
           </div>
 
           <div className="mt-7 flex flex-wrap justify-end gap-3">
@@ -1351,7 +2334,14 @@ export default function INTELFullAssemblyPracticalTest({ onFinish, onBack }) {
   const checklistOrder = ASSEMBLY_SEQUENCE;
   const [wrongOrderCount, setWrongOrderCount] = useState(0);
   const [fumbleCount, setFumbleCount] = useState(0);
+  const completedPartsRef = useRef([]);
+  const wrongOrderCountRef = useRef(0);
+  const fumbleCountRef = useRef(0);
+  const lastOrderMistakeRef = useRef({ partKey: null, timestamp: 0 });
+  const startedAtRef = useRef(null);
+  const finalizationTimerRef = useRef(null);
   const [startedAt, setStartedAt] = useState(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [result, setResult] = useState(null);
   const [achievementToast, setAchievementToast] = useState(null);
   const [validationMessage, setValidationMessage] = useState(
@@ -1370,6 +2360,12 @@ export default function INTELFullAssemblyPracticalTest({ onFinish, onBack }) {
     return reachable;
   }, [completedParts]);
 
+  const liveScoring = calculateScore(
+    wrongOrderCount,
+    fumbleCount,
+    elapsedSeconds
+  );
+
   const handleSettingChange = (key, value) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
   };
@@ -1378,10 +2374,21 @@ export default function INTELFullAssemblyPracticalTest({ onFinish, onBack }) {
     setCompletedParts([]);
     setWrongOrderCount(0);
     setFumbleCount(0);
+    completedPartsRef.current = [];
+    wrongOrderCountRef.current = 0;
+    fumbleCountRef.current = 0;
+    lastOrderMistakeRef.current = { partKey: null, timestamp: 0 };
+    startedAtRef.current = null;
+    setElapsedSeconds(0);
+    if (finalizationTimerRef.current) {
+      window.clearTimeout(finalizationTimerRef.current);
+      finalizationTimerRef.current = null;
+    }
     setStartedAt(null);
     setResult(null);
     setTestActive(false);
-    setSceneRevision((value) => value + 1);
+    setSceneRevision((value) => value + 1);
+
     setShowIntro(true);
     setValidationMessage("No hints are active. Click any loose component that is ready to be installed.");
   }, []);
@@ -1405,6 +2412,27 @@ export default function INTELFullAssemblyPracticalTest({ onFinish, onBack }) {
     return () => unsub();
   }, []);
 
+  useEffect(() => () => {
+    if (finalizationTimerRef.current) {
+      window.clearTimeout(finalizationTimerRef.current);
+      finalizationTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!testActive || !startedAtRef.current || result) return undefined;
+
+    const updateElapsed = () => {
+      setElapsedSeconds(
+        Math.max(0, (Date.now() - startedAtRef.current) / 1000)
+      );
+    };
+
+    updateElapsed();
+    const timerId = window.setInterval(updateElapsed, 1000);
+    return () => window.clearInterval(timerId);
+  }, [result, testActive]);
+
   const saveTestResult = useCallback(
     async (finalResult) => {
       if (!firebaseUser) return;
@@ -1420,6 +2448,7 @@ export default function INTELFullAssemblyPracticalTest({ onFinish, onBack }) {
                 elapsedSeconds: finalResult.elapsedSeconds,
                 wrongOrderCount: finalResult.wrongOrderCount,
                 fumbleCount: finalResult.fumbleCount,
+                penalizedFumbleCount: finalResult.penalizedFumbleCount,
                 completedAt: serverTimestamp(),
               },
             },
@@ -1437,24 +2466,28 @@ export default function INTELFullAssemblyPracticalTest({ onFinish, onBack }) {
   );
 
   const finishTest = useCallback(
-    (finalCompletedParts, finalWrongOrder, finalFumbles) => {
-      const elapsedSeconds = startedAt ? (Date.now() - startedAt) / 1000 : 0;
-      const overParMinutes = Math.max(0, Math.ceil((elapsedSeconds - TIME_PAR_SECONDS) / 60));
-
-      const rawScore =
-        100 -
-        finalWrongOrder * PENALTY_WRONG_ORDER_CLICK -
-        finalFumbles * PENALTY_FUMBLE -
-        overParMinutes * PENALTY_PER_OVER_PAR_MINUTE;
-
-      const score = Math.max(0, Math.min(100, Math.round(rawScore)));
-
+    (
+      finalCompletedParts = completedPartsRef.current,
+      finalWrongOrder = wrongOrderCountRef.current,
+      finalFumbles = fumbleCountRef.current
+    ) => {
+      const startTimestamp = startedAtRef.current ?? startedAt;
+      const finalElapsedSeconds = startTimestamp
+        ? (Date.now() - startTimestamp) / 1000
+        : 0;
+      const scoring = calculateScore(
+        finalWrongOrder,
+        finalFumbles,
+        finalElapsedSeconds
+      );
+      const score = scoring.score;
       const finalResult = {
         score,
-        elapsedSeconds,
+        elapsedSeconds: finalElapsedSeconds,
         partsCompleted: finalCompletedParts.length,
         wrongOrderCount: finalWrongOrder,
         fumbleCount: finalFumbles,
+        penalizedFumbleCount: finalFumbles,
       };
 
       setResult(finalResult);
@@ -1467,40 +2500,70 @@ export default function INTELFullAssemblyPracticalTest({ onFinish, onBack }) {
 
   const handlePartCompleted = useCallback(
     (partKey) => {
-      if (completedParts.includes(partKey)) return;
+      if (completedPartsRef.current.includes(partKey)) return;
 
-      const nextCompletedParts = [...completedParts, partKey];
+      const nextCompletedParts = [...completedPartsRef.current, partKey];
+      completedPartsRef.current = nextCompletedParts;
       setCompletedParts(nextCompletedParts);
       playCompletionSound(settings.sound, false);
       setValidationMessage(`${COMPONENT_LABELS[partKey]} installed correctly.`);
 
       if (nextCompletedParts.length === ASSEMBLY_SEQUENCE.length) {
-        finishTest(nextCompletedParts, wrongOrderCount, fumbleCount);
+        setValidationMessage("All components are installed. The completed case is rotating smoothly back to its standing position…");
+        if (finalizationTimerRef.current) window.clearTimeout(finalizationTimerRef.current);
+        finalizationTimerRef.current = window.setTimeout(() => {
+          finishTest(nextCompletedParts);
+          finalizationTimerRef.current = null;
+        }, CASE_STAND_CARD_DELAY_MS);
       }
     },
-    [completedParts, finishTest, fumbleCount, settings.sound, wrongOrderCount]
+    [finishTest, settings.sound]
   );
 
   const handleInvalidClick = useCallback(
     (partKey) => {
-      setWrongOrderCount((value) => value + 1);
+      const now = Date.now();
+      const previous = lastOrderMistakeRef.current;
+      if (
+        previous.partKey === partKey &&
+        now - previous.timestamp < ORDER_MISTAKE_DEBOUNCE_MS
+      ) {
+        return;
+      }
+
+      lastOrderMistakeRef.current = { partKey, timestamp: now };
+      const nextCount = wrongOrderCountRef.current + 1;
+      wrongOrderCountRef.current = nextCount;
+      setWrongOrderCount(nextCount);
       playMistakeSound(settings.sound);
       setValidationMessage(
-        `${COMPONENT_LABELS[partKey]} is not ready to install yet — a prerequisite component is missing. (Order mistake logged.)`
+        `${COMPONENT_LABELS[partKey]} is not ready to install yet — a prerequisite component is missing. (Sequence error ${nextCount}: -${PENALTY_WRONG_ORDER_CLICK} points.)`
       );
     },
     [settings.sound]
   );
 
-  const handleFumble = useCallback((partKey) => {
-    setFumbleCount((value) => value + 1);
-    setValidationMessage(`${COMPONENT_LABELS[partKey]} was released far from its socket. (Fumble logged.)`);
-  }, []);
+  const handleFumble = useCallback(
+    (partKey, { attempt = 1 } = {}) => {
+      const nextTotal = fumbleCountRef.current + 1;
+      fumbleCountRef.current = nextTotal;
+      setFumbleCount(nextTotal);
+      playMistakeSound(settings.sound);
+
+      setValidationMessage(
+        `${COMPONENT_LABELS[partKey]} was released outside the magnetic capture field. Placement error ${nextTotal} (attempt ${attempt} for this part): -${PENALTY_FUMBLE} points.`
+      );
+    },
+    [settings.sound]
+  );
 
   const handleStartTest = useCallback(() => {
     setShowIntro(false);
     setTestActive(true);
-    setStartedAt(Date.now());
+    const started = Date.now();
+    startedAtRef.current = started;
+    setStartedAt(started);
+    setElapsedSeconds(0);
   }, []);
 
   const handleBackToDashboard = () => {
@@ -1575,13 +2638,20 @@ export default function INTELFullAssemblyPracticalTest({ onFinish, onBack }) {
                 <div>
                   <div className="text-sm font-semibold text-white">Free-order installation — no visual guides</div>
                   <div className="text-[11px] uppercase tracking-[0.14em] text-[#7a8ba8]">
-                    Click a loose part to grab • guide it to its socket • click again to release
+                    Drag a valid loose part toward its host field • release anywhere inside the field • animated safe-path seating takes over
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-4 text-[11px] font-bold">
                   <span className="text-[#00ffb4]">{completedParts.length} / {ASSEMBLY_SEQUENCE.length} installed</span>
-                  <span className="text-[#ff9f7d]">{wrongOrderCount} order mistakes</span>
-                  <span className="text-[#ffd27d]">{fumbleCount} fumbles</span>
+                  <span className="text-[#ff9f7d]">
+                    {wrongOrderCount} sequence {wrongOrderCount === 1 ? "error" : "errors"}{liveScoring.orderPenaltyPoints > 0 ? ` (-${liveScoring.orderPenaltyPoints} pts)` : ""}
+                  </span>
+                  <span className="text-[#ffd27d]">
+                    {fumbleCount} placement {fumbleCount === 1 ? "error" : "errors"}{liveScoring.fumblePenaltyPoints > 0 ? ` (-${liveScoring.fumblePenaltyPoints} pts)` : ""}
+                  </span>
+                  <span className="text-[#8ec5ff]">
+                    {formatDuration(elapsedSeconds)} • Score {liveScoring.score} / 100
+                  </span>
                 </div>
               </div>
             </div>

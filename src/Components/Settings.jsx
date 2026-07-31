@@ -38,7 +38,7 @@ export default function SettingsModal({
     <AnimatePresence>
       {isOpen && (
         <MotionDiv
-          className="fixed inset-0 z-[999] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+          className="articton-modal-backdrop fixed inset-0 z-[999] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -48,7 +48,7 @@ export default function SettingsModal({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.98 }}
             transition={{ duration: 0.18 }}
-            className="w-full max-w-2xl overflow-hidden rounded-[24px] border border-[#1a2438] bg-[#0d1220] shadow-[0_30px_100px_rgba(0,0,0,0.65)]"
+            className="articton-settings-dialog w-full max-w-2xl overflow-hidden rounded-[24px] border border-[#1a2438] bg-[#0d1220] shadow-[0_30px_100px_rgba(0,0,0,0.65)]"
           >
             <div className="flex items-center justify-between border-b border-[#1a2438] px-6 py-5">
               <div>
@@ -129,7 +129,7 @@ export default function SettingsModal({
 
 function SettingSwitch({ icon: Icon, title, subtitle, checked, onChange }) {
   return (
-    <div className="flex items-center justify-between gap-4 rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4">
+    <div className="articton-setting-row flex items-center justify-between gap-4 rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4">
       <div className="flex min-w-0 items-center gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#00ffb4]/10 text-[#00ffb4]">
           {createElement(Icon, { className: "h-5 w-5" })}

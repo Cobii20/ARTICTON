@@ -20,21 +20,22 @@ import { getUserSettings } from "../../../utils/userSettings";
 /* INTEL FULL DISASSEMBLY — PRACTICAL TEST                            */
 /* ------------------------------------------------------------------ */
 /* Differences from the guided Module 2:                              */
-/*   - No fixed step order. Any exposed/removable part may be grabbed */
-/*     at any time (free order), as long as it is "reachable" given   */
-/*     what has already been removed (a GPU cannot be lifted out from */
-/*     underneath an installed HDD bay if that is physically nested,  */
-/*     mirrored below in REACHABILITY).                               */
+/*   - No instructor-selected one-part prompt. The learner may choose */
+/*     any currently reachable component, while physical dependencies */
+/*     are enforced: GPU first, then the populated motherboard; once  */
+/*     it is on the table, its CPU/SSD/two RAM sticks and the remaining*/
+/*     case parts may be removed in any physically valid order.       */
 /*   - No amber X-ray "click me" highlight, no green ghost target,    */
 /*     no pulsing capture ring, no floating callout label. Only a     */
 /*     neutral cursor change on hover.                                */
-/*   - Every interaction is scored: wrong-order attempts and repeated */
-/*     fumbled releases count against the final grade.                */
+/*   - Only meaningful failed placement attempts are counted live.      */
+/*     Sequence errors and confirmed placement errors reduce the grade. */
 /*   - A results screen replaces the certificate, showing a grade,    */
 /*     total time, and a breakdown of mistakes.                       */
 /* ================================================================== */
 
-const REMOVAL_SEQUENCE = ["gpu", "ssd", "hdd", "ram1", "ram2", "cpu", "psu", "motherboard"];
+const REMOVAL_SEQUENCE = ["gpu", "motherboard", "ssd", "ram1", "ram2", "cpu", "hdd", "psu"];
+const MOTHERBOARD_MOUNTED_PARTS = new Set(["cpu", "ssd", "ram1", "ram2"]);
 
 const PART_MODELS = [
   { key: "table", path: "/models/INTELtable.glb" },
@@ -62,22 +63,21 @@ const COMPONENT_LABELS = {
   motherboard: "Motherboard",
 };
 
-/* Real disassembly order is not arbitrary: the motherboard cannot be
-   pulled while the CPU/RAM/other parts sit on top of it in this rig, and
-   the case fans/shroud mean the GPU should realistically come out before
-   the drives are disturbed. This map defines which parts must ALREADY be
-   removed before a given part becomes a valid (non-mistake) target. It is
-   intentionally permissive — several valid real-world orders exist — but
-   it stops nonsensical sequences like removing the motherboard first. */
+/* Physical dependency map for the practical test. The GPU is removed
+   first so the populated motherboard has a clear extraction path. The
+   motherboard is then transferred intact to the worktable. Only after it
+   is seated there do CPU, SSD, RAM 1, and RAM 2 become independently
+   removable. HDD and PSU also become available at that stage, preserving
+   the test's free-choice rule wherever more than one order is valid. */
 const PREREQUISITES = Object.freeze({
   gpu: [],
-  ssd: [],
-  hdd: [],
-  ram1: [],
-  ram2: [],
-  cpu: [],
-  psu: [],
-  motherboard: ["cpu", "ram1", "ram2", "ssd", "gpu", "hdd", "psu"],
+  motherboard: ["gpu"],
+  cpu: ["motherboard"],
+  ram1: ["motherboard"],
+  ram2: ["motherboard"],
+  ssd: ["motherboard"],
+  hdd: ["motherboard"],
+  psu: ["motherboard"],
 });
 
 /* Final INTEL table seats — identical physical targets to the guided module,
@@ -99,14 +99,73 @@ const PLACEMENT_TARGETS = Object.freeze({
   motherboard: { position: [-11.627, -7.507, 13.488], snapDistance: 2, magnetDistance: 11 },
 });
 
+
+function createMagneticFieldBounds(targets) {
+  const positions = Object.values(targets)
+    .map((target) => target?.position)
+    .filter(Boolean);
+  const xs = positions.map((position) => position[0]);
+  const zs = positions.map((position) => position[2]);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minZ = Math.min(...zs);
+  const maxZ = Math.max(...zs);
+  const xSpan = Math.max(maxX - minX, 1);
+  const zSpan = Math.max(maxZ - minZ, 1);
+  const largestSpan = Math.max(xSpan, zSpan);
+
+  return Object.freeze({
+    minX: minX - Math.max(xSpan * 0.62, largestSpan * 0.15),
+    maxX: maxX + Math.max(xSpan * 0.62, largestSpan * 0.15),
+    minZ: minZ - Math.max(zSpan * 0.55, largestSpan * 0.15),
+    maxZ: maxZ + Math.max(zSpan * 0.32, largestSpan * 0.15),
+    feather: Math.max(largestSpan * 0.18, 2.4),
+  });
+}
+
+const MAGNETIC_FIELD_BOUNDS = createMagneticFieldBounds(PLACEMENT_TARGETS);
+
+function getMagneticFieldInfo(position) {
+  const bounds = MAGNETIC_FIELD_BOUNDS;
+  const outsideX =
+    position.x < bounds.minX
+      ? bounds.minX - position.x
+      : position.x > bounds.maxX
+      ? position.x - bounds.maxX
+      : 0;
+  const outsideZ =
+    position.z < bounds.minZ
+      ? bounds.minZ - position.z
+      : position.z > bounds.maxZ
+      ? position.z - bounds.maxZ
+      : 0;
+  const outsideDistance = Math.hypot(outsideX, outsideZ);
+  const inside = outsideDistance <= 0.0001;
+  const strength = inside
+    ? 1
+    : THREE.MathUtils.clamp(
+        1 - outsideDistance / Math.max(bounds.feather, 0.001),
+        0,
+        1
+      );
+
+  return { inside, strength, outsideDistance };
+}
+
 const DEFAULT_SNAP_DISTANCE = 1;
 const DEFAULT_MAGNET_DISTANCE = 7;
-const DEFAULT_MAGNET_STRENGTH = 0.2;
+const DEFAULT_MAGNET_STRENGTH = 0.28;
+const MAGNET_DISTANCE_MULTIPLIER = 1.65;
 const EARLY_SNAP_MULTIPLIER = 1.55;
 const RELEASE_SNAP_MULTIPLIER = 1.35;
-const LANDING_ZONE_RATIO = 0.62;
-const EASY_SEAT_MAGNET_RATIO = 0.42;
-const MAX_LANDING_PULL = 0.58;
+const LANDING_ZONE_RATIO = 0.68;
+const EASY_SEAT_MAGNET_RATIO = 0.5;
+const MAX_LANDING_PULL = 0.94;
+const MAGNETIC_CAPTURE_RATIO = 1.08;
+const RELEASED_MAGNET_SPEED = 8.5;
+const RELEASED_ROTATION_SPEED = 10;
+const MAGNETIC_SNAP_MIN_DURATION_MS = 440;
+const MAGNETIC_SNAP_MAX_DURATION_MS = 1150;
 const DRAG_FOLLOW_SPEED = 26;
 const ROTATION_FOLLOW_SPEED = 10.5;
 const SETTLE_SPEED = 10;
@@ -119,6 +178,11 @@ const OVERVIEW_CAMERA_DISTANCE_MULTIPLIER = 1.52;
 const SAFE_CARRY_RISE_START = 0.18;
 const SAFE_CARRY_DESCENT_START = 0.68;
 const SAFE_CARRY_Y_SPEED = 9.5;
+const MAGNETIC_FIELD_MIN_POINTER_TRAVEL_PX = 14;
+const MAGNETIC_FIELD_EDGE_CAPTURE_STRENGTH = 0.14;
+const MAGNETIC_FIELD_MIN_PULL = 0.1;
+const MAGNETIC_FIELD_MAX_PULL = 0.76;
+const MAGNETIC_ROUTE_CAPTURE_RATIO = 0.55;
 
 /* -------------------------- Grading rubric ------------------------- */
 /* A fresh test starts at 100. Each mistake type deducts points. The
@@ -128,7 +192,7 @@ const SAFE_CARRY_Y_SPEED = 9.5;
    with placements can reach an A without needing pixel-perfect drags. */
 const PENALTY_WRONG_ORDER_CLICK = 6; // clicked a part that isn't valid yet
 const PENALTY_FUMBLE = 3; // released far from any valid target
-const FUMBLE_THRESHOLD_PER_PART = 2; // fumbles allowed before next one penalizes
+const ORDER_MISTAKE_DEBOUNCE_MS = 650;
 const TIME_PAR_SECONDS = 480; // 8 minutes "par" time, mirrors a technician SLA
 const PENALTY_PER_OVER_PAR_MINUTE = 2;
 
@@ -144,6 +208,28 @@ function formatDuration(totalSeconds) {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = Math.floor(totalSeconds % 60);
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+function calculateScore(wrongOrderCount, fumbleCount, elapsedSeconds) {
+  const safeElapsedSeconds = Math.max(0, Number(elapsedSeconds) || 0);
+  const overParMinutes = Math.max(
+    0,
+    Math.ceil((safeElapsedSeconds - TIME_PAR_SECONDS) / 60)
+  );
+  const orderPenaltyPoints = Math.max(0, wrongOrderCount) * PENALTY_WRONG_ORDER_CLICK;
+  const fumblePenaltyPoints = Math.max(0, fumbleCount) * PENALTY_FUMBLE;
+  const timePenaltyPoints = overParMinutes * PENALTY_PER_OVER_PAR_MINUTE;
+  const totalPenaltyPoints =
+    orderPenaltyPoints + fumblePenaltyPoints + timePenaltyPoints;
+
+  return {
+    score: Math.max(0, Math.min(100, Math.round(100 - totalPenaltyPoints))),
+    overParMinutes,
+    orderPenaltyPoints,
+    fumblePenaltyPoints,
+    timePenaltyPoints,
+    totalPenaltyPoints,
+  };
 }
 
 
@@ -257,15 +343,18 @@ function getAutomaticLayFlatQuaternion(modelSize) {
 
 function PartModel({
   part,
-  isReachable,
+  isActive,
   isCompleted,
+  testActive,
+  hostTransformRef,
+  onTransformChange,
+  allowPointerThrough = false,
   onPartCompleted,
-  onInvalidClick,
+  onLockedPartClick,
   onFumble,
   onInteractionMessage,
   onDragStateChange,
   onTelemetry,
-  testActive,
 }) {
   const { scene } = useGLTF(encodeURI(part.path));
   const { camera, gl } = useThree();
@@ -287,10 +376,18 @@ function PartModel({
   const [phase, setPhase] = useState("installed");
   const grabbingRef = useRef(false);
   const completionReportedRef = useRef(false);
-  const grabStartedAtRef = useRef(0);
   const frameCounterRef = useRef(0);
-  const initialDistanceRef = useRef(1);
   const fumbleCountRef = useRef(0);
+  const initialDistanceRef = useRef(1);
+  const magnetStateRef = useRef("Detach first");
+  const magnetNoticeRef = useRef(false);
+  const snapStartedAtRef = useRef(0);
+  const snapDurationRef = useRef(MAGNETIC_SNAP_MIN_DURATION_MS);
+  const snapStartPositionRef = useRef(new THREE.Vector3());
+  const snapStartQuaternionRef = useRef(new THREE.Quaternion());
+  const snapArcHeightRef = useRef(0);
+  const snapProgressRef = useRef(0);
+  const installedQuaternionRef = useRef(new THREE.Quaternion());
 
   const mouseRef = useRef(new THREE.Vector2());
   const pointerClientRef = useRef(new THREE.Vector2());
@@ -316,9 +413,11 @@ function PartModel({
   const currentCenterWorldRef = useRef(new THREE.Vector3());
   const targetCenterWorldRef = useRef(new THREE.Vector3());
   const desiredQuaternionRef = useRef(new THREE.Quaternion());
+  const hostOffsetRef = useRef(new THREE.Vector3());
+  const rotatedHostOffsetRef = useRef(new THREE.Vector3());
 
   const isMovablePart = MOVABLE_COMPONENT_KEYS.has(part.key);
-  const canInteract = isMovablePart && testActive && !isCompleted;
+  const canInteract = isMovablePart && testActive && (isActive || isCompleted);
   const placementTarget = PLACEMENT_TARGETS[part.key];
 
   const targetPosition = useMemo(() => {
@@ -326,9 +425,14 @@ function PartModel({
     return new THREE.Vector3(...placementTarget.position);
   }, [placementTarget]);
 
-  const lockedY = targetPosition?.y ?? null;
-  const snapDistance = placementTarget?.snapDistance ?? DEFAULT_SNAP_DISTANCE;
-  const magnetDistance = placementTarget?.magnetDistance ?? DEFAULT_MAGNET_DISTANCE;
+  const snapDistance =
+    placementTarget?.snapDistance ?? DEFAULT_SNAP_DISTANCE;
+  // The authored values define the useful field radius around the seat.
+  // Expand them slightly so the attraction is noticeable before the part is
+  // already touching the target. This remains local to the active component.
+  const magnetDistance =
+    (placementTarget?.magnetDistance ?? DEFAULT_MAGNET_DISTANCE) *
+    MAGNET_DISTANCE_MULTIPLIER;
   const autoSnapDistance = snapDistance * EARLY_SNAP_MULTIPLIER;
 
   const modelBounds = useMemo(() => {
@@ -344,13 +448,12 @@ function PartModel({
   const modelSize = modelBounds.size;
   const modelRadius = Math.max(modelSize.x, modelSize.y, modelSize.z) * 0.5;
 
-  const installedQuaternion = useMemo(() => new THREE.Quaternion(), []);
   const detachedQuaternion = useMemo(() => {
     if (placementTarget?.preserveInstalledRotation) {
-      return installedQuaternion.clone();
+      return new THREE.Quaternion();
     }
     return getAutomaticLayFlatQuaternion(modelSize);
-  }, [installedQuaternion, modelSize, placementTarget]);
+  }, [modelSize, placementTarget]);
 
   const setPhaseSafely = useCallback((nextPhase) => {
     phaseRef.current = nextPhase;
@@ -378,8 +481,12 @@ function PartModel({
   const getVisualCenters = useCallback(() => {
     if (!groupRef.current || !targetPosition) return null;
 
-    currentCenterLocalRef.current.copy(groupRef.current.position).add(modelCenter);
-    targetCenterLocalRef.current.copy(targetPosition).add(modelCenter);
+    currentCenterLocalRef.current
+      .copy(groupRef.current.position)
+      .add(modelCenter);
+    targetCenterLocalRef.current
+      .copy(targetPosition)
+      .add(modelCenter);
 
     currentCenterWorldRef.current.copy(currentCenterLocalRef.current);
     targetCenterWorldRef.current.copy(targetCenterLocalRef.current);
@@ -400,7 +507,9 @@ function PartModel({
   }, [modelCenter, targetPosition]);
 
   const publishTelemetry = useCallback(() => {
-    if (!groupRef.current || !isMovablePart || !targetPosition) return;
+    if (!groupRef.current || !isMovablePart || !isActive || !targetPosition) {
+      return;
+    }
 
     const centers = getVisualCenters();
     if (!centers) return;
@@ -420,30 +529,122 @@ function PartModel({
       1
     );
 
+    const tableField = getMagneticFieldInfo(groupRef.current.position);
+    const routeCaptureDistance = Math.max(
+      magnetDistance,
+      initialDistanceRef.current * MAGNETIC_ROUTE_CAPTURE_RATIO
+    );
+    let magnetState = magnetStateRef.current;
+    if (phaseRef.current === "installed") magnetState = "Detach first";
+    else if (phaseRef.current === "detached") magnetState = "Ready to move";
+    else if (phaseRef.current === "placed") magnetState = "Placed";
+    else if (phaseRef.current === "snapping") magnetState = magnetStateRef.current;
+    else if (tableField.inside || distance <= routeCaptureDistance)
+      magnetState = "Inside magnetic table field";
+    else if (tableField.strength > 0) magnetState = "Table field pulling";
+    else if (distance <= autoSnapDistance * 1.2) magnetState = "Snap ready";
+    else if (distance < magnetDistance) magnetState = "Seat magnet engaged";
+    else magnetState = "Move toward table field";
+
+    magnetStateRef.current = magnetState;
+
+    const yDifference = Math.abs(
+      groupRef.current.position.y - targetPosition.y
+    );
+
     onTelemetry?.({
       key: part.key,
       label: COMPONENT_LABELS[part.key] || part.key,
       phase: phaseRef.current,
+      position: groupRef.current.position.toArray(),
+      currentCenter: centers.currentWorld.toArray(),
+      targetCenter: centers.targetWorld.toArray(),
       distance,
-      progress: phaseRef.current === "placed" ? 1 : progress,
+      progress:
+        phaseRef.current === "placed"
+          ? 1
+          : phaseRef.current === "snapping"
+          ? snapProgressRef.current
+          : progress,
+      magnetState,
+      yAligned:
+        phaseRef.current !== "installed" && yDifference <= 0.08,
+      yTransitioning:
+        phaseRef.current !== "installed" &&
+        phaseRef.current !== "placed" &&
+        yDifference > 0.08,
+      modelRadius: Math.max(modelRadius, 0.5),
     });
-  }, [getVisualCenters, isMovablePart, magnetDistance, onTelemetry, part.key, targetPosition]);
+  }, [
+    autoSnapDistance,
+    getVisualCenters,
+    isActive,
+    isMovablePart,
+    magnetDistance,
+    modelRadius,
+    onTelemetry,
+    part.key,
+    targetPosition,
+  ]);
+
+  useEffect(() => {
+    if (!isActive || !targetPosition) return undefined;
+
+    const centers = getVisualCenters();
+    if (centers) {
+      initialDistanceRef.current = Math.max(
+        Math.hypot(
+          centers.currentLocal.x - centers.targetLocal.x,
+          centers.currentLocal.z - centers.targetLocal.z
+        ),
+        magnetDistance,
+        1
+      );
+    }
+
+    frameCounterRef.current = 0;
+    magnetNoticeRef.current = false;
+    const frame = requestAnimationFrame(() => publishTelemetry());
+    return () => cancelAnimationFrame(frame);
+  }, [getVisualCenters, isActive, magnetDistance, publishTelemetry, targetPosition]);
 
   const detachComponent = useCallback(() => {
-    if (!testActive || phaseRef.current !== "installed") return;
+    if (!isActive || phaseRef.current !== "installed") return;
+
+    if (rotationRef.current) {
+      installedQuaternionRef.current.copy(rotationRef.current.quaternion);
+    }
+
+    // Detaching no longer changes the part's position or orientation. This
+    // prevents long components such as the GPU from rotating through the case
+    // and appearing to fall below it on the first click.
     setPhaseSafely("detached");
-    onInteractionMessage(`${COMPONENT_LABELS[part.key]} detached. Grab it and carry it to its bench position.`);
+    magnetStateRef.current = "Ready to move";
+    onInteractionMessage(
+      `${COMPONENT_LABELS[part.key]} detached safely. It will keep its installed pose until you grab and move it.`
+    );
+
     requestAnimationFrame(() => publishTelemetry());
-  }, [testActive, onInteractionMessage, part.key, publishTelemetry, setPhaseSafely]);
+  }, [
+    isActive,
+    onInteractionMessage,
+    part.key,
+    publishTelemetry,
+    setPhaseSafely,
+  ]);
 
   const beginGrab = useCallback(
     (event) => {
       if (!groupRef.current || !targetPosition) return;
+
       updateMouse(event);
 
       const centers = getVisualCenters();
       if (!centers) return;
 
+      // Preserve the current height at grab time. The component transitions
+      // smoothly to its table-seat Y level while the user moves it, instead of
+      // teleporting downward as soon as it is clicked.
       dragCurrentYRef.current = groupRef.current.position.y;
       grabStartYRef.current = groupRef.current.position.y;
       const safeClearance = THREE.MathUtils.clamp(
@@ -452,18 +653,31 @@ function PartModel({
         3.5
       );
 
+      // Establish the carry height only on the first grab. Re-grabbing a
+      // released part reuses that height instead of adding more clearance,
+      // preventing the component from ratcheting higher after every attempt.
       if (phaseRef.current === "detached") {
         safeCarryYRef.current =
-          Math.max(grabStartYRef.current, lockedY ?? grabStartYRef.current) + safeClearance;
+          Math.max(
+            grabStartYRef.current,
+            targetPosition.y
+          ) + safeClearance;
       } else {
         safeCarryYRef.current = Math.max(
           safeCarryYRef.current,
           grabStartYRef.current,
-          lockedY ?? grabStartYRef.current
+          targetPosition.y
         );
       }
       dragStartGroupLocalRef.current.copy(groupRef.current.position);
+      desiredGroupLocalRef.current.copy(groupRef.current.position);
+      assistedGoalRef.current.copy(groupRef.current.position);
       dragStartWorldRef.current.copy(centers.currentWorld);
+
+      // Screen-space drag basis: moving the pointer left/right and up/down
+      // moves the part in the same apparent screen directions at every camera
+      // angle. This removes the stiff or reversed feeling caused by a fixed
+      // camera-facing ray plane.
       grabPointerStartRef.current.copy(pointerClientRef.current);
 
       const parent = groupRef.current.parent;
@@ -494,7 +708,10 @@ function PartModel({
         .projectOnPlane(dragPlaneNormalWorldRef.current);
 
       dragUpWorldRef.current
-        .crossVectors(dragPlaneNormalWorldRef.current, dragRightWorldRef.current)
+        .crossVectors(
+          dragPlaneNormalWorldRef.current,
+          dragRightWorldRef.current
+        )
         .normalize();
 
       if (
@@ -505,30 +722,40 @@ function PartModel({
       }
 
       const rect = gl.domElement.getBoundingClientRect();
-      const cameraDistance = Math.max(camera.position.distanceTo(centers.currentWorld), 0.1);
+      const cameraDistance = Math.max(
+        camera.position.distanceTo(centers.currentWorld),
+        0.1
+      );
 
       if (camera.isPerspectiveCamera) {
         const verticalFov = THREE.MathUtils.degToRad(camera.fov);
         worldUnitsPerPixelRef.current =
-          (2 * cameraDistance * Math.tan(verticalFov / 2)) / Math.max(rect.height, 1);
+          (2 * cameraDistance * Math.tan(verticalFov / 2)) /
+          Math.max(rect.height, 1);
       } else if (camera.isOrthographicCamera) {
         worldUnitsPerPixelRef.current =
-          Math.abs(camera.top - camera.bottom) / Math.max(camera.zoom * rect.height, 1);
+          Math.abs(camera.top - camera.bottom) /
+          Math.max(camera.zoom * rect.height, 1);
       } else {
         worldUnitsPerPixelRef.current = 0.02;
       }
 
       grabbingRef.current = true;
-      grabStartedAtRef.current = performance.now();
+      magnetNoticeRef.current = false;
       setPhaseSafely("grabbed");
       onDragStateChange(true);
       document.body.style.cursor = "grabbing";
-      onInteractionMessage(`${COMPONENT_LABELS[part.key]} grabbed. Carry it to its bench position and click again to release.`);
+      onInteractionMessage(
+        `${COMPONENT_LABELS[part.key]} grabbed. Move it into the open table workspace — you do not need to reach the small highlighted seat. The invisible field will take over and animate the remaining travel.`
+      );
       publishTelemetry();
     },
     [
       camera,
       getVisualCenters,
+      gl,
+      modelRadius,
+      modelSize.y,
       onDragStateChange,
       onInteractionMessage,
       part.key,
@@ -536,10 +763,6 @@ function PartModel({
       setPhaseSafely,
       targetPosition,
       updateMouse,
-      lockedY,
-      modelRadius,
-      modelSize.y,
-      gl,
     ]
   );
 
@@ -549,29 +772,75 @@ function PartModel({
     onPartCompleted(part.key);
   }, [isCompleted, onPartCompleted, part.key]);
 
-  const seatComponent = useCallback(() => {
-    if (!groupRef.current || !targetPosition || phaseRef.current === "placed") return;
+  const finishSeatComponent = useCallback(() => {
+    if (!groupRef.current || !rotationRef.current || !targetPosition) return;
 
     groupRef.current.position.copy(targetPosition);
+    rotationRef.current.quaternion.copy(detachedQuaternion);
     dragCurrentYRef.current = targetPosition.y;
-    if (rotationRef.current) {
-      rotationRef.current.quaternion.copy(detachedQuaternion);
-    }
-
+    snapProgressRef.current = 1;
     grabbingRef.current = false;
+    magnetStateRef.current = "Placed";
     onDragStateChange(false);
     document.body.style.cursor = "default";
     setPhaseSafely("placed");
-    onInteractionMessage(`${COMPONENT_LABELS[part.key]} placed correctly on the bench.`);
+    onInteractionMessage(
+      `${COMPONENT_LABELS[part.key]} is seated correctly.`
+    );
     publishTelemetry();
     reportCompletion();
   }, [
     detachedQuaternion,
     onDragStateChange,
+    onFumble,
     onInteractionMessage,
     part.key,
     publishTelemetry,
     reportCompletion,
+    setPhaseSafely,
+    targetPosition,
+  ]);
+
+  const seatComponent = useCallback(() => {
+    if (
+      !groupRef.current ||
+      !rotationRef.current ||
+      !targetPosition ||
+      phaseRef.current === "placed" ||
+      phaseRef.current === "snapping"
+    ) {
+      return;
+    }
+
+    const distance = groupRef.current.position.distanceTo(targetPosition);
+    snapStartPositionRef.current.copy(groupRef.current.position);
+    snapStartQuaternionRef.current.copy(rotationRef.current.quaternion);
+    snapStartedAtRef.current = performance.now();
+    snapProgressRef.current = 0;
+    snapDurationRef.current = THREE.MathUtils.clamp(
+      MAGNETIC_SNAP_MIN_DURATION_MS + distance * 28,
+      MAGNETIC_SNAP_MIN_DURATION_MS,
+      MAGNETIC_SNAP_MAX_DURATION_MS
+    );
+    snapArcHeightRef.current = THREE.MathUtils.clamp(
+      Math.max(modelRadius * 0.16, distance * 0.06),
+      0.18,
+      1.8
+    );
+
+    grabbingRef.current = false;
+    magnetStateRef.current = "Magnetic capture";
+    onDragStateChange(false);
+    document.body.style.cursor = "default";
+    setPhaseSafely("snapping");
+    onInteractionMessage(
+      `Magnetic field captured ${COMPONENT_LABELS[part.key]}. Seating it now…`
+    );
+  }, [
+    modelRadius,
+    onDragStateChange,
+    onInteractionMessage,
+    part.key,
     setPhaseSafely,
     targetPosition,
   ]);
@@ -591,23 +860,59 @@ function PartModel({
       centers.currentLocal.z - centers.targetLocal.z
     );
 
-    const easyReleaseDistance = Math.min(
-      magnetDistance * LANDING_ZONE_RATIO,
-      Math.max(autoSnapDistance * RELEASE_SNAP_MULTIPLIER, snapDistance * 2.15)
+    const easyReleaseDistance = Math.max(
+      magnetDistance * MAGNETIC_CAPTURE_RATIO,
+      autoSnapDistance * RELEASE_SNAP_MULTIPLIER,
+      snapDistance * 2.15
+    );
+    const routeCaptureDistance = Math.max(
+      magnetDistance,
+      initialDistanceRef.current * MAGNETIC_ROUTE_CAPTURE_RATIO
+    );
+    const currentTableField = getMagneticFieldInfo(groupRef.current.position);
+    const pointerTableField = getMagneticFieldInfo(
+      desiredGroupLocalRef.current
+    );
+    const tableFieldStrength = Math.max(
+      currentTableField.strength,
+      pointerTableField.strength
     );
 
-    if (distanceToTarget <= easyReleaseDistance) {
+    if (
+      currentTableField.inside ||
+      pointerTableField.inside ||
+      tableFieldStrength >= MAGNETIC_FIELD_EDGE_CAPTURE_STRENGTH ||
+      distanceToTarget <= routeCaptureDistance ||
+      distanceToTarget <= easyReleaseDistance
+    ) {
       seatComponent();
       return;
     }
 
-    fumbleCountRef.current += 1;
-    if (fumbleCountRef.current > FUMBLE_THRESHOLD_PER_PART) {
-      onFumble(part.key);
+    const pointerTravel = Math.hypot(
+      pointerClientRef.current.x - grabPointerStartRef.current.x,
+      pointerClientRef.current.y - grabPointerStartRef.current.y
+    );
+
+    if (pointerTravel < MAGNETIC_FIELD_MIN_POINTER_TRAVEL_PX) {
+      setPhaseSafely("released");
+      magnetStateRef.current = "Released without placement attempt";
+      onInteractionMessage(
+        `${COMPONENT_LABELS[part.key]} was released without a meaningful drag. No placement error was recorded.`
+      );
+      publishTelemetry();
+      return;
     }
 
+    const nextFumbleCount = fumbleCountRef.current + 1;
+    fumbleCountRef.current = nextFumbleCount;
+    onFumble?.(part.key, { attempt: nextFumbleCount });
+
     setPhaseSafely("released");
-    onInteractionMessage(`${COMPONENT_LABELS[part.key]} released away from its bench position. Grab it again and move it closer.`);
+    magnetStateRef.current = "Move toward table field";
+    onInteractionMessage(
+      `${COMPONENT_LABELS[part.key]} was released before the magnetic workspace. Move it into the open table area; the field will pull it to the exact highlighted seat automatically.`
+    );
     publishTelemetry();
   }, [
     autoSnapDistance,
@@ -615,7 +920,6 @@ function PartModel({
     magnetDistance,
     snapDistance,
     onDragStateChange,
-    onFumble,
     onInteractionMessage,
     part.key,
     publishTelemetry,
@@ -633,20 +937,23 @@ function PartModel({
   useEffect(() => {
     if (phase !== "grabbed") return undefined;
 
-    const handleReleaseClick = (event) => {
+    const handlePointerUp = (event) => {
       if (event.button !== 0) return;
-      if (performance.now() - grabStartedAtRef.current < 120) return;
-      if (!gl.domElement.contains(event.target)) return;
-
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation?.();
       releaseComponent();
     };
 
-    window.addEventListener("pointerdown", handleReleaseClick, true);
-    return () => window.removeEventListener("pointerdown", handleReleaseClick, true);
-  }, [gl, phase, releaseComponent]);
+    const handleEscape = (event) => {
+      if (event.key !== "Escape") return;
+      releaseComponent();
+    };
+
+    window.addEventListener("pointerup", handlePointerUp, true);
+    window.addEventListener("keydown", handleEscape);
+    return () => {
+      window.removeEventListener("pointerup", handlePointerUp, true);
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, [phase, releaseComponent]);
 
   useEffect(() => {
     const cancelGrab = () => {
@@ -676,29 +983,105 @@ function PartModel({
     const rotationAlpha = 1 - Math.exp(-ROTATION_FOLLOW_SPEED * safeDelta);
     const settleAlpha = 1 - Math.exp(-SETTLE_SPEED * safeDelta);
 
+    // CPU, SSD, and both RAM modules remain physically attached to the
+    // motherboard until their own stage starts. The motherboard publishes its
+    // live rigid transform, and mounted parts inherit it around the exact
+    // motherboard model pivot. This prevents them from being left floating in
+    // the case while the board is carried to the table.
+    const hostTransform = hostTransformRef?.current;
+    if (hostTransform && phaseRef.current === "installed" && !isCompleted) {
+      hostOffsetRef.current
+        .copy(hostTransform.pivot)
+        .sub(modelCenter);
+      rotatedHostOffsetRef.current
+        .copy(hostOffsetRef.current)
+        .applyQuaternion(hostTransform.quaternion);
+      groupRef.current.position
+        .copy(hostTransform.position)
+        .add(hostOffsetRef.current)
+        .sub(rotatedHostOffsetRef.current);
+      rotationRef.current.quaternion.copy(hostTransform.quaternion);
+      installedQuaternionRef.current.copy(hostTransform.quaternion);
+    }
+
     const centers = targetPosition ? getVisualCenters() : null;
     const distance = centers
-      ? Math.hypot(centers.currentLocal.x - centers.targetLocal.x, centers.currentLocal.z - centers.targetLocal.z)
+      ? Math.hypot(
+          centers.currentLocal.x - centers.targetLocal.x,
+          centers.currentLocal.z - centers.targetLocal.z
+        )
       : Infinity;
-    const proximity = THREE.MathUtils.clamp(1 - distance / Math.max(magnetDistance, 0.001), 0, 1);
+    const proximity = THREE.MathUtils.clamp(
+      1 - distance / Math.max(magnetDistance, 0.001),
+      0,
+      1
+    );
 
-    if (grabbingRef.current) {
-      const pointerDeltaX = pointerClientRef.current.x - grabPointerStartRef.current.x;
-      const pointerDeltaY = pointerClientRef.current.y - grabPointerStartRef.current.y;
+    if (phaseRef.current === "snapping" && targetPosition) {
+      const elapsed = performance.now() - snapStartedAtRef.current;
+      const rawProgress = THREE.MathUtils.clamp(
+        elapsed / Math.max(snapDurationRef.current, 1),
+        0,
+        1
+      );
+      snapProgressRef.current = rawProgress;
+      // Visible magnetic motion: ease in, accelerate through the pull,
+      // then ease out while position and rotation settle together.
+      const easedProgress = THREE.MathUtils.smootherstep(rawProgress, 0, 1);
+      const rotationProgress = easedProgress;
+
+      groupRef.current.position.lerpVectors(
+        snapStartPositionRef.current,
+        targetPosition,
+        easedProgress
+      );
+      groupRef.current.position.y +=
+        Math.sin(rawProgress * Math.PI) * snapArcHeightRef.current;
+      rotationRef.current.quaternion.slerpQuaternions(
+        snapStartQuaternionRef.current,
+        detachedQuaternion,
+        rotationProgress
+      );
+      magnetStateRef.current = `Seating ${Math.round(rawProgress * 100)}%`;
+
+      if (rawProgress >= 1) {
+        finishSeatComponent();
+      }
+    } else if (grabbingRef.current) {
+      const pointerDeltaX =
+        pointerClientRef.current.x - grabPointerStartRef.current.x;
+      const pointerDeltaY =
+        pointerClientRef.current.y - grabPointerStartRef.current.y;
+      const pointerTravelPx = Math.hypot(pointerDeltaX, pointerDeltaY);
       const dragScale = worldUnitsPerPixelRef.current * DRAG_SCREEN_GAIN;
 
       desiredCenterWorldRef.current
         .copy(dragStartWorldRef.current)
-        .addScaledVector(dragRightWorldRef.current, pointerDeltaX * dragScale)
-        .addScaledVector(dragUpWorldRef.current, -pointerDeltaY * dragScale);
+        .addScaledVector(
+          dragRightWorldRef.current,
+          pointerDeltaX * dragScale
+        )
+        .addScaledVector(
+          dragUpWorldRef.current,
+          -pointerDeltaY * dragScale
+        );
 
       desiredCenterLocalRef.current.copy(desiredCenterWorldRef.current);
       const parent = groupRef.current.parent;
       if (parent) parent.worldToLocal(desiredCenterLocalRef.current);
 
-      desiredGroupLocalRef.current.copy(desiredCenterLocalRef.current).sub(modelCenter);
+      desiredGroupLocalRef.current
+        .copy(desiredCenterLocalRef.current)
+        .sub(modelCenter);
 
-      const workspacePadding = Math.max(magnetDistance * WORKSPACE_PADDING_MULTIPLIER, modelRadius * 2.4, 4);
+      // Keep dragging inside a generous corridor between the installed part
+      // and its target. This prevents accidental pointer excursions from
+      // throwing a component far outside the visible work area.
+      const workspacePadding = Math.max(
+        magnetDistance * WORKSPACE_PADDING_MULTIPLIER,
+        modelRadius * 2.4,
+        4
+      );
       desiredGroupLocalRef.current.x = THREE.MathUtils.clamp(
         desiredGroupLocalRef.current.x,
         Math.min(dragStartGroupLocalRef.current.x, targetPosition.x) - workspacePadding,
@@ -715,60 +1098,146 @@ function PartModel({
         desiredGroupLocalRef.current.z - targetPosition.z
       );
 
-      if (lockedY !== null) {
-        const routeDistance = Math.max(initialDistanceRef.current, 0.001);
-        const routeProgress = THREE.MathUtils.clamp(1 - desiredDistance / routeDistance, 0, 1);
+      const routeDistance = Math.max(initialDistanceRef.current, 0.001);
+      const routeProgress = THREE.MathUtils.clamp(
+        1 - desiredDistance / routeDistance,
+        0,
+        1
+      );
 
-        let safeRouteY = safeCarryYRef.current;
-        if (routeProgress < SAFE_CARRY_RISE_START) {
-          const riseProgress = THREE.MathUtils.smoothstep(routeProgress, 0, SAFE_CARRY_RISE_START);
-          safeRouteY = THREE.MathUtils.lerp(grabStartYRef.current, safeCarryYRef.current, riseProgress);
-        } else if (routeProgress >= SAFE_CARRY_DESCENT_START) {
-          const descentProgress = THREE.MathUtils.smoothstep(routeProgress, SAFE_CARRY_DESCENT_START, 1);
-          safeRouteY = THREE.MathUtils.lerp(safeCarryYRef.current, lockedY, descentProgress);
-        }
-
-        const landingDistance = Math.max(magnetDistance * LANDING_ZONE_RATIO, autoSnapDistance * 2.2);
-        if (desiredDistance < landingDistance) {
-          const landingProgress = THREE.MathUtils.smoothstep(1 - desiredDistance / Math.max(landingDistance, 0.001), 0, 1);
-          safeRouteY = THREE.MathUtils.lerp(safeRouteY, lockedY, landingProgress);
-        }
-
-        const ySpeed = desiredDistance < landingDistance ? SAFE_CARRY_Y_SPEED * 1.7 : SAFE_CARRY_Y_SPEED;
-        const safeYAlpha = 1 - Math.exp(-ySpeed * safeDelta);
-        dragCurrentYRef.current = THREE.MathUtils.lerp(dragCurrentYRef.current, safeRouteY, safeYAlpha);
-        desiredGroupLocalRef.current.y = dragCurrentYRef.current;
+      let safeRouteY = safeCarryYRef.current;
+      if (routeProgress < SAFE_CARRY_RISE_START) {
+        const riseProgress = THREE.MathUtils.smoothstep(
+          routeProgress,
+          0,
+          SAFE_CARRY_RISE_START
+        );
+        safeRouteY = THREE.MathUtils.lerp(
+          grabStartYRef.current,
+          safeCarryYRef.current,
+          riseProgress
+        );
+      } else if (routeProgress >= SAFE_CARRY_DESCENT_START) {
+        const descentProgress = THREE.MathUtils.smoothstep(
+          routeProgress,
+          SAFE_CARRY_DESCENT_START,
+          1
+        );
+        safeRouteY = THREE.MathUtils.lerp(
+          safeCarryYRef.current,
+          targetPosition.y,
+          descentProgress
+        );
       }
+
+      const landingDistance = Math.max(
+        magnetDistance * LANDING_ZONE_RATIO,
+        autoSnapDistance * 2.2
+      );
+      if (desiredDistance < landingDistance) {
+        const landingProgress = THREE.MathUtils.smoothstep(
+          1 - desiredDistance / Math.max(landingDistance, 0.001),
+          0,
+          1
+        );
+        safeRouteY = THREE.MathUtils.lerp(
+          safeRouteY,
+          targetPosition.y,
+          landingProgress
+        );
+      }
+
+      const ySpeed =
+        desiredDistance < landingDistance
+          ? SAFE_CARRY_Y_SPEED * 1.7
+          : SAFE_CARRY_Y_SPEED;
+      const safeYAlpha = 1 - Math.exp(-ySpeed * safeDelta);
+      dragCurrentYRef.current = THREE.MathUtils.lerp(
+        dragCurrentYRef.current,
+        safeRouteY,
+        safeYAlpha
+      );
+      desiredGroupLocalRef.current.y = dragCurrentYRef.current;
 
       assistedGoalRef.current.copy(desiredGroupLocalRef.current);
 
-      if (desiredDistance < magnetDistance) {
-        const normalizedPull = THREE.MathUtils.clamp(1 - desiredDistance / magnetDistance, 0, 1);
-        const easedPull = normalizedPull * normalizedPull * (3 - 2 * normalizedPull);
-        const pull = THREE.MathUtils.clamp(
-          DEFAULT_MAGNET_STRENGTH + easedPull * 0.38,
-          DEFAULT_MAGNET_STRENGTH,
-          MAX_LANDING_PULL
+      const tableField = getMagneticFieldInfo(desiredGroupLocalRef.current);
+      const routeCaptureDistance = Math.max(
+        magnetDistance,
+        initialDistanceRef.current * MAGNETIC_ROUTE_CAPTURE_RATIO
+      );
+      const routeFieldStrength = THREE.MathUtils.clamp(
+        1 - desiredDistance / Math.max(routeCaptureDistance, 0.001),
+        0,
+        1
+      );
+      const seatFieldStrength = THREE.MathUtils.clamp(
+        1 - desiredDistance / Math.max(magnetDistance, 0.001),
+        0,
+        1
+      );
+      const activeFieldStrength = Math.max(
+        tableField.strength,
+        routeFieldStrength,
+        seatFieldStrength
+      );
+
+      if (activeFieldStrength > 0) {
+        const easedFieldStrength = THREE.MathUtils.smootherstep(
+          activeFieldStrength,
+          0,
+          1
+        );
+        const pull = THREE.MathUtils.lerp(
+          MAGNETIC_FIELD_MIN_PULL,
+          MAGNETIC_FIELD_MAX_PULL,
+          easedFieldStrength
         );
 
         assistedGoalRef.current.lerp(targetPosition, pull);
-        if (lockedY !== null) assistedGoalRef.current.y = dragCurrentYRef.current;
+        magnetStateRef.current =
+          tableField.inside || desiredDistance <= routeCaptureDistance
+            ? "Table field captured"
+            : "Table field pulling";
+
+        if (!magnetNoticeRef.current && activeFieldStrength > 0.1) {
+          magnetNoticeRef.current = true;
+          onInteractionMessage(
+            `Magnetic field engaged for ${COMPONENT_LABELS[part.key]}. It is now pulling toward the exact seat.`
+          );
+        }
+      } else {
+        magnetStateRef.current = "Move toward table field";
+        magnetNoticeRef.current = false;
       }
 
       groupRef.current.position.lerp(assistedGoalRef.current, movementAlpha);
-      if (lockedY !== null) groupRef.current.position.y = dragCurrentYRef.current;
 
       const currentDistance = Math.hypot(
         groupRef.current.position.x - targetPosition.x,
         groupRef.current.position.z - targetPosition.z
       );
 
-      const extractionDistance = centers ? centers.currentWorld.distanceTo(dragStartWorldRef.current) : 0;
-      const extractionProgress = THREE.MathUtils.clamp(extractionDistance / Math.max(modelRadius * 1.3, 1.25), 0, 1);
-      const orientationBlend = Math.max(extractionProgress, proximity);
+      const extractionDistance = centers
+        ? centers.currentWorld.distanceTo(dragStartWorldRef.current)
+        : 0;
+      const extractionProgress = THREE.MathUtils.clamp(
+        extractionDistance / Math.max(modelRadius * 1.3, 1.25),
+        0,
+        1
+      );
+      const orientationBlend = Math.max(
+        extractionProgress,
+        proximity
+      );
 
-      desiredQuaternionRef.current.copy(installedQuaternion).slerp(detachedQuaternion, orientationBlend);
-      rotationRef.current.quaternion.slerp(desiredQuaternionRef.current, rotationAlpha);
+      desiredQuaternionRef.current
+        .copy(installedQuaternionRef.current)
+        .slerp(detachedQuaternion, orientationBlend);
+      rotationRef.current.quaternion.slerp(
+        desiredQuaternionRef.current,
+        rotationAlpha
+      );
 
       const easySeatDistance = Math.min(
         magnetDistance * EASY_SEAT_MAGNET_RATIO,
@@ -776,9 +1245,16 @@ function PartModel({
       );
       const pointerInsideSnap = desiredDistance <= easySeatDistance;
       const partInsideSnap = currentDistance <= easySeatDistance;
-      const laggingButCentered = pointerInsideSnap && currentDistance <= easySeatDistance * 1.85;
+      const laggingButCentered =
+        pointerInsideSnap && currentDistance <= easySeatDistance * 1.85;
+      const enteredTableField =
+        (tableField.inside || desiredDistance <= routeCaptureDistance) &&
+        pointerTravelPx >= MAGNETIC_FIELD_MIN_POINTER_TRAVEL_PX;
 
-      if (partInsideSnap || laggingButCentered) {
+      if (enteredTableField || partInsideSnap || laggingButCentered) {
+        magnetStateRef.current = enteredTableField
+          ? "Table field auto-capture"
+          : "Auto snap";
         seatComponent();
         return;
       }
@@ -786,51 +1262,155 @@ function PartModel({
       groupRef.current.position.lerp(targetPosition, settleAlpha);
       groupRef.current.position.y = targetPosition.y;
       rotationRef.current.quaternion.slerp(detachedQuaternion, settleAlpha);
-    } else if (phaseRef.current === "released") {
-      dragCurrentYRef.current = groupRef.current.position.y;
-      rotationRef.current.quaternion.slerp(detachedQuaternion, rotationAlpha);
+    } else if (phaseRef.current === "released" && targetPosition) {
+      // Keep the field alive after pointer release. If the component was
+      // dropped anywhere inside the magnetic radius, it continues travelling
+      // toward the seat instead of freezing in mid-air.
+      const releasedPlanarDistance = Math.hypot(
+        groupRef.current.position.x - targetPosition.x,
+        groupRef.current.position.z - targetPosition.z
+      );
+      const releasedFieldRadius = Math.max(
+        magnetDistance * MAGNETIC_CAPTURE_RATIO,
+        initialDistanceRef.current * MAGNETIC_ROUTE_CAPTURE_RATIO
+      );
+      const releasedTableField = getMagneticFieldInfo(
+        groupRef.current.position
+      );
+      const releasedRouteStrength = THREE.MathUtils.clamp(
+        1 - releasedPlanarDistance / Math.max(releasedFieldRadius, 0.001),
+        0,
+        1
+      );
+      const releasedFieldStrength = Math.max(
+        releasedTableField.strength,
+        releasedRouteStrength
+      );
+
+      if (releasedFieldStrength > 0) {
+        const releasedPull = THREE.MathUtils.smootherstep(
+          releasedFieldStrength,
+          0,
+          1
+        );
+        const releasedMoveAlpha =
+          1 -
+          Math.exp(
+            -(
+              RELEASED_MAGNET_SPEED +
+              releasedPull * RELEASED_MAGNET_SPEED
+            ) * safeDelta
+          );
+        const releasedRotationAlpha =
+          1 - Math.exp(-RELEASED_ROTATION_SPEED * safeDelta);
+
+        groupRef.current.position.lerp(targetPosition, releasedMoveAlpha);
+        rotationRef.current.quaternion.slerp(
+          detachedQuaternion,
+          releasedRotationAlpha
+        );
+        dragCurrentYRef.current = groupRef.current.position.y;
+        magnetStateRef.current = releasedTableField.inside
+          ? "Table field captured"
+          : releasedPlanarDistance <= autoSnapDistance * 1.5
+          ? "Auto snap"
+          : "Magnetic pull";
+
+        const releasedSnapDistance = Math.max(
+          autoSnapDistance * 1.35,
+          snapDistance * 2.2,
+          magnetDistance * 0.16
+        );
+        if (
+          releasedTableField.inside ||
+          releasedPlanarDistance <= releasedSnapDistance
+        ) {
+          seatComponent();
+          return;
+        }
+      } else {
+        dragCurrentYRef.current = groupRef.current.position.y;
+        rotationRef.current.quaternion.slerp(
+          detachedQuaternion,
+          rotationAlpha
+        );
+        magnetStateRef.current = "Move closer";
+      }
     } else {
-      rotationRef.current.quaternion.slerp(installedQuaternion, rotationAlpha);
+      // Installed and newly detached components keep the authored installed
+      // orientation. Rotation begins only after the part has visibly cleared
+      // its slot, avoiding geometry passing through the case.
+      rotationRef.current.quaternion.slerp(
+        installedQuaternionRef.current,
+        rotationAlpha
+      );
     }
 
+    onTransformChange?.({
+      position: groupRef.current.position,
+      quaternion: rotationRef.current.quaternion,
+      pivot: modelCenter,
+      phase: phaseRef.current,
+    });
+
     frameCounterRef.current += 1;
-    const interval = grabbingRef.current ? TELEMETRY_FRAME_INTERVAL : TELEMETRY_IDLE_FRAME_INTERVAL;
-    if (frameCounterRef.current % interval === 0) publishTelemetry();
+    const interval = grabbingRef.current
+      ? TELEMETRY_FRAME_INTERVAL
+      : TELEMETRY_IDLE_FRAME_INTERVAL;
+    if (isActive && frameCounterRef.current % interval === 0) {
+      publishTelemetry();
+    }
   });
 
   const handlePointerDown = useCallback(
     (event) => {
       if (!isMovablePart || !testActive) return;
+
+      // A populated motherboard and its mounted components overlap in the
+      // raycast. Pass-through parts must never stop the event: while the board
+      // is being removed, its locked children pass clicks to the motherboard;
+      // after the board is seated, the completed motherboard passes clicks to
+      // the active CPU, SSD, or RAM module above it.
+      if (allowPointerThrough) return;
+
       event.stopPropagation();
 
-      if (isCompleted) {
-        onInteractionMessage(`${COMPONENT_LABELS[part.key]} is already removed.`);
-        return;
-      }
-
-      if (!isReachable) {
-        onInvalidClick(part.key);
+      if (!canInteract) {
+        onLockedPartClick(part.key);
         return;
       }
 
       if (phaseRef.current === "installed") {
+        // One continuous gesture now works: pointer-down detaches the part and
+        // immediately starts the grab. A simple click still leaves it safely
+        // detached when the pointer is released.
         detachComponent();
-        return;
-      }
-
-      if (phaseRef.current === "detached" || phaseRef.current === "released") {
         beginGrab(event);
         return;
       }
+
+      if (
+        phaseRef.current === "detached" ||
+        phaseRef.current === "released"
+      ) {
+        beginGrab(event);
+        return;
+      }
+
+      if (phaseRef.current === "placed") {
+        onInteractionMessage(
+          `${COMPONENT_LABELS[part.key]} is already seated on the table.`
+        );
+      }
     },
     [
+      allowPointerThrough,
       beginGrab,
+      canInteract,
       detachComponent,
-      isCompleted,
       isMovablePart,
-      isReachable,
       onInteractionMessage,
-      onInvalidClick,
+      onLockedPartClick,
       part.key,
       testActive,
     ]
@@ -838,11 +1418,20 @@ function PartModel({
 
   const handlePointerOver = useCallback(
     (event) => {
-      if (!isMovablePart || !testActive || isCompleted) return;
+      if (!isMovablePart || allowPointerThrough) return;
       event.stopPropagation();
-      document.body.style.cursor = phaseRef.current === "installed" ? "pointer" : "grab";
+
+      if (!canInteract) {
+        document.body.style.cursor = "not-allowed";
+      } else if (phaseRef.current === "installed") {
+        document.body.style.cursor = "pointer";
+      } else if (phaseRef.current === "placed") {
+        document.body.style.cursor = "default";
+      } else {
+        document.body.style.cursor = "grab";
+      }
     },
-    [isCompleted, isMovablePart, testActive]
+    [allowPointerThrough, canInteract, isMovablePart]
   );
 
   const handlePointerOut = useCallback(() => {
@@ -850,20 +1439,39 @@ function PartModel({
   }, []);
 
   return (
-    <group
-      ref={groupRef}
-      onPointerDown={handlePointerDown}
-      onPointerOver={handlePointerOver}
-      onPointerOut={handlePointerOut}
-    >
-      <group position={[modelCenter.x, modelCenter.y, modelCenter.z]}>
-        <group ref={rotationRef}>
-          <group position={[-modelCenter.x, -modelCenter.y, -modelCenter.z]}>
-            <primitive object={clonedScene} dispose={null} />
+    <>
+      <group
+        ref={groupRef}
+        onPointerDown={handlePointerDown}
+        onPointerOver={handlePointerOver}
+        onPointerOut={handlePointerOut}
+      >
+        <group position={[modelCenter.x, modelCenter.y, modelCenter.z]}>
+          <group ref={rotationRef}>
+            {isMovablePart ? (
+              <mesh>
+                <boxGeometry
+                  args={[
+                    Math.max(modelSize.x * 1.12, 0.35),
+                    Math.max(modelSize.y * 1.18, 0.35),
+                    Math.max(modelSize.z * 1.12, 0.35),
+                  ]}
+                />
+                <meshBasicMaterial
+                  transparent
+                  opacity={0}
+                  depthWrite={false}
+                  colorWrite={false}
+                />
+              </mesh>
+            ) : null}
+            <group position={[-modelCenter.x, -modelCenter.y, -modelCenter.z]}>
+              <primitive object={clonedScene} dispose={null} />
+            </group>
           </group>
         </group>
       </group>
-    </group>
+    </>
   );
 }
 
@@ -924,17 +1532,51 @@ function AssembledPC({
   onTelemetry,
   rootRef,
 }) {
+  const motherboardTransformRef = useRef({
+    position: new THREE.Vector3(),
+    quaternion: new THREE.Quaternion(),
+    pivot: new THREE.Vector3(),
+    phase: "installed",
+  });
+
+  const handleMotherboardTransform = useCallback((transform) => {
+    motherboardTransformRef.current.position.copy(transform.position);
+    motherboardTransformRef.current.quaternion.copy(transform.quaternion);
+    motherboardTransformRef.current.pivot.copy(transform.pivot);
+    motherboardTransformRef.current.phase = transform.phase;
+  }, []);
+
+  const motherboardIsActive = testActive && reachableKeys.has("motherboard");
+  const motherboardIsCompleted = completedParts.includes("motherboard");
+  const mountedPartIsActive = [...reachableKeys].some((key) =>
+    MOTHERBOARD_MOUNTED_PARTS.has(key)
+  );
+
   return (
     <group ref={rootRef}>
       {parts.map((part) => (
         <PartModel
           key={part.key}
           part={part}
-          isReachable={reachableKeys.has(part.key)}
+          isActive={testActive && reachableKeys.has(part.key)}
           isCompleted={completedParts.includes(part.key)}
           testActive={testActive}
+          hostTransformRef={
+            MOTHERBOARD_MOUNTED_PARTS.has(part.key)
+              ? motherboardTransformRef
+              : undefined
+          }
+          onTransformChange={
+            part.key === "motherboard" ? handleMotherboardTransform : undefined
+          }
+          allowPointerThrough={
+            (motherboardIsActive && MOTHERBOARD_MOUNTED_PARTS.has(part.key)) ||
+            (part.key === "motherboard" &&
+              motherboardIsCompleted &&
+              mountedPartIsActive)
+          }
           onPartCompleted={onPartCompleted}
-          onInvalidClick={onInvalidClick}
+          onLockedPartClick={onInvalidClick}
           onFumble={onFumble}
           onInteractionMessage={onInteractionMessage}
           onDragStateChange={onDragStateChange}
@@ -1307,7 +1949,7 @@ function TestIntroCard({ onStart }) {
             <div className="rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4">
               <div className="text-xs font-black uppercase tracking-[0.16em] text-[#00ffb4]">Scored</div>
               <div className="mt-2 text-xs leading-5 text-[#9fb0ca]">
-                Wrong-order attempts and fumbled placements cost points.
+                Confirmed sequence errors and failed placement attempts cost points.
               </div>
             </div>
           </div>
@@ -1382,15 +2024,16 @@ function ResultsCard({ result, onRetry, onBackToDashboard }) {
               <div className="mt-2 text-sm font-bold text-white">{result.wrongOrderCount}</div>
             </div>
             <div className="rounded-2xl border border-[#1a2438] bg-white/[0.035] p-4">
-              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#ffd27d]">Fumbles</div>
+              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#ffd27d]">Placement Errors</div>
               <div className="mt-2 text-sm font-bold text-white">{result.fumbleCount}</div>
+              <div className="mt-1 text-[10px] text-[#7a8ba8]">-{result.fumbleCount * PENALTY_FUMBLE} points</div>
             </div>
           </div>
 
           <div className="mt-7 rounded-2xl border border-[#00ffb4]/18 bg-[#00ffb4]/6 px-4 py-3 text-xs leading-6 text-[#b7c6dd]">
-            Score starts at 100. Each out-of-order attempt costs {PENALTY_WRONG_ORDER_CLICK} points, each
-            excess fumble costs {PENALTY_FUMBLE} points, and time beyond {Math.round(TIME_PAR_SECONDS / 60)}{" "}
-            minutes costs {PENALTY_PER_OVER_PAR_MINUTE} points per extra minute. 75+ is a pass.
+            Score starts at 100. Each confirmed sequence error costs {PENALTY_WRONG_ORDER_CLICK} points, each
+            meaningful failed placement costs {PENALTY_FUMBLE} points, and time beyond {Math.round(TIME_PAR_SECONDS / 60)}{" "}
+            minutes costs {PENALTY_PER_OVER_PAR_MINUTE} points per extra minute. Click-release actions without a real drag are ignored. 75+ is a pass.
           </div>
 
           <div className="mt-7 flex flex-wrap justify-end gap-3">
@@ -1431,7 +2074,14 @@ export default function INTELFullDisassemblyPracticalTest({ onFinish, onBack }) 
   const checklistOrder = REMOVAL_SEQUENCE;
   const [wrongOrderCount, setWrongOrderCount] = useState(0);
   const [fumbleCount, setFumbleCount] = useState(0);
+  const completedPartsRef = useRef([]);
+  const wrongOrderCountRef = useRef(0);
+  const fumbleCountRef = useRef(0);
+  const lastOrderMistakeRef = useRef({ partKey: null, timestamp: 0 });
+  const startedAtRef = useRef(null);
+  const finalizationTimerRef = useRef(null);
   const [startedAt, setStartedAt] = useState(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [result, setResult] = useState(null);
   const [achievementToast, setAchievementToast] = useState(null);
   const [validationMessage, setValidationMessage] = useState(
@@ -1452,6 +2102,12 @@ export default function INTELFullDisassemblyPracticalTest({ onFinish, onBack }) 
 
   const allComponentsRemoved = completedParts.length === REMOVAL_SEQUENCE.length;
 
+  const liveScoring = calculateScore(
+    wrongOrderCount,
+    fumbleCount,
+    elapsedSeconds
+  );
+
   const handleSettingChange = (key, value) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
   };
@@ -1460,10 +2116,21 @@ export default function INTELFullDisassemblyPracticalTest({ onFinish, onBack }) 
     setCompletedParts([]);
     setWrongOrderCount(0);
     setFumbleCount(0);
+    completedPartsRef.current = [];
+    wrongOrderCountRef.current = 0;
+    fumbleCountRef.current = 0;
+    lastOrderMistakeRef.current = { partKey: null, timestamp: 0 };
+    startedAtRef.current = null;
+    setElapsedSeconds(0);
+    if (finalizationTimerRef.current) {
+      window.clearTimeout(finalizationTimerRef.current);
+      finalizationTimerRef.current = null;
+    }
     setStartedAt(null);
     setResult(null);
     setTestActive(false);
-    setSceneRevision((value) => value + 1);
+    setSceneRevision((value) => value + 1);
+
     setShowIntro(true);
     setValidationMessage("No hints are active. Click any exposed component to begin removing it.");
   }, []);
@@ -1487,6 +2154,27 @@ export default function INTELFullDisassemblyPracticalTest({ onFinish, onBack }) 
     return () => unsub();
   }, []);
 
+  useEffect(() => () => {
+    if (finalizationTimerRef.current) {
+      window.clearTimeout(finalizationTimerRef.current);
+      finalizationTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!testActive || !startedAtRef.current || result) return undefined;
+
+    const updateElapsed = () => {
+      setElapsedSeconds(
+        Math.max(0, (Date.now() - startedAtRef.current) / 1000)
+      );
+    };
+
+    updateElapsed();
+    const timerId = window.setInterval(updateElapsed, 1000);
+    return () => window.clearInterval(timerId);
+  }, [result, testActive]);
+
   const saveTestResult = useCallback(
     async (finalResult) => {
       if (!firebaseUser) return;
@@ -1502,6 +2190,7 @@ export default function INTELFullDisassemblyPracticalTest({ onFinish, onBack }) 
                 elapsedSeconds: finalResult.elapsedSeconds,
                 wrongOrderCount: finalResult.wrongOrderCount,
                 fumbleCount: finalResult.fumbleCount,
+                penalizedFumbleCount: finalResult.penalizedFumbleCount,
                 completedAt: serverTimestamp(),
               },
             },
@@ -1519,24 +2208,28 @@ export default function INTELFullDisassemblyPracticalTest({ onFinish, onBack }) 
   );
 
   const finishTest = useCallback(
-    (finalCompletedParts, finalWrongOrder, finalFumbles) => {
-      const elapsedSeconds = startedAt ? (Date.now() - startedAt) / 1000 : 0;
-      const overParMinutes = Math.max(0, Math.ceil((elapsedSeconds - TIME_PAR_SECONDS) / 60));
-
-      const rawScore =
-        100 -
-        finalWrongOrder * PENALTY_WRONG_ORDER_CLICK -
-        finalFumbles * PENALTY_FUMBLE -
-        overParMinutes * PENALTY_PER_OVER_PAR_MINUTE;
-
-      const score = Math.max(0, Math.min(100, Math.round(rawScore)));
-
+    (
+      finalCompletedParts = completedPartsRef.current,
+      finalWrongOrder = wrongOrderCountRef.current,
+      finalFumbles = fumbleCountRef.current
+    ) => {
+      const startTimestamp = startedAtRef.current ?? startedAt;
+      const finalElapsedSeconds = startTimestamp
+        ? (Date.now() - startTimestamp) / 1000
+        : 0;
+      const scoring = calculateScore(
+        finalWrongOrder,
+        finalFumbles,
+        finalElapsedSeconds
+      );
+      const score = scoring.score;
       const finalResult = {
         score,
-        elapsedSeconds,
+        elapsedSeconds: finalElapsedSeconds,
         partsCompleted: finalCompletedParts.length,
         wrongOrderCount: finalWrongOrder,
         fumbleCount: finalFumbles,
+        penalizedFumbleCount: finalFumbles,
       };
 
       setResult(finalResult);
@@ -1549,43 +2242,65 @@ export default function INTELFullDisassemblyPracticalTest({ onFinish, onBack }) 
 
   const handlePartCompleted = useCallback(
     (partKey) => {
-      if (completedParts.includes(partKey)) return;
+      if (completedPartsRef.current.includes(partKey)) return;
 
-      const nextCompletedParts = [...completedParts, partKey];
+      const nextCompletedParts = [...completedPartsRef.current, partKey];
+      completedPartsRef.current = nextCompletedParts;
       setCompletedParts(nextCompletedParts);
       playCompletionSound(settings.sound, false);
       setValidationMessage(`${COMPONENT_LABELS[partKey]} removed and placed correctly.`);
 
       if (nextCompletedParts.length === REMOVAL_SEQUENCE.length) {
-        finishTest(nextCompletedParts, wrongOrderCount, fumbleCount);
+        finishTest(nextCompletedParts);
       }
     },
-    [completedParts, finishTest, fumbleCount, settings.sound, wrongOrderCount]
+    [finishTest, settings.sound]
   );
 
   const handleInvalidClick = useCallback(
     (partKey) => {
-      setWrongOrderCount((value) => value + 1);
+      const now = Date.now();
+      const previous = lastOrderMistakeRef.current;
+      if (
+        previous.partKey === partKey &&
+        now - previous.timestamp < ORDER_MISTAKE_DEBOUNCE_MS
+      ) {
+        return;
+      }
+
+      lastOrderMistakeRef.current = { partKey, timestamp: now };
+      const nextCount = wrongOrderCountRef.current + 1;
+      wrongOrderCountRef.current = nextCount;
+      setWrongOrderCount(nextCount);
       playMistakeSound(settings.sound);
       setValidationMessage(
-        `${COMPONENT_LABELS[partKey]} is not accessible yet — something else needs to come out first. (Order mistake logged.)`
+        `${COMPONENT_LABELS[partKey]} is not accessible yet — a prerequisite component must be completed first. (Sequence error ${nextCount}: -${PENALTY_WRONG_ORDER_CLICK} points.)`
       );
     },
     [settings.sound]
   );
 
   const handleFumble = useCallback(
-    (partKey) => {
-      setFumbleCount((value) => value + 1);
-      setValidationMessage(`${COMPONENT_LABELS[partKey]} was released far from its bench position. (Fumble logged.)`);
+    (partKey, { attempt = 1 } = {}) => {
+      const nextTotal = fumbleCountRef.current + 1;
+      fumbleCountRef.current = nextTotal;
+      setFumbleCount(nextTotal);
+      playMistakeSound(settings.sound);
+
+      setValidationMessage(
+        `${COMPONENT_LABELS[partKey]} was released outside the magnetic capture field. Placement error ${nextTotal} (attempt ${attempt} for this part): -${PENALTY_FUMBLE} points.`
+      );
     },
-    []
+    [settings.sound]
   );
 
   const handleStartTest = useCallback(() => {
     setShowIntro(false);
     setTestActive(true);
-    setStartedAt(Date.now());
+    const started = Date.now();
+    startedAtRef.current = started;
+    setStartedAt(started);
+    setElapsedSeconds(0);
   }, []);
 
   const handleBackToDashboard = () => {
@@ -1667,8 +2382,15 @@ export default function INTELFullDisassemblyPracticalTest({ onFinish, onBack }) 
                 </div>
                 <div className="flex flex-wrap items-center gap-4 text-[11px] font-bold">
                   <span className="text-[#00ffb4]">{completedParts.length} / {REMOVAL_SEQUENCE.length} removed</span>
-                  <span className="text-[#ff9f7d]">{wrongOrderCount} order mistakes</span>
-                  <span className="text-[#ffd27d]">{fumbleCount} fumbles</span>
+                  <span className="text-[#ff9f7d]">
+                    {wrongOrderCount} sequence {wrongOrderCount === 1 ? "error" : "errors"}{liveScoring.orderPenaltyPoints > 0 ? ` (-${liveScoring.orderPenaltyPoints} pts)` : ""}
+                  </span>
+                  <span className="text-[#ffd27d]">
+                    {fumbleCount} placement {fumbleCount === 1 ? "error" : "errors"}{liveScoring.fumblePenaltyPoints > 0 ? ` (-${liveScoring.fumblePenaltyPoints} pts)` : ""}
+                  </span>
+                  <span className="text-[#8ec5ff]">
+                    {formatDuration(elapsedSeconds)} • Score {liveScoring.score} / 100
+                  </span>
                 </div>
               </div>
             </div>
