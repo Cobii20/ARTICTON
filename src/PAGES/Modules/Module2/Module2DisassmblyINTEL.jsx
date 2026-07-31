@@ -23,16 +23,35 @@ import { getUserSettings } from "../../../utils/userSettings";
 /* Ordered disassembly configuration (INTEL platform)          */
 /* ------------------------------------------------------------------ */
 
+/*
+ * Validated training order:
+ * 1) remove the GPU so it cannot obstruct the board,
+ * 2) remove the motherboard with the CPU, M.2 SSD, and both RAM sticks still
+ *    mounted,
+ * 3) service the board-mounted parts on the table,
+ * 4) finish with the case-mounted HDD and PSU.
+ *
+ * RAM is intentionally represented as one unordered stage. Either stick can
+ * be removed first, but both must be seated before the learner may continue.
+ */
 const steps = [
-  { key: "gpu", name: "GPU Disassembly", partKey: "gpu" },
-  { key: "ssd", name: "SSD Disassembly", partKey: "ssd" },
-  { key: "hdd", name: "HDD Disassembly", partKey: "hdd" },
-  { key: "ram1", name: "RAM 1 Disassembly", partKey: "ram1" },
-  { key: "ram2", name: "RAM 2 Disassembly", partKey: "ram2" },
-  { key: "cpu", name: "CPU Disassembly", partKey: "cpu" },
-  { key: "psu", name: "PSU Disassembly", partKey: "psu" },
-  { key: "motherboard", name: "Motherboard Disassembly", partKey: "motherboard" },
-  { key: "final", name: "Full Disassembly", partKey: null },
+  { key: "gpu", name: "GPU Disassembly", partKeys: ["gpu"] },
+  {
+    key: "motherboard",
+    name: "Motherboard Disassembly",
+    partKeys: ["motherboard"],
+  },
+  { key: "ssd", name: "SSD Disassembly", partKeys: ["ssd"] },
+  {
+    key: "ram",
+    name: "RAM Disassembly (2 Modules)",
+    partKeys: ["ram1", "ram2"],
+    unordered: true,
+  },
+  { key: "cpu", name: "CPU Disassembly", partKeys: ["cpu"] },
+  { key: "hdd", name: "HDD Disassembly", partKeys: ["hdd"] },
+  { key: "psu", name: "PSU Disassembly", partKeys: ["psu"] },
+  { key: "final", name: "Full Disassembly", partKeys: [] },
 ];
 
 const PART_MODELS = [
@@ -48,9 +67,9 @@ const PART_MODELS = [
   { key: "gpu", path: "/models/NEWgpuINTEL.glb" },
 ];
 
-const REMOVAL_SEQUENCE = steps
-  .map((step) => step.partKey)
-  .filter(Boolean);
+const GUIDED_STEPS = steps.filter((step) => step.key !== "final");
+const REMOVAL_SEQUENCE = GUIDED_STEPS.flatMap((step) => step.partKeys);
+const MOTHERBOARD_MOUNTED_PARTS = new Set(["cpu", "ssd", "ram1", "ram2"]);
 
 const MOVABLE_COMPONENT_KEYS = new Set(REMOVAL_SEQUENCE);
 
@@ -65,9 +84,124 @@ const COMPONENT_LABELS = {
   motherboard: "Motherboard",
 };
 
-/* Final INTEL table seats measured from the user-provided in-scene telemetry.
-   Every removable component now has its own highlighted seat, fixed Y movement
-   plane, magnetic pull range, and final snap position. */
+const STEP_INSTRUCTION_GUIDES = Object.freeze({
+  gpu: {
+    title: "Prepare to Remove the GPU",
+    summary: "The graphics card is removed first so its bracket, power leads, and large body cannot obstruct the motherboard. Treat the card and PCIe slot as precision parts.",
+    procedure: [
+      "Confirm the PC is shut down, the PSU switch is off, the AC cable is unplugged, residual power is discharged, and ESD protection is in place.",
+      "Release each PCIe power connector by pressing its latch and pulling on the connector body—not on the wires.",
+      "Remove the rear expansion-bracket screw or screws, then press the PCIe x16 slot-retention latch completely.",
+      "Support the GPU with both hands, hold its edges or backplate, and lift it straight out while keeping the bracket clear of the case."
+    ],
+    safety: "Support the card's weight before releasing the slot latch. Keep fingers away from fan blades and gold contacts.",
+    verify: "No power cable or screw remains attached, the slot latch is released, and the gold edge connector clears the slot without resistance.",
+    avoid: "Pulling before the retention latch is released or rocking the GPU sideways, which can damage the PCIe slot.",
+    simulation: "Drag the GPU into the open table workspace. Once it enters the broad invisible field, release it and let the animated magnetic route complete the seating."
+  },
+  motherboard: {
+    title: "Prepare to Remove the Populated Motherboard",
+    summary: "Remove the motherboard as one supported assembly with the CPU, SSD, and both RAM modules still mounted. These smaller parts are serviced only after the board is safely on the table.",
+    procedure: [
+      "Disconnect the 24-pin ATX cable, CPU EPS cable, fan leads, SATA leads, front-panel connectors, USB headers, and front-audio connector. Label small connectors when needed.",
+      "Check the entire board perimeter and remove every motherboard mounting screw while supporting the board.",
+      "Grip two strong board edges with both hands, keep the populated board level, and lift it evenly from the standoffs.",
+      "Move the rear I/O ports clear of the case opening before carrying the motherboard to the table."
+    ],
+    safety: "Do not flex the board or place its soldered underside on metal. Confirm every cable and screw is free before lifting.",
+    verify: "The board lifts without snagging, the rear I/O clears the case, and the CPU, SSD, and both RAM modules remain mounted.",
+    avoid: "Using a heatsink, socket, RAM stick, or connector as a handle, or leaving one hidden screw attached.",
+    simulation: "Move the whole populated motherboard toward the table. The mounted CPU, SSD, and RAM travel with it and become clickable only after the board is seated."
+  },
+  ssd: {
+    title: "Prepare to Remove the M.2 SSD",
+    summary: "With the motherboard supported on the table, release the M.2 drive without bending its connector or losing the small retaining hardware.",
+    procedure: [
+      "Locate the M.2 retaining screw or tool-less latch and support the free end of the SSD before releasing it.",
+      "Allow the drive to rise naturally to roughly a 20–30° angle; do not force it flat or upward.",
+      "Grip the side edges and pull the SSD straight out of the M.2 socket along the same angle.",
+      "Store the retaining screw or latch hardware in a labeled tray."
+    ],
+    safety: "Handle the SSD by its edges. Avoid touching memory packages, controller chips, and gold contacts.",
+    verify: "The retaining hardware is removed, the SSD rises freely, and the edge connector leaves the socket straight without scraping.",
+    avoid: "Prying the SSD upward while it is still secured or pulling it vertically instead of out along the slot angle.",
+    simulation: "Drag the SSD away from the seated motherboard and into the table field; the magnetic animation will align it with its storage position."
+  },
+  ram: {
+    title: "Prepare to Remove Both RAM Modules",
+    summary: "Either RAM module may be removed first. Complete both modules in this stage while keeping the DIMM slots and gold contacts protected.",
+    procedure: [
+      "Open the DIMM retaining latch or latches fully for the selected module.",
+      "Grip the module at both top corners and lift evenly, following the slot direction without twisting.",
+      "Place the module on an antistatic surface, then repeat the same process for the remaining RAM module.",
+      "Keep the two modules together as a matched set and note their original slot positions."
+    ],
+    safety: "Use only the top and side edges. Do not touch the gold contacts or press on surface-mounted chips.",
+    verify: "Each latch is fully open and each RAM module clears its slot evenly with no bending.",
+    avoid: "Pulling one end first, using excessive force, or forgetting that both modules must be removed before continuing.",
+    simulation: "Select either RAM stick first. After it seats on the table, remove the other; the next stage unlocks only when both are complete."
+  },
+  cpu: {
+    title: "Prepare to Remove the CPU",
+    summary: "The processor is removed only after the motherboard is on the table and the cooling assembly has been safely released.",
+    procedure: [
+      "Disconnect the CPU-fan lead, loosen the cooler fasteners gradually in a cross pattern, and gently twist the cooler to break the thermal-paste seal before lifting it.",
+      "Release the socket lever, open the load plate completely, then lift the processor straight up by its edges using the corner triangle and notches as orientation references.",
+      "Place the CPU contact-side up in a protective tray and keep the exposed motherboard socket covered and untouched."
+    ],
+    safety: "Intel socket pins are in the motherboard socket and bend easily. Keep fingers, tools, and loose screws away from the open socket.",
+    verify: "The cooler is free, the retention mechanism is fully open, and the CPU lifts vertically without friction.",
+    avoid: "Touching the socket pins or CPU contact pads, dragging the CPU across the socket, or forcing the load plate.",
+    simulation: "Lift the CPU away from the socket and guide it toward the table field. The magnet will animate the final protected placement."
+  },
+  hdd: {
+    title: "Prepare to Remove the HDD",
+    summary: "The hard drive is heavier than its connectors suggest. Disconnect it first, then support the drive while releasing its tray or screws.",
+    procedure: [
+      "Disconnect the SATA data cable and SATA power connector by their molded plugs, not by their wires.",
+      "Support the drive and remove the mounting screws, release tabs, or drive-caddy latch.",
+      "Slide the HDD straight out of its bay without striking the case or bending the connectors.",
+      "Place the drive flat on a stable, antistatic area and keep its circuit board protected."
+    ],
+    safety: "Do not drop, shake, or sharply impact a hard drive. Keep tools away from its exposed circuit board.",
+    verify: "Both cables are disconnected, all mounts are released, and the drive slides freely while fully supported.",
+    avoid: "Using the SATA connectors as handles or allowing the drive's weight to hang from a cable.",
+    simulation: "Carry the HDD into the table magnetic field and release it before the highlighted seat; the animation handles the final approach."
+  },
+  psu: {
+    title: "Prepare to Remove the PSU",
+    summary: "The power supply is removed last after every cable it feeds has been disconnected. Its weight must be supported before the rear screws are released.",
+    procedure: [
+      "Trace and disconnect every PSU lead, including motherboard, CPU, GPU, SATA, and peripheral power connections.",
+      "Support the PSU from inside the case and remove the rear mounting screws in a controlled pattern.",
+      "Slide the unit straight out of its bay while keeping cables clear of fans, brackets, and case openings.",
+      "Set the PSU down securely without opening its enclosure."
+    ],
+    safety: "A PSU contains high-voltage capacitors. Never open its enclosure, even when unplugged. Support its full weight during removal.",
+    verify: "No power lead remains connected, all rear screws are removed, and the PSU exits the bay without snagging.",
+    avoid: "Removing the mounting screws before supporting the PSU or attempting to service internal PSU components.",
+    simulation: "Move the PSU into the table field. Its animated route preserves the installed rotation and lowers it smoothly into the final seat."
+  },
+  final: {
+    title: "Final Unguided Disassembly Challenge",
+    summary: "Repeat the complete procedure without target highlights. The same safety rules and dependency checks remain active.",
+    procedure: [
+      "Remove the GPU first, then remove the populated motherboard and seat it on the table.",
+      "Remove the SSD, then remove both RAM modules in either order, followed by the CPU.",
+      "Finish with the HDD and remove the PSU last.",
+      "Pause before every movement to verify cables, screws, latches, support, and a clear travel path."
+    ],
+    safety: "No guide highlight means you must identify every connector and retention point yourself. Never use force to compensate for uncertainty.",
+    verify: "All eight components are safely seated on the table and the validated order has been followed from start to finish.",
+    avoid: "Guessing, skipping a latch or cable check, or servicing board-mounted parts before the motherboard is seated.",
+    simulation: "Complete GPU → motherboard → SSD → both RAM modules (either order) → CPU → HDD → PSU. Magnetic seating remains active, but guide highlights are hidden."
+  }
+});
+
+/* Final INTEL table seats measured from the in-scene telemetry.
+   These coordinates are in the same local space used by each draggable
+   component group. A component is completed only after it reaches its
+   assigned seat and is magnetically snapped into place. */
 const PLACEMENT_TARGETS = Object.freeze({
   gpu: {
     position: [-11.387, -6.232, 24.891],
@@ -112,35 +246,128 @@ const PLACEMENT_TARGETS = Object.freeze({
   },
 });
 
+/*
+ * The magnetic capture zone is the whole open table workspace, not only the
+ * small holographic seat. The bounds are derived from all authored placement
+ * seats, so the same logic automatically respects AMD and Intel model scale.
+ */
+function createMagneticFieldBounds(targets) {
+  const positions = Object.values(targets)
+    .map((target) => target?.position)
+    .filter(Boolean);
+  const xs = positions.map((position) => position[0]);
+  const zs = positions.map((position) => position[2]);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minZ = Math.min(...zs);
+  const maxZ = Math.max(...zs);
+  const xSpan = Math.max(maxX - minX, 1);
+  const zSpan = Math.max(maxZ - minZ, 1);
+  const largestSpan = Math.max(xSpan, zSpan);
+
+  return Object.freeze({
+    minX: minX - Math.max(xSpan * 0.62, largestSpan * 0.15),
+    maxX: maxX + Math.max(xSpan * 0.62, largestSpan * 0.15),
+    minZ: minZ - Math.max(zSpan * 0.55, largestSpan * 0.15),
+    maxZ: maxZ + Math.max(zSpan * 0.32, largestSpan * 0.15),
+    feather: Math.max(largestSpan * 0.18, 2.4),
+  });
+}
+
+const MAGNETIC_FIELD_BOUNDS = createMagneticFieldBounds(PLACEMENT_TARGETS);
+
+function getMagneticFieldInfo(position) {
+  const bounds = MAGNETIC_FIELD_BOUNDS;
+  const outsideX =
+    position.x < bounds.minX
+      ? bounds.minX - position.x
+      : position.x > bounds.maxX
+      ? position.x - bounds.maxX
+      : 0;
+  const outsideZ =
+    position.z < bounds.minZ
+      ? bounds.minZ - position.z
+      : position.z > bounds.maxZ
+      ? position.z - bounds.maxZ
+      : 0;
+  const outsideDistance = Math.hypot(outsideX, outsideZ);
+  const inside = outsideDistance <= 0.0001;
+  const strength = inside
+    ? 1
+    : THREE.MathUtils.clamp(
+        1 - outsideDistance / Math.max(bounds.feather, 0.001),
+        0,
+        1
+      );
+
+  return { inside, strength, outsideDistance };
+}
+
 const DEFAULT_SNAP_DISTANCE = 1;
 const DEFAULT_MAGNET_DISTANCE = 7;
-const DEFAULT_MAGNET_STRENGTH = 0.2;
-const MINIMUM_REMOVAL_DISTANCE = 0.04;
+const DEFAULT_MAGNET_STRENGTH = 0.28;
+const MAGNET_DISTANCE_MULTIPLIER = 1.65;
 const EARLY_SNAP_MULTIPLIER = 1.55;
 const RELEASE_SNAP_MULTIPLIER = 1.35;
-const LANDING_ZONE_RATIO = 0.62;
-const EASY_SEAT_MAGNET_RATIO = 0.42;
-const MAX_LANDING_PULL = 0.58;
+const LANDING_ZONE_RATIO = 0.68;
+const EASY_SEAT_MAGNET_RATIO = 0.5;
+const MAX_LANDING_PULL = 0.94;
+const MAGNETIC_CAPTURE_RATIO = 1.08;
+const RELEASED_MAGNET_SPEED = 8.5;
+const RELEASED_ROTATION_SPEED = 10;
+const MAGNETIC_SNAP_MIN_DURATION_MS = 440;
+const MAGNETIC_SNAP_MAX_DURATION_MS = 1150;
 const DRAG_FOLLOW_SPEED = 26;
 const ROTATION_FOLLOW_SPEED = 10.5;
-const HEIGHT_TRANSITION_SPEED = 3.8;
 const SETTLE_SPEED = 10;
 const WORKSPACE_PADDING_MULTIPLIER = 1.5;
 const TELEMETRY_FRAME_INTERVAL = 3;
 const TELEMETRY_IDLE_FRAME_INTERVAL = 16;
-const CAMERA_FOCUS_DURATION_MS = 620;
 const DRAG_SCREEN_GAIN = 1.06;
 const EASY_DRAG_CAMERA_DIRECTION = [0.42, 0.96, 1.08];
 const OVERVIEW_CAMERA_DISTANCE_MULTIPLIER = 1.52;
 const SAFE_CARRY_RISE_START = 0.18;
 const SAFE_CARRY_DESCENT_START = 0.68;
 const SAFE_CARRY_Y_SPEED = 9.5;
-const DISASSEMBLY_UX_VERSION = "Safe Extraction + Easy Seating";
+const MAGNETIC_FIELD_MIN_POINTER_TRAVEL_PX = 14;
+const MAGNETIC_FIELD_EDGE_CAPTURE_STRENGTH = 0.14;
+const MAGNETIC_FIELD_MIN_PULL = 0.1;
+const MAGNETIC_FIELD_MAX_PULL = 0.76;
+const MAGNETIC_ROUTE_CAPTURE_RATIO = 0.55;
 
 const LEGACY_STORAGE_KEYS = [
   "module2CompletedStepsINTEL",
   "module2DisassembledPartsINTEL",
 ];
+
+function getRemainingParts(stepConfig, completedParts) {
+  if (!stepConfig?.partKeys?.length) return [];
+  return stepConfig.partKeys.filter((key) => !completedParts.includes(key));
+}
+
+function isProcedureStepComplete(stepConfig, completedParts) {
+  return (
+    Boolean(stepConfig?.partKeys?.length) &&
+    stepConfig.partKeys.every((key) => completedParts.includes(key))
+  );
+}
+
+function getActiveProcedureStage(completedParts) {
+  return (
+    GUIDED_STEPS.find((stepConfig) =>
+      stepConfig.partKeys.some((key) => !completedParts.includes(key))
+    ) || null
+  );
+}
+
+function formatAllowedPartLabel(partKeys) {
+  if (!partKeys?.length) return "the current component";
+  if (partKeys.length === 1) return COMPONENT_LABELS[partKeys[0]];
+  if (partKeys.every((key) => key.startsWith("ram"))) {
+    return "either RAM module";
+  }
+  return partKeys.map((key) => COMPONENT_LABELS[key]).join(" or ");
+}
 
 function playCompletionSound(enabled, isFinal = false) {
   if (!enabled || typeof window === "undefined") return;
@@ -223,6 +450,9 @@ function PartModel({
   part,
   isActive,
   isCompleted,
+  hostTransformRef,
+  onTransformChange,
+  allowPointerThrough = false,
   onPartCompleted,
   onLockedPartClick,
   onInteractionMessage,
@@ -244,20 +474,22 @@ function PartModel({
 
   const groupRef = useRef(null);
   const rotationRef = useRef(null);
-  const tetherRef = useRef(null);
-  const tetherMaterialRef = useRef(null);
-  const captureRingRef = useRef(null);
-  const captureRingMaterialRef = useRef(null);
 
   const phaseRef = useRef("installed");
   const [phase, setPhase] = useState("installed");
   const grabbingRef = useRef(false);
   const completionReportedRef = useRef(false);
-  const grabStartedAtRef = useRef(0);
   const frameCounterRef = useRef(0);
   const initialDistanceRef = useRef(1);
   const magnetStateRef = useRef("Detach first");
   const magnetNoticeRef = useRef(false);
+  const snapStartedAtRef = useRef(0);
+  const snapDurationRef = useRef(MAGNETIC_SNAP_MIN_DURATION_MS);
+  const snapStartPositionRef = useRef(new THREE.Vector3());
+  const snapStartQuaternionRef = useRef(new THREE.Quaternion());
+  const snapArcHeightRef = useRef(0);
+  const snapProgressRef = useRef(0);
+  const installedQuaternionRef = useRef(new THREE.Quaternion());
 
   const mouseRef = useRef(new THREE.Vector2());
   const pointerClientRef = useRef(new THREE.Vector2());
@@ -269,15 +501,11 @@ function PartModel({
   const cameraUpWorldRef = useRef(new THREE.Vector3());
   const parentWorldQuaternionRef = useRef(new THREE.Quaternion());
   const worldUnitsPerPixelRef = useRef(0.02);
-  const raycasterRef = useRef(new THREE.Raycaster());
-  const dragPlaneRef = useRef(new THREE.Plane());
-  const dragOffsetRef = useRef(new THREE.Vector3());
   const dragStartWorldRef = useRef(new THREE.Vector3());
   const dragStartGroupLocalRef = useRef(new THREE.Vector3());
   const dragCurrentYRef = useRef(0);
   const grabStartYRef = useRef(0);
   const safeCarryYRef = useRef(0);
-  const hitPointRef = useRef(new THREE.Vector3());
   const desiredCenterWorldRef = useRef(new THREE.Vector3());
   const desiredCenterLocalRef = useRef(new THREE.Vector3());
   const desiredGroupLocalRef = useRef(new THREE.Vector3());
@@ -286,10 +514,9 @@ function PartModel({
   const targetCenterLocalRef = useRef(new THREE.Vector3());
   const currentCenterWorldRef = useRef(new THREE.Vector3());
   const targetCenterWorldRef = useRef(new THREE.Vector3());
-  const cameraDirectionRef = useRef(new THREE.Vector3());
-  const lineStartRef = useRef(new THREE.Vector3());
-  const lineEndRef = useRef(new THREE.Vector3());
   const desiredQuaternionRef = useRef(new THREE.Quaternion());
+  const hostOffsetRef = useRef(new THREE.Vector3());
+  const rotatedHostOffsetRef = useRef(new THREE.Vector3());
 
   const isMovablePart = MOVABLE_COMPONENT_KEYS.has(part.key);
   const canInteract = isMovablePart && (isActive || isCompleted);
@@ -300,11 +527,14 @@ function PartModel({
     return new THREE.Vector3(...placementTarget.position);
   }, [placementTarget]);
 
-  const lockedY = targetPosition?.y ?? null;
   const snapDistance =
     placementTarget?.snapDistance ?? DEFAULT_SNAP_DISTANCE;
+  // The authored values define the useful field radius around the seat.
+  // Expand them slightly so the attraction is noticeable before the part is
+  // already touching the target. This remains local to the active component.
   const magnetDistance =
-    placementTarget?.magnetDistance ?? DEFAULT_MAGNET_DISTANCE;
+    (placementTarget?.magnetDistance ?? DEFAULT_MAGNET_DISTANCE) *
+    MAGNET_DISTANCE_MULTIPLIER;
   const autoSnapDistance = snapDistance * EARLY_SNAP_MULTIPLIER;
 
   const modelBounds = useMemo(() => {
@@ -320,19 +550,12 @@ function PartModel({
   const modelSize = modelBounds.size;
   const modelRadius = Math.max(modelSize.x, modelSize.y, modelSize.z) * 0.5;
 
-  const installedQuaternion = useMemo(() => new THREE.Quaternion(), []);
   const detachedQuaternion = useMemo(() => {
     if (placementTarget?.preserveInstalledRotation) {
-      return installedQuaternion.clone();
+      return new THREE.Quaternion();
     }
     return getAutomaticLayFlatQuaternion(modelSize);
-  }, [installedQuaternion, modelSize, placementTarget]);
-
-  const captureRingRadius = THREE.MathUtils.clamp(
-    Math.max(modelRadius * 0.78, autoSnapDistance * 0.9),
-    0.7,
-    7
-  );
+  }, [modelSize, placementTarget]);
 
   const setPhaseSafely = useCallback((nextPhase) => {
     phaseRef.current = nextPhase;
@@ -408,18 +631,28 @@ function PartModel({
       1
     );
 
+    const tableField = getMagneticFieldInfo(groupRef.current.position);
+    const routeCaptureDistance = Math.max(
+      magnetDistance,
+      initialDistanceRef.current * MAGNETIC_ROUTE_CAPTURE_RATIO
+    );
     let magnetState = magnetStateRef.current;
     if (phaseRef.current === "installed") magnetState = "Detach first";
     else if (phaseRef.current === "detached") magnetState = "Ready to move";
     else if (phaseRef.current === "placed") magnetState = "Placed";
+    else if (phaseRef.current === "snapping") magnetState = magnetStateRef.current;
+    else if (tableField.inside || distance <= routeCaptureDistance)
+      magnetState = "Inside magnetic table field";
+    else if (tableField.strength > 0) magnetState = "Table field pulling";
     else if (distance <= autoSnapDistance * 1.2) magnetState = "Snap ready";
-    else if (distance < magnetDistance) magnetState = "Magnet engaged";
-    else magnetState = "Move closer";
+    else if (distance < magnetDistance) magnetState = "Seat magnet engaged";
+    else magnetState = "Move toward table field";
 
     magnetStateRef.current = magnetState;
 
-    const yDifference =
-      lockedY === null ? 0 : Math.abs(groupRef.current.position.y - lockedY);
+    const yDifference = Math.abs(
+      groupRef.current.position.y - targetPosition.y
+    );
 
     onTelemetry?.({
       key: part.key,
@@ -429,14 +662,16 @@ function PartModel({
       currentCenter: centers.currentWorld.toArray(),
       targetCenter: centers.targetWorld.toArray(),
       distance,
-      progress: phaseRef.current === "placed" ? 1 : progress,
+      progress:
+        phaseRef.current === "placed"
+          ? 1
+          : phaseRef.current === "snapping"
+          ? snapProgressRef.current
+          : progress,
       magnetState,
-      yLocked:
-        lockedY !== null &&
-        phaseRef.current !== "installed" &&
-        yDifference <= 0.08,
+      yAligned:
+        phaseRef.current !== "installed" && yDifference <= 0.08,
       yTransitioning:
-        lockedY !== null &&
         phaseRef.current !== "installed" &&
         phaseRef.current !== "placed" &&
         yDifference > 0.08,
@@ -447,7 +682,6 @@ function PartModel({
     getVisualCenters,
     isActive,
     isMovablePart,
-    lockedY,
     magnetDistance,
     modelRadius,
     onTelemetry,
@@ -478,6 +712,10 @@ function PartModel({
 
   const detachComponent = useCallback(() => {
     if (!isActive || phaseRef.current !== "installed") return;
+
+    if (rotationRef.current) {
+      installedQuaternionRef.current.copy(rotationRef.current.quaternion);
+    }
 
     // Detaching no longer changes the part's position or orientation. This
     // prevents long components such as the GPU from rotating through the case
@@ -524,16 +762,18 @@ function PartModel({
         safeCarryYRef.current =
           Math.max(
             grabStartYRef.current,
-            lockedY ?? grabStartYRef.current
+            targetPosition.y
           ) + safeClearance;
       } else {
         safeCarryYRef.current = Math.max(
           safeCarryYRef.current,
           grabStartYRef.current,
-          lockedY ?? grabStartYRef.current
+          targetPosition.y
         );
       }
       dragStartGroupLocalRef.current.copy(groupRef.current.position);
+      desiredGroupLocalRef.current.copy(groupRef.current.position);
+      assistedGoalRef.current.copy(groupRef.current.position);
       dragStartWorldRef.current.copy(centers.currentWorld);
 
       // Screen-space drag basis: moving the pointer left/right and up/down
@@ -603,19 +843,21 @@ function PartModel({
       }
 
       grabbingRef.current = true;
-      grabStartedAtRef.current = performance.now();
       magnetNoticeRef.current = false;
       setPhaseSafely("grabbed");
       onDragStateChange(true);
       document.body.style.cursor = "grabbing";
       onInteractionMessage(
-        `${COMPONENT_LABELS[part.key]} grabbed. It will follow a safe visible carry path above the case and table, then descend into an enlarged assisted seating zone near the highlighted seat.`
+        `${COMPONENT_LABELS[part.key]} grabbed. Move it into the open table workspace — you do not need to reach the small highlighted seat. The invisible field will take over and animate the remaining travel.`
       );
       publishTelemetry();
     },
     [
       camera,
       getVisualCenters,
+      gl,
+      modelRadius,
+      modelSize.y,
       onDragStateChange,
       onInteractionMessage,
       part.key,
@@ -632,24 +874,20 @@ function PartModel({
     onPartCompleted(part.key);
   }, [isCompleted, onPartCompleted, part.key]);
 
-  const seatComponent = useCallback(() => {
-    if (!groupRef.current || !targetPosition || phaseRef.current === "placed") {
-      return;
-    }
+  const finishSeatComponent = useCallback(() => {
+    if (!groupRef.current || !rotationRef.current || !targetPosition) return;
 
     groupRef.current.position.copy(targetPosition);
+    rotationRef.current.quaternion.copy(detachedQuaternion);
     dragCurrentYRef.current = targetPosition.y;
-    if (rotationRef.current) {
-      rotationRef.current.quaternion.copy(detachedQuaternion);
-    }
-
+    snapProgressRef.current = 1;
     grabbingRef.current = false;
     magnetStateRef.current = "Placed";
     onDragStateChange(false);
     document.body.style.cursor = "default";
     setPhaseSafely("placed");
     onInteractionMessage(
-      `${COMPONENT_LABELS[part.key]} smoothly snapped into its highlighted table position.`
+      `${COMPONENT_LABELS[part.key]} is seated correctly.`
     );
     publishTelemetry();
     reportCompletion();
@@ -660,6 +898,50 @@ function PartModel({
     part.key,
     publishTelemetry,
     reportCompletion,
+    setPhaseSafely,
+    targetPosition,
+  ]);
+
+  const seatComponent = useCallback(() => {
+    if (
+      !groupRef.current ||
+      !rotationRef.current ||
+      !targetPosition ||
+      phaseRef.current === "placed" ||
+      phaseRef.current === "snapping"
+    ) {
+      return;
+    }
+
+    const distance = groupRef.current.position.distanceTo(targetPosition);
+    snapStartPositionRef.current.copy(groupRef.current.position);
+    snapStartQuaternionRef.current.copy(rotationRef.current.quaternion);
+    snapStartedAtRef.current = performance.now();
+    snapProgressRef.current = 0;
+    snapDurationRef.current = THREE.MathUtils.clamp(
+      MAGNETIC_SNAP_MIN_DURATION_MS + distance * 28,
+      MAGNETIC_SNAP_MIN_DURATION_MS,
+      MAGNETIC_SNAP_MAX_DURATION_MS
+    );
+    snapArcHeightRef.current = THREE.MathUtils.clamp(
+      Math.max(modelRadius * 0.16, distance * 0.06),
+      0.18,
+      1.8
+    );
+
+    grabbingRef.current = false;
+    magnetStateRef.current = "Magnetic capture";
+    onDragStateChange(false);
+    document.body.style.cursor = "default";
+    setPhaseSafely("snapping");
+    onInteractionMessage(
+      `Magnetic field captured ${COMPONENT_LABELS[part.key]}. Seating it now…`
+    );
+  }, [
+    modelRadius,
+    onDragStateChange,
+    onInteractionMessage,
+    part.key,
     setPhaseSafely,
     targetPosition,
   ]);
@@ -679,24 +961,39 @@ function PartModel({
       centers.currentLocal.z - centers.targetLocal.z
     );
 
-    const easyReleaseDistance = Math.min(
-      magnetDistance * LANDING_ZONE_RATIO,
-      Math.max(
-        autoSnapDistance * RELEASE_SNAP_MULTIPLIER,
-        snapDistance * 2.15
-      )
+    const easyReleaseDistance = Math.max(
+      magnetDistance * MAGNETIC_CAPTURE_RATIO,
+      autoSnapDistance * RELEASE_SNAP_MULTIPLIER,
+      snapDistance * 2.15
+    );
+    const routeCaptureDistance = Math.max(
+      magnetDistance,
+      initialDistanceRef.current * MAGNETIC_ROUTE_CAPTURE_RATIO
+    );
+    const currentTableField = getMagneticFieldInfo(groupRef.current.position);
+    const pointerTableField = getMagneticFieldInfo(
+      desiredGroupLocalRef.current
+    );
+    const tableFieldStrength = Math.max(
+      currentTableField.strength,
+      pointerTableField.strength
     );
 
-    if (distanceToTarget <= easyReleaseDistance) {
+    if (
+      currentTableField.inside ||
+      pointerTableField.inside ||
+      tableFieldStrength >= MAGNETIC_FIELD_EDGE_CAPTURE_STRENGTH ||
+      distanceToTarget <= routeCaptureDistance ||
+      distanceToTarget <= easyReleaseDistance
+    ) {
       seatComponent();
       return;
     }
 
     setPhaseSafely("released");
-    magnetStateRef.current =
-      distanceToTarget < magnetDistance ? "Magnet engaged" : "Move closer";
+    magnetStateRef.current = "Move toward table field";
     onInteractionMessage(
-      `${COMPONENT_LABELS[part.key]} released safely. Click it again to continue moving it toward the target.`
+      `${COMPONENT_LABELS[part.key]} was released before the magnetic workspace. Move it into the open table area; the field will pull it to the exact highlighted seat automatically.`
     );
     publishTelemetry();
   }, [
@@ -722,20 +1019,23 @@ function PartModel({
   useEffect(() => {
     if (phase !== "grabbed") return undefined;
 
-    const handleReleaseClick = (event) => {
+    const handlePointerUp = (event) => {
       if (event.button !== 0) return;
-      if (performance.now() - grabStartedAtRef.current < 120) return;
-      if (!gl.domElement.contains(event.target)) return;
-
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation?.();
       releaseComponent();
     };
 
-    window.addEventListener("pointerdown", handleReleaseClick, true);
-    return () => window.removeEventListener("pointerdown", handleReleaseClick, true);
-  }, [gl, phase, releaseComponent]);
+    const handleEscape = (event) => {
+      if (event.key !== "Escape") return;
+      releaseComponent();
+    };
+
+    window.addEventListener("pointerup", handlePointerUp, true);
+    window.addEventListener("keydown", handleEscape);
+    return () => {
+      window.removeEventListener("pointerup", handlePointerUp, true);
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, [phase, releaseComponent]);
 
   useEffect(() => {
     const cancelGrab = () => {
@@ -757,14 +1057,34 @@ function PartModel({
     };
   }, [onDragStateChange, publishTelemetry, setPhaseSafely]);
 
-  useFrame(({ clock }, delta) => {
+  useFrame((_, delta) => {
     if (!groupRef.current || !rotationRef.current) return;
 
     const safeDelta = Math.min(delta, 0.05);
     const movementAlpha = 1 - Math.exp(-DRAG_FOLLOW_SPEED * safeDelta);
     const rotationAlpha = 1 - Math.exp(-ROTATION_FOLLOW_SPEED * safeDelta);
-    const heightAlpha = 1 - Math.exp(-HEIGHT_TRANSITION_SPEED * safeDelta);
     const settleAlpha = 1 - Math.exp(-SETTLE_SPEED * safeDelta);
+
+    // CPU, SSD, and both RAM modules remain physically attached to the
+    // motherboard until their own stage starts. The motherboard publishes its
+    // live rigid transform, and mounted parts inherit it around the exact
+    // motherboard model pivot. This prevents them from being left floating in
+    // the case while the board is carried to the table.
+    const hostTransform = hostTransformRef?.current;
+    if (hostTransform && phaseRef.current === "installed" && !isCompleted) {
+      hostOffsetRef.current
+        .copy(hostTransform.pivot)
+        .sub(modelCenter);
+      rotatedHostOffsetRef.current
+        .copy(hostOffsetRef.current)
+        .applyQuaternion(hostTransform.quaternion);
+      groupRef.current.position
+        .copy(hostTransform.position)
+        .add(hostOffsetRef.current)
+        .sub(rotatedHostOffsetRef.current);
+      rotationRef.current.quaternion.copy(hostTransform.quaternion);
+      installedQuaternionRef.current.copy(hostTransform.quaternion);
+    }
 
     const centers = targetPosition ? getVisualCenters() : null;
     const distance = centers
@@ -779,44 +1099,42 @@ function PartModel({
       1
     );
 
-    if (isActive && phaseRef.current !== "placed" && centers) {
-      if (tetherRef.current) {
-        lineStartRef.current.copy(centers.currentLocal);
-        lineEndRef.current.copy(centers.targetLocal);
-        tetherRef.current.geometry.setFromPoints([
-          lineStartRef.current,
-          lineEndRef.current,
-        ]);
-        tetherRef.current.visible = phaseRef.current !== "installed";
-      }
+    if (phaseRef.current === "snapping" && targetPosition) {
+      const elapsed = performance.now() - snapStartedAtRef.current;
+      const rawProgress = THREE.MathUtils.clamp(
+        elapsed / Math.max(snapDurationRef.current, 1),
+        0,
+        1
+      );
+      snapProgressRef.current = rawProgress;
+      // Visible magnetic motion: ease in, accelerate through the pull,
+      // then ease out while position and rotation settle together.
+      const easedProgress = THREE.MathUtils.smootherstep(rawProgress, 0, 1);
+      const rotationProgress = easedProgress;
 
-      if (tetherMaterialRef.current) {
-        tetherMaterialRef.current.opacity = 0.18 + proximity * 0.58;
-        tetherMaterialRef.current.color.set(
-          proximity > 0.72 ? "#ffffff" : "#00ffb4"
-        );
-      }
+      groupRef.current.position.lerpVectors(
+        snapStartPositionRef.current,
+        targetPosition,
+        easedProgress
+      );
+      groupRef.current.position.y +=
+        Math.sin(rawProgress * Math.PI) * snapArcHeightRef.current;
+      rotationRef.current.quaternion.slerpQuaternions(
+        snapStartQuaternionRef.current,
+        detachedQuaternion,
+        rotationProgress
+      );
+      magnetStateRef.current = `Seating ${Math.round(rawProgress * 100)}%`;
 
-      if (captureRingRef.current) {
-        captureRingRef.current.visible = true;
-        captureRingRef.current.position.copy(centers.targetLocal);
-        const pulse = 1 + Math.sin(clock.elapsedTime * 4.2) * 0.05;
-        captureRingRef.current.scale.setScalar(pulse);
+      if (rawProgress >= 1) {
+        finishSeatComponent();
       }
-
-      if (captureRingMaterialRef.current) {
-        captureRingMaterialRef.current.opacity = 0.16 + proximity * 0.4;
-      }
-    } else {
-      if (tetherRef.current) tetherRef.current.visible = false;
-      if (captureRingRef.current) captureRingRef.current.visible = false;
-    }
-
-    if (grabbingRef.current) {
+    } else if (grabbingRef.current) {
       const pointerDeltaX =
         pointerClientRef.current.x - grabPointerStartRef.current.x;
       const pointerDeltaY =
         pointerClientRef.current.y - grabPointerStartRef.current.y;
+      const pointerTravelPx = Math.hypot(pointerDeltaX, pointerDeltaY);
       const dragScale = worldUnitsPerPixelRef.current * DRAG_SCREEN_GAIN;
 
       desiredCenterWorldRef.current
@@ -862,114 +1180,120 @@ function PartModel({
         desiredGroupLocalRef.current.z - targetPosition.z
       );
 
-      if (lockedY !== null) {
-        const routeDistance = Math.max(initialDistanceRef.current, 0.001);
-        const routeProgress = THREE.MathUtils.clamp(
-          1 - desiredDistance / routeDistance,
+      const routeDistance = Math.max(initialDistanceRef.current, 0.001);
+      const routeProgress = THREE.MathUtils.clamp(
+        1 - desiredDistance / routeDistance,
+        0,
+        1
+      );
+
+      let safeRouteY = safeCarryYRef.current;
+      if (routeProgress < SAFE_CARRY_RISE_START) {
+        const riseProgress = THREE.MathUtils.smoothstep(
+          routeProgress,
+          0,
+          SAFE_CARRY_RISE_START
+        );
+        safeRouteY = THREE.MathUtils.lerp(
+          grabStartYRef.current,
+          safeCarryYRef.current,
+          riseProgress
+        );
+      } else if (routeProgress >= SAFE_CARRY_DESCENT_START) {
+        const descentProgress = THREE.MathUtils.smoothstep(
+          routeProgress,
+          SAFE_CARRY_DESCENT_START,
+          1
+        );
+        safeRouteY = THREE.MathUtils.lerp(
+          safeCarryYRef.current,
+          targetPosition.y,
+          descentProgress
+        );
+      }
+
+      const landingDistance = Math.max(
+        magnetDistance * LANDING_ZONE_RATIO,
+        autoSnapDistance * 2.2
+      );
+      if (desiredDistance < landingDistance) {
+        const landingProgress = THREE.MathUtils.smoothstep(
+          1 - desiredDistance / Math.max(landingDistance, 0.001),
           0,
           1
         );
-
-        let safeRouteY = safeCarryYRef.current;
-        if (routeProgress < SAFE_CARRY_RISE_START) {
-          const riseProgress = THREE.MathUtils.smoothstep(
-            routeProgress,
-            0,
-            SAFE_CARRY_RISE_START
-          );
-          safeRouteY = THREE.MathUtils.lerp(
-            grabStartYRef.current,
-            safeCarryYRef.current,
-            riseProgress
-          );
-        } else if (routeProgress >= SAFE_CARRY_DESCENT_START) {
-          const descentProgress = THREE.MathUtils.smoothstep(
-            routeProgress,
-            SAFE_CARRY_DESCENT_START,
-            1
-          );
-          safeRouteY = THREE.MathUtils.lerp(
-            safeCarryYRef.current,
-            lockedY,
-            descentProgress
-          );
-        }
-
-        const landingDistance = Math.max(
-          magnetDistance * LANDING_ZONE_RATIO,
-          autoSnapDistance * 2.2
-        );
-        if (desiredDistance < landingDistance) {
-          const landingProgress = THREE.MathUtils.smoothstep(
-            1 - desiredDistance / Math.max(landingDistance, 0.001),
-            0,
-            1
-          );
-          safeRouteY = THREE.MathUtils.lerp(
-            safeRouteY,
-            lockedY,
-            landingProgress
-          );
-        }
-
-        const ySpeed =
-          desiredDistance < landingDistance
-            ? SAFE_CARRY_Y_SPEED * 1.7
-            : SAFE_CARRY_Y_SPEED;
-        const safeYAlpha = 1 - Math.exp(-ySpeed * safeDelta);
-        dragCurrentYRef.current = THREE.MathUtils.lerp(
-          dragCurrentYRef.current,
+        safeRouteY = THREE.MathUtils.lerp(
           safeRouteY,
-          safeYAlpha
+          targetPosition.y,
+          landingProgress
         );
-        desiredGroupLocalRef.current.y = dragCurrentYRef.current;
       }
+
+      const ySpeed =
+        desiredDistance < landingDistance
+          ? SAFE_CARRY_Y_SPEED * 1.7
+          : SAFE_CARRY_Y_SPEED;
+      const safeYAlpha = 1 - Math.exp(-ySpeed * safeDelta);
+      dragCurrentYRef.current = THREE.MathUtils.lerp(
+        dragCurrentYRef.current,
+        safeRouteY,
+        safeYAlpha
+      );
+      desiredGroupLocalRef.current.y = dragCurrentYRef.current;
 
       assistedGoalRef.current.copy(desiredGroupLocalRef.current);
 
-      // Preserve the same/default magnet range and strength. Only the drag
-      // solver changed, so the part follows the pointer freely until it enters
-      // the normal magnetic capture range.
-      if (desiredDistance < magnetDistance) {
-        const normalizedPull = THREE.MathUtils.clamp(
-          1 - desiredDistance / magnetDistance,
+      const tableField = getMagneticFieldInfo(desiredGroupLocalRef.current);
+      const routeCaptureDistance = Math.max(
+        magnetDistance,
+        initialDistanceRef.current * MAGNETIC_ROUTE_CAPTURE_RATIO
+      );
+      const routeFieldStrength = THREE.MathUtils.clamp(
+        1 - desiredDistance / Math.max(routeCaptureDistance, 0.001),
+        0,
+        1
+      );
+      const seatFieldStrength = THREE.MathUtils.clamp(
+        1 - desiredDistance / Math.max(magnetDistance, 0.001),
+        0,
+        1
+      );
+      const activeFieldStrength = Math.max(
+        tableField.strength,
+        routeFieldStrength,
+        seatFieldStrength
+      );
+
+      if (activeFieldStrength > 0) {
+        const easedFieldStrength = THREE.MathUtils.smootherstep(
+          activeFieldStrength,
           0,
           1
         );
-        const easedPull = normalizedPull * normalizedPull *
-          (3 - 2 * normalizedPull);
-        const pull = THREE.MathUtils.clamp(
-          DEFAULT_MAGNET_STRENGTH + easedPull * 0.38,
-          DEFAULT_MAGNET_STRENGTH,
-          MAX_LANDING_PULL
+        const pull = THREE.MathUtils.lerp(
+          MAGNETIC_FIELD_MIN_PULL,
+          MAGNETIC_FIELD_MAX_PULL,
+          easedFieldStrength
         );
 
         assistedGoalRef.current.lerp(targetPosition, pull);
-        if (lockedY !== null) {
-          assistedGoalRef.current.y = dragCurrentYRef.current;
-        }
-
         magnetStateRef.current =
-          desiredDistance <= autoSnapDistance * 1.5
-            ? "Snap ready"
-            : "Magnet engaged";
+          tableField.inside || desiredDistance <= routeCaptureDistance
+            ? "Table field captured"
+            : "Table field pulling";
 
-        if (!magnetNoticeRef.current && normalizedPull > 0.18) {
+        if (!magnetNoticeRef.current && activeFieldStrength > 0.1) {
           magnetNoticeRef.current = true;
           onInteractionMessage(
-            `Magnet engaged for ${COMPONENT_LABELS[part.key]}. Keep moving naturally toward the center.`
+            `Magnetic field engaged for ${COMPONENT_LABELS[part.key]}. It is now pulling toward the exact seat.`
           );
         }
       } else {
-        magnetStateRef.current = "Move closer";
+        magnetStateRef.current = "Move toward table field";
         magnetNoticeRef.current = false;
       }
 
       groupRef.current.position.lerp(assistedGoalRef.current, movementAlpha);
-
-      if (lockedY !== null) {
-        groupRef.current.position.y = dragCurrentYRef.current;
-      }
 
       const currentDistance = Math.hypot(
         groupRef.current.position.x - targetPosition.x,
@@ -990,7 +1314,7 @@ function PartModel({
       );
 
       desiredQuaternionRef.current
-        .copy(installedQuaternion)
+        .copy(installedQuaternionRef.current)
         .slerp(detachedQuaternion, orientationBlend);
       rotationRef.current.quaternion.slerp(
         desiredQuaternionRef.current,
@@ -1005,9 +1329,14 @@ function PartModel({
       const partInsideSnap = currentDistance <= easySeatDistance;
       const laggingButCentered =
         pointerInsideSnap && currentDistance <= easySeatDistance * 1.85;
+      const enteredTableField =
+        (tableField.inside || desiredDistance <= routeCaptureDistance) &&
+        pointerTravelPx >= MAGNETIC_FIELD_MIN_POINTER_TRAVEL_PX;
 
-      if (partInsideSnap || laggingButCentered) {
-        magnetStateRef.current = "Auto snap";
+      if (enteredTableField || partInsideSnap || laggingButCentered) {
+        magnetStateRef.current = enteredTableField
+          ? "Table field auto-capture"
+          : "Auto snap";
         seatComponent();
         return;
       }
@@ -1015,24 +1344,96 @@ function PartModel({
       groupRef.current.position.lerp(targetPosition, settleAlpha);
       groupRef.current.position.y = targetPosition.y;
       rotationRef.current.quaternion.slerp(detachedQuaternion, settleAlpha);
-    } else if (phaseRef.current === "released") {
-      // Keep the part at its last safe visible carry height after release.
-      // It descends to the exact seat height only while the user actively
-      // moves it close to the target or when the final snap occurs.
-      dragCurrentYRef.current = groupRef.current.position.y;
-      rotationRef.current.quaternion.slerp(
-        detachedQuaternion,
-        rotationAlpha
+    } else if (phaseRef.current === "released" && targetPosition) {
+      // Keep the field alive after pointer release. If the component was
+      // dropped anywhere inside the magnetic radius, it continues travelling
+      // toward the seat instead of freezing in mid-air.
+      const releasedPlanarDistance = Math.hypot(
+        groupRef.current.position.x - targetPosition.x,
+        groupRef.current.position.z - targetPosition.z
       );
+      const releasedFieldRadius = Math.max(
+        magnetDistance * MAGNETIC_CAPTURE_RATIO,
+        initialDistanceRef.current * MAGNETIC_ROUTE_CAPTURE_RATIO
+      );
+      const releasedTableField = getMagneticFieldInfo(
+        groupRef.current.position
+      );
+      const releasedRouteStrength = THREE.MathUtils.clamp(
+        1 - releasedPlanarDistance / Math.max(releasedFieldRadius, 0.001),
+        0,
+        1
+      );
+      const releasedFieldStrength = Math.max(
+        releasedTableField.strength,
+        releasedRouteStrength
+      );
+
+      if (releasedFieldStrength > 0) {
+        const releasedPull = THREE.MathUtils.smootherstep(
+          releasedFieldStrength,
+          0,
+          1
+        );
+        const releasedMoveAlpha =
+          1 -
+          Math.exp(
+            -(
+              RELEASED_MAGNET_SPEED +
+              releasedPull * RELEASED_MAGNET_SPEED
+            ) * safeDelta
+          );
+        const releasedRotationAlpha =
+          1 - Math.exp(-RELEASED_ROTATION_SPEED * safeDelta);
+
+        groupRef.current.position.lerp(targetPosition, releasedMoveAlpha);
+        rotationRef.current.quaternion.slerp(
+          detachedQuaternion,
+          releasedRotationAlpha
+        );
+        dragCurrentYRef.current = groupRef.current.position.y;
+        magnetStateRef.current = releasedTableField.inside
+          ? "Table field captured"
+          : releasedPlanarDistance <= autoSnapDistance * 1.5
+          ? "Auto snap"
+          : "Magnetic pull";
+
+        const releasedSnapDistance = Math.max(
+          autoSnapDistance * 1.35,
+          snapDistance * 2.2,
+          magnetDistance * 0.16
+        );
+        if (
+          releasedTableField.inside ||
+          releasedPlanarDistance <= releasedSnapDistance
+        ) {
+          seatComponent();
+          return;
+        }
+      } else {
+        dragCurrentYRef.current = groupRef.current.position.y;
+        rotationRef.current.quaternion.slerp(
+          detachedQuaternion,
+          rotationAlpha
+        );
+        magnetStateRef.current = "Move closer";
+      }
     } else {
       // Installed and newly detached components keep the authored installed
       // orientation. Rotation begins only after the part has visibly cleared
       // its slot, avoiding geometry passing through the case.
       rotationRef.current.quaternion.slerp(
-        installedQuaternion,
+        installedQuaternionRef.current,
         rotationAlpha
       );
     }
+
+    onTransformChange?.({
+      position: groupRef.current.position,
+      quaternion: rotationRef.current.quaternion,
+      pivot: modelCenter,
+      phase: phaseRef.current,
+    });
 
     frameCounterRef.current += 1;
     const interval = grabbingRef.current
@@ -1046,6 +1447,14 @@ function PartModel({
   const handlePointerDown = useCallback(
     (event) => {
       if (!isMovablePart) return;
+
+      // A populated motherboard and its mounted components overlap in the
+      // raycast. Pass-through parts must never stop the event: while the board
+      // is being removed, its locked children pass clicks to the motherboard;
+      // after the board is seated, the completed motherboard passes clicks to
+      // the active CPU, SSD, or RAM module above it.
+      if (allowPointerThrough) return;
+
       event.stopPropagation();
 
       if (!canInteract) {
@@ -1054,7 +1463,11 @@ function PartModel({
       }
 
       if (phaseRef.current === "installed") {
+        // One continuous gesture now works: pointer-down detaches the part and
+        // immediately starts the grab. A simple click still leaves it safely
+        // detached when the pointer is released.
         detachComponent();
+        beginGrab(event);
         return;
       }
 
@@ -1073,6 +1486,7 @@ function PartModel({
       }
     },
     [
+      allowPointerThrough,
       beginGrab,
       canInteract,
       detachComponent,
@@ -1085,7 +1499,7 @@ function PartModel({
 
   const handlePointerOver = useCallback(
     (event) => {
-      if (!isMovablePart) return;
+      if (!isMovablePart || allowPointerThrough) return;
       event.stopPropagation();
 
       if (!canInteract) {
@@ -1098,7 +1512,7 @@ function PartModel({
         document.body.style.cursor = "grab";
       }
     },
-    [canInteract, isMovablePart]
+    [allowPointerThrough, canInteract, isMovablePart]
   );
 
   const handlePointerOut = useCallback(() => {
@@ -1115,44 +1529,29 @@ function PartModel({
       >
         <group position={[modelCenter.x, modelCenter.y, modelCenter.z]}>
           <group ref={rotationRef}>
+            {isMovablePart ? (
+              <mesh>
+                <boxGeometry
+                  args={[
+                    Math.max(modelSize.x * 1.12, 0.35),
+                    Math.max(modelSize.y * 1.18, 0.35),
+                    Math.max(modelSize.z * 1.12, 0.35),
+                  ]}
+                />
+                <meshBasicMaterial
+                  transparent
+                  opacity={0}
+                  depthWrite={false}
+                  colorWrite={false}
+                />
+              </mesh>
+            ) : null}
             <group position={[-modelCenter.x, -modelCenter.y, -modelCenter.z]}>
               <primitive object={clonedScene} dispose={null} />
             </group>
           </group>
         </group>
       </group>
-
-      <line ref={tetherRef} visible={false} renderOrder={1100}>
-        <bufferGeometry />
-        <lineBasicMaterial
-          ref={tetherMaterialRef}
-          color="#00ffb4"
-          transparent
-          opacity={0.42}
-          depthTest={false}
-          depthWrite={false}
-        />
-      </line>
-
-      <mesh
-        ref={captureRingRef}
-        visible={false}
-        rotation={[-Math.PI / 2, 0, 0]}
-        renderOrder={1099}
-      >
-        <ringGeometry
-          args={[captureRingRadius * 0.72, captureRingRadius, 64]}
-        />
-        <meshBasicMaterial
-          ref={captureRingMaterialRef}
-          color="#00ffb4"
-          transparent
-          opacity={0.2}
-          side={THREE.DoubleSide}
-          depthTest={false}
-          depthWrite={false}
-        />
-      </mesh>
     </>
   );
 }
@@ -1234,21 +1633,6 @@ function SourcePartGuide({ part }) {
           depthWrite={false}
         />
       </mesh>
-
-      <Html
-        center
-        position={guideData.callout.toArray()}
-        transform
-        sprite
-        distanceFactor={12}
-        occlude={false}
-        style={{ pointerEvents: "none" }}
-      >
-        <div className="flex items-center gap-2 whitespace-nowrap rounded-xl border border-amber-300/45 bg-[#11100b]/94 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-amber-200 shadow-[0_12px_35px_rgba(0,0,0,0.5)] backdrop-blur-md">
-          <span className="flex h-5 w-5 items-center justify-center rounded-full border border-amber-200/50 bg-amber-300/15 text-[12px]">◎</span>
-          Click {COMPONENT_LABELS[part.key]}
-        </div>
-      </Html>
     </group>
   );
 }
@@ -1408,21 +1792,6 @@ function PlacementTargetGuide({ part }) {
           side={THREE.DoubleSide}
         />
       </mesh>
-
-      <Html
-        center
-        position={guideData.callout.toArray()}
-        transform
-        sprite
-        distanceFactor={12}
-        occlude={false}
-        style={{ pointerEvents: "none" }}
-      >
-        <div className="whitespace-nowrap rounded-xl border border-[#00ffb4]/40 bg-[#07111d]/94 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#73ffd4] shadow-[0_12px_35px_rgba(0,0,0,0.5)] backdrop-blur-md">
-          <span className="mr-2 inline-flex rounded-full border border-[#00ffb4]/35 bg-[#00ffb4]/12 px-2 py-0.5 text-[8px]">TARGET</span>
-          Place {COMPONENT_LABELS[part.key]} here
-        </div>
-      </Html>
     </group>
   );
 }
@@ -1472,11 +1841,57 @@ class ModelErrorBoundary extends React.Component {
   }
 }
 
+function HostTransformGuide({ hostTransformRef, children }) {
+  const groupRef = useRef(null);
+  const matrixRef = useRef(new THREE.Matrix4());
+  const translationRef = useRef(new THREE.Matrix4());
+  const pivotRef = useRef(new THREE.Matrix4());
+  const inversePivotRef = useRef(new THREE.Matrix4());
+  const rotationRef = useRef(new THREE.Matrix4());
+
+  useFrame(() => {
+    const group = groupRef.current;
+    const transform = hostTransformRef.current;
+    if (!group || !transform) return;
+
+    translationRef.current.makeTranslation(
+      transform.position.x,
+      transform.position.y,
+      transform.position.z
+    );
+    pivotRef.current.makeTranslation(
+      transform.pivot.x,
+      transform.pivot.y,
+      transform.pivot.z
+    );
+    inversePivotRef.current.makeTranslation(
+      -transform.pivot.x,
+      -transform.pivot.y,
+      -transform.pivot.z
+    );
+    rotationRef.current.makeRotationFromQuaternion(transform.quaternion);
+
+    matrixRef.current
+      .copy(translationRef.current)
+      .multiply(pivotRef.current)
+      .multiply(rotationRef.current)
+      .multiply(inversePivotRef.current);
+    group.matrix.copy(matrixRef.current);
+    group.matrixWorldNeedsUpdate = true;
+  });
+
+  return (
+    <group ref={groupRef} matrixAutoUpdate={false}>
+      {children}
+    </group>
+  );
+}
+
 
 function AssembledPC({
   parts,
-  activePartKey,
-  activePhase,
+  activePartKeys,
+  partPhases,
   completedParts,
   guidesEnabled = true,
   onPartCompleted,
@@ -1486,7 +1901,26 @@ function AssembledPC({
   onTelemetry,
   rootRef,
 }) {
-  const activePart = parts.find((part) => part.key === activePartKey);
+  const motherboardTransformRef = useRef({
+    position: new THREE.Vector3(),
+    quaternion: new THREE.Quaternion(),
+    pivot: new THREE.Vector3(),
+    phase: "installed",
+  });
+
+  const handleMotherboardTransform = useCallback((transform) => {
+    motherboardTransformRef.current.position.copy(transform.position);
+    motherboardTransformRef.current.quaternion.copy(transform.quaternion);
+    motherboardTransformRef.current.pivot.copy(transform.pivot);
+    motherboardTransformRef.current.phase = transform.phase;
+  }, []);
+
+  const activeParts = parts.filter((part) => activePartKeys.includes(part.key));
+  const motherboardIsActive = activePartKeys.includes("motherboard");
+  const motherboardIsCompleted = completedParts.includes("motherboard");
+  const mountedPartIsActive = activePartKeys.some((key) =>
+    MOTHERBOARD_MOUNTED_PARTS.has(key)
+  );
 
   return (
     <group ref={rootRef}>
@@ -1494,8 +1928,24 @@ function AssembledPC({
         <PartModel
           key={part.key}
           part={part}
-          isActive={part.key === activePartKey}
+          isActive={activePartKeys.includes(part.key)}
           isCompleted={completedParts.includes(part.key)}
+          hostTransformRef={
+            MOTHERBOARD_MOUNTED_PARTS.has(part.key)
+              ? motherboardTransformRef
+              : undefined
+          }
+          onTransformChange={
+            part.key === "motherboard"
+              ? handleMotherboardTransform
+              : undefined
+          }
+          allowPointerThrough={
+            (motherboardIsActive && MOTHERBOARD_MOUNTED_PARTS.has(part.key)) ||
+            (part.key === "motherboard" &&
+              motherboardIsCompleted &&
+              mountedPartIsActive)
+          }
           onPartCompleted={onPartCompleted}
           onLockedPartClick={onLockedPartClick}
           onInteractionMessage={onInteractionMessage}
@@ -1504,19 +1954,46 @@ function AssembledPC({
         />
       ))}
 
-      {guidesEnabled && activePart && activePhase === "installed" ? (
-        <SourcePartGuide
-          key={`source-${activePart.key}`}
-          part={activePart}
-        />
-      ) : null}
+      {guidesEnabled
+        ? activeParts.map((activePart) => {
+            if (
+              completedParts.includes(activePart.key) ||
+              (partPhases[activePart.key] || "installed") !== "installed"
+            ) {
+              return null;
+            }
 
-      {guidesEnabled && activePart && PLACEMENT_TARGETS[activePart.key]?.position ? (
-        <PlacementTargetGuide
-          key={`target-${activePart.key}`}
-          part={activePart}
-        />
-      ) : null}
+            const guide = (
+              <SourcePartGuide
+                key={`source-${activePart.key}`}
+                part={activePart}
+              />
+            );
+
+            return MOTHERBOARD_MOUNTED_PARTS.has(activePart.key) ? (
+              <HostTransformGuide
+                key={`hosted-source-${activePart.key}`}
+                hostTransformRef={motherboardTransformRef}
+              >
+                {guide}
+              </HostTransformGuide>
+            ) : (
+              guide
+            );
+          })
+        : null}
+
+      {guidesEnabled
+        ? activeParts.map((activePart) =>
+            !completedParts.includes(activePart.key) &&
+            PLACEMENT_TARGETS[activePart.key]?.position ? (
+              <PlacementTargetGuide
+                key={`target-${activePart.key}`}
+                part={activePart}
+              />
+            ) : null
+          )
+        : null}
     </group>
   );
 }
@@ -1614,7 +2091,7 @@ function InitialSceneCamera({ sceneRootRef, controlsRef, overviewRequest }) {
 
 function ModelViewer({
   parts,
-  activePartKey,
+  activePartKeys,
   completedParts,
   guidesEnabled = true,
   onPartCompleted,
@@ -1623,14 +2100,21 @@ function ModelViewer({
 }) {
   const [isDraggingPart, setIsDraggingPart] = useState(false);
   const [telemetry, setTelemetry] = useState(null);
+  const [partPhases, setPartPhases] = useState({});
   const [overviewRequest, setOverviewRequest] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const viewerRef = useRef(null);
   const controlsRef = useRef(null);
   const sceneRootRef = useRef(null);
-  const activePhase = telemetry?.key === activePartKey
-    ? telemetry.phase
-    : "installed";
+  const activePartKeySignature = activePartKeys.join("|");
+
+  const handleTelemetry = useCallback((nextTelemetry) => {
+    setTelemetry(nextTelemetry);
+    setPartPhases((previous) => {
+      if (previous[nextTelemetry.key] === nextTelemetry.phase) return previous;
+      return { ...previous, [nextTelemetry.key]: nextTelemetry.phase };
+    });
+  }, []);
 
   useEffect(() => {
     const restoreControls = () => setIsDraggingPart(false);
@@ -1645,7 +2129,26 @@ function ModelViewer({
 
   useEffect(() => {
     setTelemetry(null);
-  }, [activePartKey]);
+  }, [activePartKeySignature]);
+
+  useEffect(() => {
+    const handleKeyboardControls = (event) => {
+      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) {
+        return;
+      }
+      const tagName = event.target?.tagName?.toLowerCase();
+      if (tagName === "input" || tagName === "textarea" || tagName === "select") {
+        return;
+      }
+
+      if (event.key.toLowerCase() === "r" && !isDraggingPart) {
+        setOverviewRequest((value) => value + 1);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyboardControls);
+    return () => window.removeEventListener("keydown", handleKeyboardControls);
+  }, [isDraggingPart]);
 
   const refreshOverviewAfterResize = useCallback(() => {
     // Fullscreen changes the canvas dimensions. Wait for the browser to finish
@@ -1717,6 +2220,7 @@ function ModelViewer({
   return (
     <div
       ref={viewerRef}
+      onContextMenu={(event) => event.preventDefault()}
       className={[
         "relative h-full w-full overflow-hidden bg-[#070c14]",
         isFullscreen ? "rounded-none" : "",
@@ -1754,15 +2258,15 @@ function ModelViewer({
             <AssembledPC
               rootRef={sceneRootRef}
               parts={parts}
-              activePartKey={activePartKey}
-              activePhase={activePhase}
+              activePartKeys={activePartKeys}
+              partPhases={partPhases}
               completedParts={completedParts}
               guidesEnabled={guidesEnabled}
               onPartCompleted={onPartCompleted}
               onLockedPartClick={onLockedPartClick}
               onInteractionMessage={onInteractionMessage}
               onDragStateChange={setIsDraggingPart}
-              onTelemetry={setTelemetry}
+              onTelemetry={handleTelemetry}
             />
           </Suspense>
         </ModelErrorBoundary>
@@ -1842,11 +2346,13 @@ function ModelViewer({
               ? guidesEnabled
                 ? "Click the amber X-ray highlight to detach the correct part."
                 : "Click the correct component to detach it — no highlight this time."
+              : telemetry.phase === "snapping"
+              ? "The invisible magnetic field is seating and rotating the component automatically."
               : telemetry.yTransitioning
               ? "The component is moving safely toward its table-seat height."
-              : telemetry.yLocked
-              ? "Table-height alignment is active. The normal magnet engages near the target."
-              : "Move the component toward the green target and click again to release."}
+              : telemetry.yAligned
+              ? "Height is aligned. Release inside the invisible field to start the seating animation."
+              : "Hold and drag toward the green seat, then release. Press Esc to drop it safely."}
           </div>
         </div>
       ) : null}
@@ -2083,7 +2589,7 @@ function ModuleIntroCard({ platform, moduleType, onStart }) {
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(0,255,180,0.13),transparent_42%)]" />
         <div className="relative">
           <div className="inline-flex items-center gap-2 rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/8 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-[#00ffb4]">
-            Module {isAssembly ? "3" : "2"} - {platform} Platform
+            Module {isAssembly ? "3" : "2"} • {platform} Platform
           </div>
           <h2 className="mt-5 text-3xl font-black tracking-tight text-white md:text-4xl">
             {moduleType} Guided Practice
@@ -2091,32 +2597,40 @@ function ModuleIntroCard({ platform, moduleType, onStart }) {
           <p className="mt-3 max-w-xl text-sm leading-7 text-[#9fb0ca]">
             {isAssembly
               ? "Install each component in order using the bird's-eye workspace, exact target-height assistance, and normal magnetic snap."
-              : "Remove each component in order. The camera first identifies the installed part, then opens to the table workspace after detachment. Once every component is removed once, you'll repeat the full sequence one more time with no guides before your certificate unlocks."}
+              : "Each task begins with an instruction card covering power and ESD precautions, release points, handling technique, correct results, and common mistakes. Remove components in the validated order, then repeat the complete sequence once without guide highlights before the certificate unlocks."}
           </p>
 
           <div className="mt-6 grid gap-3 sm:grid-cols-3">
             <div className="rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4">
               <div className="text-xs font-black uppercase tracking-[0.16em] text-[#00ffb4]">1. Identify</div>
-              <div className="mt-2 text-xs leading-5 text-[#9fb0ca]">Follow the highlighted source and target labels.</div>
+              <div className="mt-2 text-xs leading-5 text-[#9fb0ca]">
+                Read the step card first, then identify the highlighted component, its cables, screws, latches, and safe handling points.
+              </div>
             </div>
             <div className="rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4">
               <div className="text-xs font-black uppercase tracking-[0.16em] text-[#00ffb4]">2. Move</div>
-              <div className="mt-2 text-xs leading-5 text-[#9fb0ca]">Click to grab, move smoothly, then click again to release.</div>
+              <div className="mt-2 text-xs leading-5 text-[#9fb0ca]">
+                Complete the required release checks, then click-hold to detach and carry the part into the table workspace.
+              </div>
             </div>
             <div className="rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4">
               <div className="text-xs font-black uppercase tracking-[0.16em] text-[#00ffb4]">3. Complete</div>
-              <div className="mt-2 text-xs leading-5 text-[#9fb0ca]">A sound and progress update confirm every correct placement.</div>
+              <div className="mt-2 text-xs leading-5 text-[#9fb0ca]">
+                Confirm the card’s expected result after seating; the next instruction guide appears only when the current stage is complete.
+              </div>
             </div>
           </div>
 
           <div className="mt-7 flex flex-wrap items-center justify-between gap-4">
-            <div className="text-xs text-[#7a8ba8]">Right-drag rotates - mouse wheel zooms - camera locks while moving a part</div>
+            <div className="text-xs text-[#7a8ba8]">
+              Right-drag rotates • mouse wheel zooms • camera locks while moving a part
+            </div>
             <button
               type="button"
               onClick={onStart}
               className="rounded-2xl bg-[#00ffb4] px-7 py-3 text-sm font-black text-[#07111d] shadow-[0_16px_45px_rgba(0,255,180,0.25)] transition hover:scale-[1.03]"
             >
-              Start Guided Practice
+              Start Guided Practice →
             </button>
           </div>
         </div>
@@ -2125,91 +2639,120 @@ function ModuleIntroCard({ platform, moduleType, onStart }) {
   );
 }
 
-function StepCompletionCard({
+
+
+function StepInstructionCard({
   platform,
   moduleType,
   stepNumber,
   totalSteps,
-  label,
-  nextLabel,
-  isFinal,
-  onContinue,
+  stepName,
+  guide,
+  isFinalChallenge = false,
+  onBegin,
 }) {
-  const isAssembly = moduleType === "Assembly";
-  const actionWord = isAssembly ? "installed" : "removed and seated";
-  const title = isAssembly
-    ? `${label} Installation Complete`
-    : `${label} Disassembly Complete`;
+  const action = moduleType === "Assembly" ? "installation" : "removal";
+  const safeGuide = guide || {
+    title: stepName,
+    summary: `Review the required ${action} procedure before interacting with the simulation.`,
+    procedure: ["Identify the active component and its connection points.", "Use the highlighted workspace and complete the step without forcing the part."],
+    safety: "Handle the component by its edges and keep the work area controlled.",
+    verify: "The component should move freely and finish in the highlighted seated position.",
+    avoid: "Do not force, twist, or drag a component through surrounding hardware.",
+    simulation: "Drag the active component toward its destination. The magnetic field will take over and animate the final movement.",
+  };
 
   return (
     <div
-      className="absolute inset-0 z-[780] flex items-center justify-center bg-[#050912]/82 p-5 backdrop-blur-md"
+      className="articton-instruction-overlay absolute inset-0 z-[780] flex items-center justify-center bg-[#050912]/82 p-4 backdrop-blur-md md:p-6"
       role="dialog"
       aria-modal="true"
-      aria-labelledby="step-completion-title"
+      aria-labelledby="step-instruction-title"
     >
-      <div className="relative w-full max-w-2xl overflow-hidden rounded-[30px] border border-[#00ffb4]/35 bg-[#0b1220]/97 p-7 shadow-[0_40px_120px_rgba(0,0,0,0.76),0_0_70px_rgba(0,255,180,0.10)] md:p-9">
+      <div className="articton-instruction-card relative w-full max-w-4xl overflow-hidden rounded-[30px] border border-[#00ffb4]/35 bg-[#0b1220]/97 p-6 shadow-[0_40px_120px_rgba(0,0,0,0.76),0_0_70px_rgba(0,255,180,0.10)] md:p-8">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_0%,rgba(0,255,180,0.16),transparent_42%)]" />
         <div className="pointer-events-none absolute -right-24 -top-24 h-56 w-56 rounded-full border border-[#00ffb4]/15 bg-[#00ffb4]/5 blur-2xl" />
 
-        <div className="relative">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="articton-instruction-content relative">
+          <div className="articton-instruction-topbar flex flex-wrap items-center justify-between gap-3">
             <div className="inline-flex items-center gap-2 rounded-full border border-[#00ffb4]/30 bg-[#00ffb4]/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.22em] text-[#73ffd4]">
-              Step {stepNumber} of {totalSteps} Complete
+              {isFinalChallenge
+                ? "Final Challenge • Before You Begin"
+                : `Step ${stepNumber} of ${totalSteps} • Before You Begin`}
             </div>
             <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-[#9fb0ca]">
               {platform} Platform
             </div>
           </div>
 
-          <div className="mt-6 flex items-start gap-5">
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-[#00ffb4]/40 bg-[#00ffb4]/12 text-3xl font-black text-[#00ffb4] shadow-[0_0_34px_rgba(0,255,180,0.18)]">
-              ✓
+          <div className="articton-instruction-hero mt-6 flex items-start gap-5">
+            <div className="articton-instruction-step-icon flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-[#00ffb4]/40 bg-[#00ffb4]/12 text-2xl font-black text-[#00ffb4] shadow-[0_0_34px_rgba(0,255,180,0.18)]">
+              {isFinalChallenge ? "★" : stepNumber}
             </div>
             <div className="min-w-0">
               <div className="text-[11px] font-black uppercase tracking-[0.24em] text-[#00ffb4]">
-                Excellent Work
+                Instruction Guide
               </div>
               <h2
-                id="step-completion-title"
-                className="mt-2 text-2xl font-black leading-tight text-white md:text-4xl"
+                id="step-instruction-title"
+                className="articton-instruction-title mt-2 text-2xl font-black leading-tight text-white md:text-4xl"
               >
-                {title}
+                {safeGuide.title || stepName}
               </h2>
-              <p className="mt-3 text-sm leading-7 text-[#9fb0ca]">
-                You correctly {actionWord} the {label}. The component is locked in its completed position and your progress has been updated.
+              <p className="articton-instruction-summary mt-3 max-w-3xl text-sm leading-7 text-[#aebdd3]">
+                {safeGuide.summary}
               </p>
             </div>
           </div>
 
-          <div className="mt-7 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl border border-[#1a2438] bg-white/[0.035] p-4">
-              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#00ffb4]">Accuracy</div>
-              <div className="mt-2 text-sm font-bold text-white">Correct placement</div>
-            </div>
-            <div className="rounded-2xl border border-[#1a2438] bg-white/[0.035] p-4">
-              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#00ffb4]">Progress</div>
-              <div className="mt-2 text-sm font-bold text-white">Step saved</div>
-            </div>
-            <div className="rounded-2xl border border-[#1a2438] bg-white/[0.035] p-4">
-              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#00ffb4]">Next</div>
-              <div className="mt-2 truncate text-sm font-bold text-white">
-                {nextLabel}
+          <div className="articton-instruction-details mt-7 grid gap-4 lg:grid-cols-[1.35fr_0.85fr]">
+            <section className="articton-instruction-procedure rounded-2xl border border-[#1a2438] bg-white/[0.035] p-5">
+              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-[#00ffb4]">
+                Correct Procedure
+              </div>
+              <ol className="mt-4 space-y-3">
+                {safeGuide.procedure.map((item, index) => (
+                  <li key={`${stepName}-instruction-${index}`} className="flex gap-3 text-sm leading-6 text-[#d7e1ee]">
+                    <span className="articton-instruction-number flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[#00ffb4]/30 bg-[#00ffb4]/10 text-[10px] font-black text-[#00ffb4]">
+                      {index + 1}
+                    </span>
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ol>
+            </section>
+
+            <div className="articton-instruction-side grid gap-3">
+              <div className="articton-instruction-side-card rounded-2xl border border-[#ffd166]/25 bg-[#ffd166]/[0.06] p-4">
+                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#ffd166]">Safety / Handling</div>
+                <p className="mt-2 text-xs leading-6 text-[#d8dfeb]">{safeGuide.safety}</p>
+              </div>
+              <div className="articton-instruction-side-card rounded-2xl border border-[#00ffb4]/22 bg-[#00ffb4]/[0.06] p-4">
+                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#00ffb4]">Correct Result</div>
+                <p className="mt-2 text-xs leading-6 text-[#d8dfeb]">{safeGuide.verify}</p>
+              </div>
+              <div className="articton-instruction-side-card rounded-2xl border border-[#ff7b72]/22 bg-[#ff7b72]/[0.055] p-4">
+                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#ff9a92]">Common Mistake to Avoid</div>
+                <p className="mt-2 text-xs leading-6 text-[#d8dfeb]">{safeGuide.avoid}</p>
               </div>
             </div>
           </div>
 
-          <div className="mt-7 rounded-2xl border border-[#00ffb4]/18 bg-[#00ffb4]/6 px-4 py-3 text-xs leading-6 text-[#b7c6dd]">
-            The next component remains locked until you continue, so the sequence stays clear and controlled.
+          <div className="articton-instruction-simulation mt-5 rounded-2xl border border-[#00ffb4]/18 bg-[#00ffb4]/6 px-4 py-3 text-xs leading-6 text-[#c3d1e4]">
+            <span className="font-black uppercase tracking-[0.14em] text-[#00ffb4]">In the simulation: </span>
+            {safeGuide.simulation}
           </div>
 
-          <div className="mt-7 flex flex-wrap justify-end gap-3">
+          <div className="articton-instruction-footer mt-6 flex flex-wrap items-center justify-between gap-4">
+            <div className="articton-instruction-footer-note text-xs text-[#7f91ad]">
+              Read first • begin only when the component, release point, and safety check are clear
+            </div>
             <button
               type="button"
-              onClick={onContinue}
-              className="rounded-2xl bg-[#00ffb4] px-6 py-3 text-sm font-black text-[#07111d] shadow-[0_16px_45px_rgba(0,255,180,0.18)] transition hover:scale-[1.02]"
+              onClick={onBegin}
+              className="articton-instruction-button rounded-2xl bg-[#00ffb4] px-7 py-3 text-sm font-black text-[#07111d] shadow-[0_16px_45px_rgba(0,255,180,0.20)] transition hover:scale-[1.02]"
             >
-              Continue to {nextLabel} →
+              {isFinalChallenge ? "Begin Final Challenge" : `Begin ${stepName}`} →
             </button>
           </div>
         </div>
@@ -2317,9 +2860,9 @@ export default function Module2DisassemblyINTEL({ onFinish, onBack, onLogout, on
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showCertificate, setShowCertificate] = useState(false);
   const [showIntro, setShowIntro] = useState(true);
-  const [pendingStepCompletion, setPendingStepCompletion] = useState(null);
+  const [instructionStepIndex, setInstructionStepIndex] = useState(null);
   const [validationMessage, setValidationMessage] = useState(
-    "Begin with the GPU. Detach it, grab it, then move it into the highlighted table seat."
+    "Begin with the GPU. Detach it, then move it into the open table workspace; the magnetic field will animate it into the highlighted seat."
   );
   const [achievementToast, setAchievementToast] = useState(null);
 
@@ -2334,13 +2877,18 @@ export default function Module2DisassemblyINTEL({ onFinish, onBack, onLogout, on
   const currentStep = steps[step];
   const isFinalRound = currentStep?.key === "final";
 
-  // During the final round the learner repeats the entire removal sequence
-  // with no guide highlights. The "active" part is simply the next one in
-  // REMOVAL_SEQUENCE that hasn't been redone yet in this round.
-  const nextFinalRoundPartKey =
-    REMOVAL_SEQUENCE.find((key) => !finalRoundCompletedParts.includes(key)) ?? null;
-  const activePartKey = isFinalRound ? nextFinalRoundPartKey : currentStep?.partKey || null;
-  const activePartLabel = activePartKey ? COMPONENT_LABELS[activePartKey] : null;
+  // Both guided and unguided modes are stage-based. The RAM stage exposes both
+  // sticks at once and accepts either one first; every other stage exposes one
+  // component. The final pass uses the exact same validated dependencies.
+  const activeFinalStage = isFinalRound
+    ? getActiveProcedureStage(finalRoundCompletedParts)
+    : null;
+  const activePartKeys = isFinalRound
+    ? getRemainingParts(activeFinalStage, finalRoundCompletedParts)
+    : getRemainingParts(currentStep, completedParts);
+  const activePartLabel = activePartKeys.length
+    ? formatAllowedPartLabel(activePartKeys)
+    : null;
 
   const finalRoundComplete =
     finalRoundCompletedParts.length === REMOVAL_SEQUENCE.length;
@@ -2356,14 +2904,16 @@ export default function Module2DisassemblyINTEL({ onFinish, onBack, onLogout, on
     return Object.fromEntries(
       steps.map((item) => [
         item.key,
-        item.partKey
-          ? completedParts.includes(item.partKey)
-          : finalRoundComplete,
+        item.key === "final"
+          ? finalRoundComplete
+          : isProcedureStepComplete(item, completedParts),
       ])
     );
   }, [finalRoundComplete, completedParts]);
 
-  const currentStepCompleted = currentStep?.key === "final" && finalRoundComplete;
+  const currentStepCompleted = currentStep?.key === "final"
+    ? finalRoundComplete
+    : isProcedureStepComplete(currentStep, completedParts);
 
   const canSelectStep = useCallback(
     (index) => index <= step,
@@ -2382,9 +2932,9 @@ export default function Module2DisassemblyINTEL({ onFinish, onBack, onLogout, on
     setSceneRevision((value) => value + 1);
     setShowCertificate(false);
     setShowIntro(true);
-    setPendingStepCompletion(null);
+    setInstructionStepIndex(null);
     setValidationMessage(
-      "Scene restarted. Begin with the GPU and place it in the highlighted table seat."
+      "Scene restarted. Begin with the GPU, then remove the motherboard with its CPU, SSD, and both RAM modules still attached."
     );
   }, []);
 
@@ -2446,7 +2996,7 @@ export default function Module2DisassemblyINTEL({ onFinish, onBack, onLogout, on
         },
         { merge: true }
       );
-      const achievement = await unlockAchievement(firebaseUser.uid, "module2", { platform: "Intel" });
+      const achievement = await unlockAchievement(firebaseUser.uid, "module2", { platform: "INTEL" });
       setAchievementToast(achievement);
       window.setTimeout(() => setAchievementToast(null), 4200);
     } catch (error) {
@@ -2457,29 +3007,46 @@ export default function Module2DisassemblyINTEL({ onFinish, onBack, onLogout, on
   const handlePartCompleted = useCallback(
     (partKey) => {
       const isFinalRoundNow = steps[step]?.key === "final";
+      const allowedPartKeys = isFinalRoundNow
+        ? getRemainingParts(
+            getActiveProcedureStage(finalRoundCompletedParts),
+            finalRoundCompletedParts
+          )
+        : getRemainingParts(steps[step], completedParts);
+
+      if (
+        instructionStepIndex !== null ||
+        !allowedPartKeys.includes(partKey) ||
+        (isFinalRoundNow
+          ? finalRoundCompletedParts.includes(partKey)
+          : completedParts.includes(partKey))
+      ) {
+        return;
+      }
 
       if (isFinalRoundNow) {
-        // Unguided repeat pass: no completion card, no certificate button
-        // here. We just track progress and, once everything is redone,
-        // unlock the certificate.
-        setFinalRoundCompletedParts((prev) => {
-          if (prev.includes(partKey)) return prev;
-          const next = [...prev, partKey];
-          const practiceDone = next.length === REMOVAL_SEQUENCE.length;
+        setFinalRoundCompletedParts((previous) => {
+          if (previous.includes(partKey)) return previous;
 
+          const next = [...previous, partKey];
+          const practiceDone = REMOVAL_SEQUENCE.every((key) =>
+            next.includes(key)
+          );
           playCompletionSound(settings.sound, practiceDone);
 
           if (practiceDone) {
             setValidationMessage(
-              "Full disassembly complete — every component removed correctly with no guides. Your certificate is ready."
+              "Full disassembly complete — the validated order was followed with no guides. Your certificate is ready."
             );
             void saveFinalCompletion();
           } else {
-            const upcomingPartKey = REMOVAL_SEQUENCE.find(
-              (key) => !next.includes(key)
-            );
+            const nextStage = getActiveProcedureStage(next);
+            const nextAllowed = getRemainingParts(nextStage, next);
+            const currentStageStillOpen = nextStage?.partKeys.includes(partKey);
             setValidationMessage(
-              `${COMPONENT_LABELS[partKey]} removed correctly. Continue with the ${COMPONENT_LABELS[upcomingPartKey]}.`
+              currentStageStillOpen
+                ? `${COMPONENT_LABELS[partKey]} removed correctly. Remove the remaining RAM module.`
+                : `${COMPONENT_LABELS[partKey]} removed correctly. Continue with ${formatAllowedPartLabel(nextAllowed)}.`
             );
           }
 
@@ -2488,73 +3055,93 @@ export default function Module2DisassemblyINTEL({ onFinish, onBack, onLogout, on
         return;
       }
 
-      if (
-        pendingStepCompletion ||
-        partKey !== activePartKey ||
-        completedParts.includes(partKey)
-      ) {
-        return;
-      }
-
       const nextCompletedParts = [...completedParts, partKey];
-      const guidedPhaseFinished = nextCompletedParts.length === REMOVAL_SEQUENCE.length;
-      const nextStepIndex = guidedPhaseFinished ? steps.length - 1 : step + 1;
-      const nextPartKey = guidedPhaseFinished ? null : steps[nextStepIndex]?.partKey;
+      const stageComplete = isProcedureStepComplete(
+        steps[step],
+        nextCompletedParts
+      );
 
       setCompletedParts(nextCompletedParts);
       playCompletionSound(settings.sound, false);
-      setValidationMessage(
-        guidedPhaseFinished
-          ? `${COMPONENT_LABELS[partKey]} completed. One final unguided pass is next — confirm below to begin.`
-          : `${COMPONENT_LABELS[partKey]} seated correctly. Confirm the completion card to continue.`
+
+      if (!stageComplete) {
+        const remaining = getRemainingParts(steps[step], nextCompletedParts);
+        setValidationMessage(
+          `${COMPONENT_LABELS[partKey]} seated correctly. ${formatAllowedPartLabel(remaining)} is still attached; remove it next.`
+        );
+        return;
+      }
+
+      const guidedPhaseFinished = REMOVAL_SEQUENCE.every((key) =>
+        nextCompletedParts.includes(key)
       );
-      setPendingStepCompletion({
-        partKey,
-        label: COMPONENT_LABELS[partKey],
-        completedStepIndex: step,
-        nextStepIndex,
-        nextLabel: guidedPhaseFinished ? "Full Disassembly" : COMPONENT_LABELS[nextPartKey],
-        entersFinalRound: guidedPhaseFinished,
-      });
+      const completedLabel =
+        steps[step].key === "ram"
+          ? "Both RAM modules"
+          : COMPONENT_LABELS[partKey];
+
+      if (guidedPhaseFinished) {
+        const finalStepIndex = steps.length - 1;
+        setStep(finalStepIndex);
+        setFinalRoundCompletedParts([]);
+        setSceneRevision((value) => value + 1);
+        setInstructionStepIndex(finalStepIndex);
+        setValidationMessage(
+          `${completedLabel} complete. Review the final unguided challenge instructions before beginning.`
+        );
+        return;
+      }
+
+      const nextStepIndex = step + 1;
+      setStep(nextStepIndex);
+      setInstructionStepIndex(nextStepIndex);
+      setValidationMessage(
+        `${completedLabel} complete. Read the next instruction card before starting ${steps[nextStepIndex].name}.`
+      );
     },
     [
-      activePartKey,
       completedParts,
-      pendingStepCompletion,
+      finalRoundCompletedParts,
+      instructionStepIndex,
       saveFinalCompletion,
       settings.sound,
       step,
     ]
   );
 
-  const handleContinueAfterStep = useCallback(() => {
-    if (!pendingStepCompletion) return;
+  const handleBeginInstructionStep = useCallback(() => {
+    if (instructionStepIndex === null) return;
 
-    const completed = pendingStepCompletion;
-    setPendingStepCompletion(null);
-    setStep(completed.nextStepIndex);
+    const instructionStep = steps[instructionStepIndex];
+    setInstructionStepIndex(null);
 
-    if (completed.entersFinalRound) {
-      // Reinstall every part and drop the guides — the learner now repeats
-      // the whole sequence solo before the certificate unlocks.
-      setFinalRoundCompletedParts([]);
-      setSceneRevision((value) => value + 1);
+    if (instructionStep?.key === "final") {
       setValidationMessage(
-        "Final round: disassemble every component once more, in order — no guide highlights this time."
+        "Final round active: remove GPU → populated motherboard → SSD → both RAM modules (either order) → CPU → HDD → PSU. Guide highlights are disabled."
       );
       return;
     }
 
+    const allowed = getRemainingParts(instructionStep, completedParts);
     setValidationMessage(
-      `${completed.label} complete. Next: ${completed.nextLabel}.`
+      `${instructionStep.name} started. Remove ${formatAllowedPartLabel(allowed)} using the procedure and safety checks you just reviewed.`
     );
-  }, [pendingStepCompletion]);
+  }, [completedParts, instructionStepIndex]);
+
+  const handleStartGuidedPractice = useCallback(() => {
+    setShowIntro(false);
+    setStep(0);
+    setInstructionStepIndex(0);
+    setValidationMessage(
+      "Read the GPU instruction card before interacting with the first component."
+    );
+  }, []);
 
   const handleLockedPartClick = useCallback(
     (partKey) => {
       const clickedLabel = COMPONENT_LABELS[partKey] || "This component";
       setValidationMessage(
-        `${clickedLabel} is locked. Follow the sequence and remove ${activePartLabel || "the current component"} first.`
+        `${clickedLabel} is locked. Follow the validated sequence and remove ${activePartLabel || "the current component"} first.`
       );
     }, [activePartLabel]
   );
@@ -2565,7 +3152,7 @@ export default function Module2DisassemblyINTEL({ onFinish, onBack, onLogout, on
 
       if (index > step) {
         setValidationMessage(
-          `That step is locked. Complete ${activePartLabel || "the current step"} first.`
+          `That step is locked. Complete ${activePartLabel || "the current stage"} first.`
         );
       } else {
         setValidationMessage(
@@ -2637,7 +3224,7 @@ export default function Module2DisassemblyINTEL({ onFinish, onBack, onLogout, on
         platform="INTEL"
         moduleNumber="2"
         moduleType="Disassembly"
-        description="You completed the ordered removal of the GPU, SSD, HDD, both RAM modules, CPU, PSU, and motherboard — including a full unguided repeat pass."
+        description="You completed the validated board-first removal order: GPU, motherboard with mounted parts, SSD, both RAM modules in either order, CPU, HDD, and PSU — including a full unguided repeat pass."
         userName={user.name}
         onBack={handleBackToDashboard}
         onSwitchPlatform={() => {
@@ -2658,19 +3245,20 @@ export default function Module2DisassemblyINTEL({ onFinish, onBack, onLogout, on
           <ModuleIntroCard
             platform="INTEL"
             moduleType="Disassembly"
-            onStart={() => setShowIntro(false)}
+            onStart={handleStartGuidedPractice}
           />
         ) : null}
 
-        {pendingStepCompletion ? (
-          <StepCompletionCard
+        {instructionStepIndex !== null ? (
+          <StepInstructionCard
             platform="INTEL"
             moduleType="Disassembly"
-            stepNumber={pendingStepCompletion.completedStepIndex + 1}
-            totalSteps={REMOVAL_SEQUENCE.length}
-            label={pendingStepCompletion.label}
-            nextLabel={pendingStepCompletion.nextLabel}
-            onContinue={handleContinueAfterStep}
+            stepNumber={Math.min(instructionStepIndex + 1, GUIDED_STEPS.length)}
+            totalSteps={GUIDED_STEPS.length}
+            stepName={steps[instructionStepIndex]?.name || "Disassembly Step"}
+            guide={STEP_INSTRUCTION_GUIDES[steps[instructionStepIndex]?.key]}
+            isFinalChallenge={steps[instructionStepIndex]?.key === "final"}
+            onBegin={handleBeginInstructionStep}
           />
         ) : null}
 
@@ -2735,7 +3323,7 @@ export default function Module2DisassemblyINTEL({ onFinish, onBack, onLogout, on
                         ? `Unguided pass • remove the ${activePartLabel} • ${finalRoundCompletedParts.length}/${REMOVAL_SEQUENCE.length} done`
                         : "Unguided pass complete • open your certificate from the sidebar"
                       : activePartLabel
-                      ? `1st click: detach ${activePartLabel} • 2nd click: grab • move mouse • 3rd click: release`
+                      ? `Click + hold: detach and drag ${activePartLabel} • release inside the magnetic field`
                       : "Sequence complete • review the result or open the certificate"}
                   </div>
                 </div>
@@ -2780,7 +3368,7 @@ export default function Module2DisassemblyINTEL({ onFinish, onBack, onLogout, on
                   <ModelViewer
                     key={sceneRevision}
                     parts={PART_MODELS}
-                    activePartKey={activePartKey}
+                    activePartKeys={activePartKeys}
                     completedParts={modelViewerCompletedParts}
                     guidesEnabled={!isFinalRound}
                     onPartCompleted={handlePartCompleted}
@@ -2880,7 +3468,7 @@ export default function Module2DisassemblyINTEL({ onFinish, onBack, onLogout, on
 
             <div className="flex justify-center items-center gap-4 border-t border-[#1a2438] px-6 pb-6 pt-4">
               <div className="text-center text-xs text-[#7a8ba8]">
-                Left click interacts with components • right drag rotates the camera • mouse wheel zooms
+                Click + hold detaches and drags • release inside the field to animate the magnetic seat • Esc releases safely • right drag rotates • wheel zooms • R resets camera
               </div>
             </div>
 

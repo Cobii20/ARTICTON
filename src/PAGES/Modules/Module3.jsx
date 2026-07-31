@@ -194,11 +194,11 @@ function Module3PlatformChoice({
               </div>
 
               <div className="mt-2 text-[30px] font-black leading-tight text-white">
-                Choose your disassembly platform
+                Choose your assembly platform
               </div>
 
               <div className="mx-auto mt-3 max-w-xl text-[14px] leading-6 text-[#dbe6f5]">
-                What processor platform would you like to disassemble?
+                What processor platform would you like to assemble?
               </div>
 
               <div className="mt-7 grid gap-3 sm:grid-cols-2">

@@ -1,5 +1,56 @@
 @import "tailwindcss";
 
+:root {
+  color-scheme: dark;
+  --articton-bg: #07111b;
+  --articton-bg-deep: #050912;
+  --articton-surface: #0d1624;
+  --articton-surface-strong: #111c2c;
+  --articton-surface-muted: #0a1320;
+  --articton-surface-soft: rgba(255, 255, 255, 0.045);
+  --articton-border: #1b2a40;
+  --articton-border-strong: #2a3a52;
+  --articton-border-soft: rgba(255, 255, 255, 0.1);
+  --articton-text: #f4f8fb;
+  --articton-text-muted: #9aacbf;
+  --articton-text-subtle: #71849d;
+  --articton-accent: #00eeb2;
+  --articton-accent-strong: #00c997;
+  --articton-accent-soft: rgba(0, 238, 178, 0.11);
+  --articton-accent-ink: #052219;
+  --articton-info: #8ec5ff;
+  --articton-warning: #ffd166;
+  --articton-danger: #ff8b82;
+  --articton-shadow-sm: 0 10px 32px rgba(0, 0, 0, 0.26);
+  --articton-shadow: 0 24px 72px rgba(0, 0, 0, 0.42);
+  --articton-page-padding: clamp(0.75rem, 2vw, 2rem);
+}
+
+html.articton-light {
+  color-scheme: light;
+  --articton-bg: #f3f7fa;
+  --articton-bg-deep: #e9f0f5;
+  --articton-surface: #ffffff;
+  --articton-surface-strong: #f8fbfd;
+  --articton-surface-muted: #eef4f7;
+  --articton-surface-soft: rgba(255, 255, 255, 0.86);
+  --articton-border: #d5e0e8;
+  --articton-border-strong: #bdccd8;
+  --articton-border-soft: rgba(61, 86, 109, 0.18);
+  --articton-text: #10253a;
+  --articton-text-muted: #51697d;
+  --articton-text-subtle: #71869a;
+  --articton-accent: #007d65;
+  --articton-accent-strong: #006852;
+  --articton-accent-soft: rgba(0, 125, 101, 0.105);
+  --articton-accent-ink: #ffffff;
+  --articton-info: #176da2;
+  --articton-warning: #8b5600;
+  --articton-danger: #b42318;
+  --articton-shadow-sm: 0 10px 30px rgba(27, 54, 77, 0.09);
+  --articton-shadow: 0 24px 70px rgba(27, 54, 77, 0.13);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -7,171 +58,870 @@
 html,
 body,
 #root {
-  height: 100%;
+  width: 100%;
+  min-width: 320px;
+  min-height: 100%;
   margin: 0;
   padding: 0;
-  background-color: #061e29;
 }
 
 html {
   scroll-behavior: smooth;
+  font-size: clamp(14px, calc(13px + 0.16vw), 16px);
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  background: var(--articton-bg);
 }
 
 body {
+  min-height: 100dvh;
+  background: var(--articton-bg);
+  color: var(--articton-text);
   font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
-    "Segoe UI", Roboto, "Helvetica Neue", Arial;
-  color: #f3f4f4;
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: none;
+}
+
+#root {
+  min-height: 100dvh;
+  isolation: isolate;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button,
+[role="button"] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+img,
+svg,
+video {
+  max-width: 100%;
 }
 
 canvas {
   display: block;
+  max-width: 100%;
   outline: none;
+  touch-action: none;
 }
 
+/* Use the real viewport on mobile browsers instead of the legacy 100vh. */
+.h-screen {
+  height: 100dvh !important;
+}
+
+.min-h-screen {
+  min-height: 100dvh !important;
+}
+
+.max-h-screen {
+  max-height: 100dvh !important;
+}
+
+.w-screen {
+  width: 100dvw !important;
+}
+
+/* Visually quiet scrollbars for pages that intentionally scroll. */
 ::-webkit-scrollbar {
-  width: 10px;
+  width: 9px;
+  height: 9px;
 }
+
 ::-webkit-scrollbar-track {
-  background: #061e29;
+  background: var(--articton-bg-deep);
 }
+
 ::-webkit-scrollbar-thumb {
-  background: #5f9598;
-  border-radius: 6px;
+  border: 2px solid var(--articton-bg-deep);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--articton-accent) 42%, #71849d);
 }
+
+.scrollArea {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollArea::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Responsive, non-scrolling instruction guide                                */
+/* -------------------------------------------------------------------------- */
+
+.articton-instruction-overlay {
+  padding: clamp(0.45rem, 1.4vmin, 1.5rem) !important;
+  overflow: hidden;
+}
+
+.articton-instruction-card {
+  width: min(96vw, 64rem) !important;
+  height: min(95dvh, 55rem);
+  max-width: none !important;
+  max-height: none !important;
+  padding: clamp(0.85rem, 1.8vmin, 1.75rem) !important;
+  overflow: hidden !important;
+  border-radius: clamp(1.15rem, 2.4vmin, 1.9rem) !important;
+  container-type: size;
+}
+
+.articton-instruction-content {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  flex-direction: column;
+}
+
+.articton-instruction-topbar {
+  flex: 0 0 auto;
+}
+
+.articton-instruction-hero {
+  flex: 0 0 auto;
+  margin-top: clamp(0.65rem, 1.7vh, 1.5rem) !important;
+  gap: clamp(0.75rem, 1.6vw, 1.25rem) !important;
+}
+
+.articton-instruction-step-icon {
+  width: clamp(2.75rem, 6.5vh, 4rem) !important;
+  height: clamp(2.75rem, 6.5vh, 4rem) !important;
+  font-size: clamp(1.05rem, 2.4vh, 1.5rem) !important;
+}
+
+.articton-instruction-title {
+  margin-top: clamp(0.2rem, 0.7vh, 0.5rem) !important;
+  font-size: clamp(1.45rem, 3.45vh, 2.25rem) !important;
+  line-height: 1.06 !important;
+  overflow-wrap: anywhere;
+}
+
+.articton-instruction-summary {
+  margin-top: clamp(0.35rem, 0.95vh, 0.75rem) !important;
+  font-size: clamp(0.72rem, 1.38vh, 0.875rem) !important;
+  line-height: clamp(1.15rem, 2.25vh, 1.72rem) !important;
+}
+
+.articton-instruction-details {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1.35fr) minmax(15rem, 0.85fr) !important;
+  min-height: 0;
+  flex: 1 1 auto;
+  gap: clamp(0.55rem, 1.3vmin, 1rem) !important;
+  margin-top: clamp(0.65rem, 1.65vh, 1.7rem) !important;
+}
+
+.articton-instruction-procedure,
+.articton-instruction-side-card {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.articton-instruction-procedure {
+  padding: clamp(0.75rem, 1.5vmin, 1.25rem) !important;
+}
+
+.articton-instruction-procedure ol {
+  margin-top: clamp(0.5rem, 1.15vh, 1rem) !important;
+  gap: clamp(0.32rem, 0.85vh, 0.75rem) !important;
+}
+
+.articton-instruction-procedure li {
+  font-size: clamp(0.68rem, 1.35vh, 0.875rem) !important;
+  line-height: clamp(1.05rem, 2.12vh, 1.5rem) !important;
+}
+
+.articton-instruction-procedure li > span:last-child,
+.articton-instruction-side-card p,
+.articton-instruction-simulation {
+  overflow-wrap: anywhere;
+}
+
+.articton-instruction-number {
+  width: clamp(1.25rem, 2.9vh, 1.5rem) !important;
+  height: clamp(1.25rem, 2.9vh, 1.5rem) !important;
+}
+
+.articton-instruction-side {
+  display: grid;
+  min-height: 0;
+  grid-template-rows: repeat(3, minmax(0, 1fr));
+  gap: clamp(0.4rem, 0.95vh, 0.75rem) !important;
+}
+
+.articton-instruction-side-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  padding: clamp(0.65rem, 1.25vmin, 1rem) !important;
+}
+
+.articton-instruction-side-card p {
+  margin-top: clamp(0.2rem, 0.6vh, 0.5rem) !important;
+  font-size: clamp(0.63rem, 1.18vh, 0.75rem) !important;
+  line-height: clamp(0.98rem, 1.88vh, 1.5rem) !important;
+}
+
+.articton-instruction-simulation {
+  flex: 0 0 auto;
+  margin-top: clamp(0.45rem, 1.15vh, 1.25rem) !important;
+  padding: clamp(0.55rem, 1.15vmin, 0.8rem) clamp(0.7rem, 1.35vmin, 1rem) !important;
+  font-size: clamp(0.64rem, 1.18vh, 0.75rem) !important;
+  line-height: clamp(1rem, 1.9vh, 1.5rem) !important;
+}
+
+.articton-instruction-footer {
+  flex: 0 0 auto;
+  margin-top: clamp(0.45rem, 1.2vh, 1.4rem) !important;
+  gap: clamp(0.45rem, 1.1vmin, 1rem) !important;
+}
+
+.articton-instruction-footer-note {
+  font-size: clamp(0.62rem, 1.12vh, 0.75rem) !important;
+}
+
+.articton-instruction-button {
+  min-height: 2.6rem;
+  max-width: 100%;
+  padding: clamp(0.6rem, 1.2vh, 0.75rem) clamp(1rem, 2vw, 1.75rem) !important;
+  font-size: clamp(0.72rem, 1.25vh, 0.875rem) !important;
+  white-space: normal;
+}
+
+@media (max-width: 720px) {
+  .articton-instruction-card {
+    width: min(97vw, 42rem) !important;
+    height: 97dvh;
+  }
+
+  .articton-instruction-details {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .articton-instruction-side {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .articton-instruction-side-card {
+    padding: 0.55rem !important;
+  }
+
+  .articton-instruction-footer {
+    align-items: stretch !important;
+  }
+
+  .articton-instruction-footer-note {
+    display: none;
+  }
+
+  .articton-instruction-button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 520px) {
+  .articton-instruction-topbar {
+    gap: 0.4rem !important;
+  }
+
+  .articton-instruction-topbar > div {
+    padding: 0.38rem 0.58rem !important;
+    font-size: 0.57rem !important;
+    letter-spacing: 0.11em !important;
+  }
+
+  .articton-instruction-hero {
+    align-items: flex-start !important;
+  }
+
+  .articton-instruction-step-icon {
+    width: 2.4rem !important;
+    height: 2.4rem !important;
+  }
+
+  .articton-instruction-title {
+    font-size: clamp(1.2rem, 6vw, 1.55rem) !important;
+  }
+
+  .articton-instruction-summary {
+    font-size: 0.68rem !important;
+    line-height: 1.05rem !important;
+  }
+
+  .articton-instruction-procedure li {
+    font-size: 0.65rem !important;
+    line-height: 1.02rem !important;
+  }
+
+  .articton-instruction-side-card p {
+    font-size: 0.58rem !important;
+    line-height: 0.88rem !important;
+  }
+
+  .articton-instruction-side-card > div {
+    font-size: 0.55rem !important;
+    letter-spacing: 0.08em !important;
+  }
+}
+
+@media (max-height: 720px) and (min-width: 721px) {
+  .articton-instruction-card {
+    width: min(97vw, 70rem) !important;
+    height: 97dvh;
+    padding: 0.72rem 1rem !important;
+  }
+
+  .articton-instruction-footer-note {
+    display: none;
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Application shells and theme foundations                                   */
+/* -------------------------------------------------------------------------- */
+
+.articton-app-shell {
+  width: 100%;
+  height: 100dvh;
+  min-height: 100dvh;
+  overflow: hidden;
+  background: var(--articton-bg);
+  color: var(--articton-text);
+}
+
+.articton-landing-page {
+  min-height: 100dvh;
+  background: var(--articton-bg);
+  color: var(--articton-text);
+}
+
+:where(.articton-app-shell, .articton-landing-page) :focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--articton-accent) 42%, transparent);
+  outline-offset: 2px;
+}
+
+/* The real 3D workspace intentionally remains dark in both themes. The
+   surrounding learning UI changes theme, but model visibility and authored
+   lighting stay stable. */
+.articton-3d-stage,
+html.articton-light .articton-3d-stage {
+  color-scheme: dark;
+  background: #070c14 !important;
+  color: #e8ecf4 !important;
+}
+
+html.articton-light .articton-3d-stage [class*="bg-[#070c14]"],
+html.articton-light .articton-3d-stage [class*="bg-[#0a0e17]"],
+html.articton-light .articton-3d-stage [class*="bg-[#0b1220]"],
+html.articton-light .articton-3d-stage [class*="bg-[#0d1220]"] {
+  background-color: #070c14 !important;
+}
+
+html.articton-light .articton-3d-stage [class*="text-white"],
+html.articton-light .articton-3d-stage [class*="text-[#e8ecf4]"],
+html.articton-light .articton-3d-stage [class*="text-[#dbe6f5]"] {
+  color: #eef5fb !important;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Polished light mode                                                        */
+/* -------------------------------------------------------------------------- */
 
 html.articton-light,
 html.articton-light body,
 html.articton-light #root {
-  background-color: #f3f8fb;
-  color: #142235;
+  background:
+    radial-gradient(circle at 12% -8%, rgba(0, 125, 101, 0.075), transparent 30rem),
+    radial-gradient(circle at 92% 0%, rgba(23, 109, 162, 0.055), transparent 28rem),
+    var(--articton-bg);
+  color: var(--articton-text);
 }
 
-html.articton-light ::-webkit-scrollbar-track {
-  background: #dcecef;
+html.articton-light ::selection {
+  background: rgba(0, 125, 101, 0.2);
+  color: #062e25;
 }
 
-html.articton-light ::-webkit-scrollbar-thumb {
-  background: #7aaeb2;
+html.articton-light .articton-app-shell,
+html.articton-light .articton-landing-page {
+  background:
+    radial-gradient(circle at 8% -10%, rgba(0, 125, 101, 0.08), transparent 32rem),
+    radial-gradient(circle at 95% 8%, rgba(23, 109, 162, 0.055), transparent 30rem),
+    var(--articton-bg) !important;
+  color: var(--articton-text) !important;
 }
 
-html.articton-light [class*="bg-[#0a0e17]"],
-html.articton-light [class*="bg-[#061e29]"],
-html.articton-light [class*="bg-[#031018]"] {
-  background-color: #f3f8fb !important;
+/* Convert the recurring dark surfaces into a restrained white hierarchy. */
+html.articton-light :where(.articton-app-shell, .articton-landing-page)
+  :where(
+    [class*="bg-[#080c14]"],
+    [class*="bg-[#0a0e17]"],
+    [class*="bg-[#0b1220]"],
+    [class*="bg-[#0d1220]"],
+    [class*="bg-[#0d1624]"],
+    [class*="bg-[#111827]"],
+    [class*="bg-[#111b2f]"]
+  ):not(.articton-3d-stage) {
+  background-color: var(--articton-surface) !important;
 }
 
-html.articton-light [class*="bg-[#0d1220]"],
-html.articton-light [class*="bg-[#0b1220]"],
-html.articton-light [class*="bg-[#111827]"],
-html.articton-light [class*="bg-[#111b2f]"] {
-  background-color: #ffffff !important;
+html.articton-light :where(.articton-app-shell, .articton-landing-page)
+  :where(
+    [class*="bg-[#061e29]"],
+    [class*="bg-[#031018]"],
+    [class*="bg-[#050912]"]
+  ):not(.articton-3d-stage) {
+  background-color: var(--articton-bg) !important;
 }
 
-html.articton-light [class*="bg-[linear-gradient(135deg"],
-html.articton-light [class*="bg-[linear-gradient(90deg"],
-html.articton-light [class*="bg-gradient-to-b"],
-html.articton-light [class*="bg-gradient-to-br"] {
-  background-image: linear-gradient(135deg, #f8fbfd, #eef6f8) !important;
+html.articton-light :where(.articton-app-shell, .articton-landing-page)
+  :where(
+    [class*="bg-white/[0.02]"],
+    [class*="bg-white/[0.03]"],
+    [class*="bg-white/[0.04]"],
+    [class*="bg-white/[0.05]"],
+    [class*="bg-white/[0.06]"],
+    [class*="bg-white/5"],
+    [class*="bg-white/10"]
+  ) {
+  background-color: var(--articton-surface-strong) !important;
 }
 
-html.articton-light [class*="bg-[radial-gradient"] {
-  background-image: radial-gradient(circle at center, rgba(0, 166, 132, 0.08), transparent 62%) !important;
+html.articton-light :where(.articton-app-shell, .articton-landing-page)
+  :where(
+    [class*="border-[#1a2438]"],
+    [class*="border-[#26324a]"],
+    [class*="border-[#2a3550]"],
+    [class*="border-white/10"],
+    [class*="border-white/12"],
+    [class*="ring-white/5"]
+  ) {
+  border-color: var(--articton-border) !important;
+  --tw-ring-color: var(--articton-border-soft) !important;
 }
 
-html.articton-light [class*="bg-black/10"] {
-  background-color: transparent !important;
+html.articton-light :where(.articton-app-shell, .articton-landing-page)
+  :where(
+    [class*="text-white"],
+    [class*="text-[#e8ecf4]"],
+    [class*="text-[#dbe6f5]"],
+    [class*="text-[#f3f4f4]"],
+    [class*="text-[#d7e1ee]"],
+    [class*="text-[#d8dfeb]"],
+    [class*="text-[#dffef5]"]
+  ) {
+  color: var(--articton-text) !important;
 }
 
-html.articton-light [class*="ring-white/5"] {
-  box-shadow: inset 0 0 0 1px rgba(145, 164, 184, 0.26) !important;
+html.articton-light :where(.articton-app-shell, .articton-landing-page)
+  :where(
+    [class*="text-[#7a8ba8]"],
+    [class*="text-[#9fb0ca]"],
+    [class*="text-[#9fb0c9]"],
+    [class*="text-[#aebdd3]"],
+    [class*="text-[#c3d1e4]"],
+    [class*="text-[#c8d4e6]"],
+    [class*="text-[#7f91ad]"],
+    [class*="text-[#4c5d66]"]
+  ) {
+  color: var(--articton-text-muted) !important;
 }
 
-html.articton-light [class*="bg-white/[0.03]"],
-html.articton-light [class*="bg-white/[0.04]"],
-html.articton-light [class*="bg-white/[0.05]"],
-html.articton-light [class*="bg-white/[0.06]"],
-html.articton-light [class*="bg-white/[0.02]"] {
-  background-color: rgba(255, 255, 255, 0.84) !important;
+html.articton-light :where(.articton-app-shell, .articton-landing-page)
+  :where([class*="text-[#4a5b78]"], [class*="text-[#6f8499]"]) {
+  color: var(--articton-text-subtle) !important;
 }
 
-html.articton-light [class*="border-[#1a2438]"],
-html.articton-light [class*="border-[#26324a]"],
-html.articton-light [class*="border-white/10"],
-html.articton-light [class*="border-transparent"] {
-  border-color: #c4d3e4 !important;
+html.articton-light :where(.articton-app-shell, .articton-landing-page)
+  :where(
+    [class*="text-[#00ffb4]"],
+    [class*="text-[#73ffd4]"],
+    [class*="text-[#b7fff0]"],
+    [class*="text-[#9fdccb]"]
+  ) {
+  color: var(--articton-accent) !important;
 }
 
-html.articton-light [class*="text-white"],
-html.articton-light [class*="text-[#e8ecf4]"],
-html.articton-light [class*="text-[#dbe6f5]"],
-html.articton-light [class*="text-[#f3f4f4]"] {
-  color: #142235 !important;
+html.articton-light :where(.articton-app-shell, .articton-landing-page)
+  [class*="bg-[#00ffb4]"] {
+  background-color: var(--articton-accent) !important;
 }
 
-html.articton-light [class*="text-[#7a8ba8]"],
-html.articton-light [class*="text-[#9fb0ca]"],
-html.articton-light [class*="text-[#9fb0c9]"],
-html.articton-light [class*="text-[#c8d4e6]"] {
-  color: #4f647d !important;
+html.articton-light :where(.articton-app-shell, .articton-landing-page)
+  :where([class*="bg-[#00ffb4]/"], [class*="bg-[#00b4ff]/"]) {
+  background-color: var(--articton-accent-soft) !important;
 }
 
-html.articton-light [class*="text-[#00ffb4]"],
-html.articton-light [class*="text-[#b7fff0]"],
-html.articton-light [class*="text-[#9fdccb]"] {
-  color: #007965 !important;
+html.articton-light :where(.articton-app-shell, .articton-landing-page)
+  [class*="border-[#00ffb4]/"] {
+  border-color: rgba(0, 125, 101, 0.32) !important;
 }
 
-html.articton-light [class*="bg-[#00ffb4]"] {
-  background-color: #00b894 !important;
+/* Text sitting on a solid accent must remain high contrast. */
+html.articton-light :where(.articton-app-shell, .articton-landing-page)
+  [class*="bg-[#00ffb4]"][class*="text-[#07111d]"],
+html.articton-light :where(.articton-app-shell, .articton-landing-page)
+  [class*="bg-[#00ffb4]"][class*="text-[#0a0e17]"] {
+  color: #ffffff !important;
 }
 
-html.articton-light [class*="bg-[#00ffb4]/"],
-html.articton-light [class*="bg-[#00b4ff]/"] {
-  background-color: rgba(0, 184, 148, 0.11) !important;
+html.articton-light :where(.articton-app-shell, .articton-landing-page)
+  [class*="text-[#8ec5ff]"] {
+  color: var(--articton-info) !important;
 }
 
-html.articton-light [class*="border-[#00ffb4]/"] {
-  border-color: rgba(0, 137, 113, 0.28) !important;
+html.articton-light :where(.articton-app-shell, .articton-landing-page)
+  :where([class*="text-yellow-"], [class*="text-[#ffd166]"], [class*="text-[#ffd27d]"]) {
+  color: var(--articton-warning) !important;
 }
 
-html.articton-light [class*="text-yellow-"] {
-  color: #8a4b00 !important;
+html.articton-light :where(.articton-app-shell, .articton-landing-page)
+  :where([class*="text-red-"], [class*="text-[#ff9a92]"], [class*="text-[#ff9f7d]"]) {
+  color: var(--articton-danger) !important;
 }
 
-html.articton-light [class*="text-red-"] {
-  color: #9f1d1d !important;
+html.articton-light :where(.articton-app-shell, .articton-landing-page)
+  :where([class*="bg-red-500/10"], [class*="bg-[#ff9f7d]/8"]) {
+  background-color: rgba(180, 35, 24, 0.075) !important;
 }
 
-html.articton-light input,
-html.articton-light textarea,
-html.articton-light select {
-  color: #142235;
-  background-color: #ffffff;
+html.articton-light :where(.articton-app-shell, .articton-landing-page)
+  :where([class*="border-red-500/20"], [class*="border-[#ff9f7d]/30"]) {
+  border-color: rgba(180, 35, 24, 0.24) !important;
 }
 
-html.articton-light input::placeholder,
-html.articton-light textarea::placeholder {
-  color: #7a8da3;
+/* Inputs and interactive controls. */
+html.articton-light :where(.articton-app-shell, .articton-landing-page)
+  :where(input, textarea, select, .articton-field) {
+  border-color: var(--articton-border-strong) !important;
+  background: #ffffff !important;
+  color: var(--articton-text) !important;
+  box-shadow: inset 0 1px 0 rgba(16, 37, 58, 0.025);
 }
 
-html.articton-light [class*="shadow-[0_70px"],
-html.articton-light [class*="shadow-[0_34px"],
-html.articton-light [class*="shadow-[0_30px"],
-html.articton-light [class*="shadow-[0_26px"],
-html.articton-light [class*="shadow-[0_20px"],
-html.articton-light [class*="shadow-[0_18px"],
-html.articton-light [class*="shadow-[0_12px"] {
-  box-shadow: 0 22px 70px rgba(25, 52, 78, 0.13) !important;
+html.articton-light :where(.articton-app-shell, .articton-landing-page)
+  :where(input, textarea)::placeholder {
+  color: #8092a3 !important;
+  opacity: 1;
 }
 
-html.articton-light [class*="shadow-[inset"] {
-  box-shadow: inset 0 0 0 1px rgba(153, 173, 191, 0.26) !important;
+html.articton-light :where(.articton-app-shell, .articton-landing-page)
+  :where(input, textarea, select, .articton-field):focus {
+  border-color: rgba(0, 125, 101, 0.58) !important;
+  box-shadow: 0 0 0 4px rgba(0, 125, 101, 0.11) !important;
 }
 
-html.articton-light aside {
-  background-color: rgba(255, 255, 255, 0.92) !important;
+html.articton-light .articton-dropdown-menu {
+  border-color: var(--articton-border) !important;
+  background: #ffffff !important;
+  box-shadow: var(--articton-shadow-sm) !important;
 }
 
-html.articton-light details > div {
-  background-color: rgba(255, 255, 255, 0.94) !important;
+/* Replace heavy black shadows with soft elevation. */
+html.articton-light :where(.articton-app-shell, .articton-landing-page)
+  :where(
+    [class*="shadow-[0_70px"],
+    [class*="shadow-[0_40px"],
+    [class*="shadow-[0_34px"],
+    [class*="shadow-[0_30px"],
+    [class*="shadow-[0_28px"],
+    [class*="shadow-[0_26px"],
+    [class*="shadow-[0_24px"],
+    [class*="shadow-[0_20px"],
+    [class*="shadow-[0_18px"],
+    [class*="shadow-[0_16px"],
+    [class*="shadow-[0_14px"],
+    [class*="shadow-[0_12px"]
+  ) {
+  box-shadow: var(--articton-shadow) !important;
+}
+
+html.articton-light :where(.articton-app-shell, .articton-landing-page)
+  [class*="shadow-[inset"]:not(.articton-3d-stage) {
+  box-shadow: inset 0 0 0 1px rgba(103, 128, 150, 0.2) !important;
+}
+
+html.articton-light :where(.articton-app-shell, .articton-landing-page)
+  :where([class*="bg-black/70"], [class*="bg-black/60"], [class*="bg-black/50"]) {
+  background-color: rgba(30, 49, 66, 0.28) !important;
+}
+
+/* Keep generated decorative grids and glows quiet in light mode. */
+html.articton-light :where(.articton-app-shell, .articton-landing-page)
+  [class*="bg-[radial-gradient"]:not(.articton-3d-stage) {
+  opacity: 0.5;
+}
+
+html.articton-light :where(.articton-app-shell, .articton-landing-page)
+  [class*="bg-[linear-gradient(rgba(0,255,180"] {
+  opacity: 0.34 !important;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Dashboard, modules, practical tests, admin and faculty                     */
+/* -------------------------------------------------------------------------- */
+
+html.articton-light .articton-dashboard-page aside,
+html.articton-light .articton-admin-page aside,
+html.articton-light .articton-faculty-page aside {
+  background: rgba(255, 255, 255, 0.93) !important;
+  border-color: var(--articton-border) !important;
+  box-shadow: 14px 0 38px rgba(27, 54, 77, 0.055);
+}
+
+html.articton-light :where(.articton-dashboard-page, .articton-module-selector-page,
+  .articton-module-content-page, .articton-module-page, .articton-practice-page,
+  .articton-admin-page, .articton-faculty-page)
+  :where(details > div, [role="menu"]) {
+  background: #ffffff !important;
+  border-color: var(--articton-border) !important;
+  box-shadow: var(--articton-shadow-sm) !important;
+}
+
+html.articton-light .articton-practice-page [class*="text-[#ff9f7d]"] {
+  color: #a63a2a !important;
+}
+
+html.articton-light .articton-practice-page [class*="bg-[#ff9f7d]/"] {
+  background-color: rgba(166, 58, 42, 0.08) !important;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Instruction guide                                                         */
+/* -------------------------------------------------------------------------- */
+
+html.articton-light .articton-instruction-overlay {
+  background:
+    radial-gradient(circle at 50% 15%, rgba(0, 125, 101, 0.09), transparent 28rem),
+    rgba(227, 237, 243, 0.88) !important;
+}
+
+html.articton-light .articton-instruction-card {
+  border-color: rgba(0, 125, 101, 0.32) !important;
+  background: rgba(255, 255, 255, 0.985) !important;
+  box-shadow: 0 32px 90px rgba(27, 54, 77, 0.18), 0 0 0 1px rgba(255, 255, 255, 0.72) inset !important;
+}
+
+html.articton-light .articton-instruction-procedure,
+html.articton-light .articton-instruction-side-card,
+html.articton-light .articton-instruction-simulation {
+  background: var(--articton-surface-strong) !important;
+  border-color: var(--articton-border) !important;
+}
+
+html.articton-light .articton-instruction-side-card[class*="border-yellow"] {
+  background: #fffaf0 !important;
+  border-color: rgba(139, 86, 0, 0.25) !important;
+}
+
+html.articton-light .articton-instruction-side-card[class*="border-red"] {
+  background: #fff7f6 !important;
+  border-color: rgba(180, 35, 24, 0.22) !important;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Settings modal                                                             */
+/* -------------------------------------------------------------------------- */
+
+html.articton-light .articton-modal-backdrop {
+  background: rgba(29, 48, 65, 0.28) !important;
+}
+
+html.articton-light .articton-settings-dialog {
+  border-color: var(--articton-border) !important;
+  background: #ffffff !important;
+  box-shadow: 0 34px 100px rgba(27, 54, 77, 0.2) !important;
+}
+
+html.articton-light .articton-setting-row {
+  border-color: var(--articton-border) !important;
+  background: var(--articton-surface-strong) !important;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Landing page                                                               */
+/* -------------------------------------------------------------------------- */
+
+.articton-landing {
+  min-height: 100dvh;
+  background: var(--articton-bg);
+  color: var(--articton-text);
+}
+
+html.articton-light .articton-glass-nav {
+  border-color: rgba(71, 96, 118, 0.17) !important;
+  background: rgba(250, 253, 255, 0.88) !important;
+  box-shadow: 0 12px 34px rgba(27, 54, 77, 0.09) !important;
+}
+
+/* Keep the landing navigation faithful to the original design. Home, About,
+   and Login are plain text links; only Signup uses the accented pill style. */
+.articton-landing-nav .articton-nav-link {
+  appearance: none;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  color: rgba(255, 255, 255, 0.8);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 400;
+  line-height: 1.25rem;
+  text-decoration: none;
+  box-shadow: none;
+  cursor: pointer;
+  transition: color 160ms ease;
+}
+
+.articton-landing-nav .articton-nav-link:hover,
+.articton-landing-nav .articton-nav-link:focus-visible {
+  background: transparent;
+  color: #ffffff;
+  box-shadow: none;
+}
+
+.articton-landing-nav .articton-signup-button {
+  font-size: 0.875rem;
+  font-weight: 400;
+  line-height: 1.25rem;
+}
+
+html.articton-light .articton-landing-nav .articton-nav-link {
+  color: #40556a;
+}
+
+html.articton-light .articton-landing-nav .articton-nav-link:hover,
+html.articton-light .articton-landing-nav .articton-nav-link:focus-visible {
+  color: #0f1f2e;
+}
+
+html.articton-light .articton-landing-nav .articton-signup-button {
+  border-color: rgba(0, 125, 101, 0.28) !important;
+  background: rgba(0, 125, 101, 0.07) !important;
+  color: #007d65 !important;
+}
+
+html.articton-light .articton-landing-nav .articton-signup-button:hover {
+  background: rgba(0, 125, 101, 0.12) !important;
+}
+
+html.articton-light .articton-theme-toggle {
+  border-color: var(--articton-border) !important;
+  background: #ffffff !important;
+  color: var(--articton-text-muted) !important;
+  box-shadow: 0 5px 16px rgba(27, 54, 77, 0.08);
+}
+
+html.articton-light .articton-theme-toggle:hover {
+  border-color: rgba(0, 125, 101, 0.35) !important;
+  background: var(--articton-accent-soft) !important;
+  color: var(--articton-accent) !important;
+}
+
+html.articton-light .articton-landing-hero,
+html.articton-light .articton-landing-about,
+html.articton-light .articton-auth-section {
+  background:
+    radial-gradient(circle at 72% 30%, rgba(0, 125, 101, 0.105), transparent 26rem),
+    radial-gradient(circle at 20% 12%, rgba(23, 109, 162, 0.06), transparent 24rem),
+    linear-gradient(180deg, #f9fcfd 0%, #f1f6f9 100%) !important;
+}
+
+html.articton-light .articton-landing-grid > div:first-child {
+  background-image:
+    linear-gradient(rgba(0, 125, 101, 0.052) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 125, 101, 0.052) 1px, transparent 1px) !important;
+}
+
+html.articton-light .articton-landing-grid > div:last-child {
+  background-image: linear-gradient(180deg, rgba(243, 247, 250, 0), rgba(243, 247, 250, 0.28) 66%, rgba(243, 247, 250, 0.96)) !important;
+}
+
+html.articton-light .articton-landing-wave {
+  background: linear-gradient(180deg, transparent 0%, rgba(0, 125, 101, 0.035) 45%, rgba(0, 125, 101, 0.085) 50%, rgba(0, 125, 101, 0.035) 55%, transparent 100%) !important;
+}
+
+html.articton-light .articton-content-card,
+html.articton-light .articton-auth-card {
+  border-color: var(--articton-border) !important;
+  background: rgba(255, 255, 255, 0.96) !important;
+  box-shadow: var(--articton-shadow) !important;
+}
+
+html.articton-light .articton-auth-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0, 125, 101, 0.32), transparent);
+  pointer-events: none;
+}
+
+html.articton-light .articton-landing-footer {
+  border-color: var(--articton-border) !important;
+  background: #eaf1f5 !important;
+  color: var(--articton-text-muted) !important;
+}
+
+html.articton-light .articton-landing [class*="bg-[linear-gradient(180deg,rgba(10,14,23"] {
+  background-image: linear-gradient(180deg, rgba(243, 247, 250, 0), rgba(243, 247, 250, 0.22) 68%, rgba(243, 247, 250, 0.94)) !important;
+}
+
+/* Disabled states remain legible rather than looking faded into the page. */
+html.articton-light :where(.articton-app-shell, .articton-landing-page) button:disabled {
+  opacity: 0.58;
+  filter: saturate(0.72);
+}
+
+@media (max-width: 700px) {
+  .articton-landing-nav .articton-nav-label-optional {
+    display: none;
+  }
+
+  .articton-landing-nav .articton-nav-links {
+    gap: 0.35rem !important;
+  }
+
+  .articton-landing-nav .articton-nav-link {
+    padding: 0.45rem 0.2rem;
+  }
+
+  .articton-landing-nav .articton-theme-toggle {
+    height: 2.35rem;
+    width: 2.35rem;
+  }
+
+}
+
+@media (prefers-contrast: more) {
+  html.articton-light {
+    --articton-border: #aebfcb;
+    --articton-text-muted: #354f64;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

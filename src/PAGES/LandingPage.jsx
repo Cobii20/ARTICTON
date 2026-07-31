@@ -2,7 +2,7 @@ import React, { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, useGLTF, Bounds, Grid } from "@react-three/drei";
-import { Cpu, GraduationCap, MousePointerClick, Rotate3d } from "lucide-react";
+import { Cpu, GraduationCap, Moon, MousePointerClick, Rotate3d, Sun } from "lucide-react";
 import { auth, db, functions } from "../firebase.js";
 import {
   createUserWithEmailAndPassword,
@@ -11,11 +11,21 @@ import {
 } from "firebase/auth";
 import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
+import { getUserSettings, saveUserSetting, subscribeUserSettings } from "../utils/userSettings";
 
 export default function ArtictonLandingPage({ onLogin }) {
   const [activeSection, setActiveSection] = useState("home");
+  const [isLightPage, setIsLightPage] = useState(() => !getUserSettings().darkMode);
 
-  const isLightPage = false;
+  useEffect(() => {
+    return subscribeUserSettings((settings) => {
+      setIsLightPage(!(settings.darkMode ?? true));
+    });
+  }, []);
+
+  const handleThemeToggle = () => {
+    saveUserSetting("darkMode", isLightPage);
+  };
 
   useEffect(() => {
     const shouldLockScroll =
@@ -34,8 +44,10 @@ export default function ArtictonLandingPage({ onLogin }) {
   return (
     <div
       className={[
-        "min-h-screen font-[Outfit] antialiased",
-        isLightPage ? "bg-[#f8fafb] text-[#0f1a22]" : "bg-[#0a0e17] text-[#e8ecf4]",
+        "articton-landing articton-landing-page min-h-screen font-[Outfit] antialiased",
+        isLightPage
+          ? "articton-landing--light bg-[#f8fafb] text-[#0f1a22]"
+          : "articton-landing--dark bg-[#0a0e17] text-[#e8ecf4]",
       ].join(" ")}
     >
       <Navbar
@@ -44,6 +56,8 @@ export default function ArtictonLandingPage({ onLogin }) {
         onAbout={() => setActiveSection("about")}
         onOpenLogin={() => setActiveSection("login")}
         onSignup={() => setActiveSection("signup")}
+        isLightPage={isLightPage}
+        onToggleTheme={handleThemeToggle}
       />
 
       {activeSection === "home" ? (
@@ -54,12 +68,12 @@ export default function ArtictonLandingPage({ onLogin }) {
             
           />
          
-          <Footer dark />
+          <Footer dark={!isLightPage} />
         </>
       ) : activeSection === "about" ? (
         <>
           <AboutPage onJoin={() => setActiveSection("signup")} />
-          <Footer dark />
+          <Footer dark={!isLightPage} />
         </>
       ) : activeSection === "signup" ? (
         <>
@@ -68,7 +82,7 @@ export default function ArtictonLandingPage({ onLogin }) {
             onSwitchToLogin={() => setActiveSection("login")}
             onAfterSignup={() => setActiveSection("login")}
           />
-          <Footer dark />
+          <Footer dark={!isLightPage} />
         </>
       ) : (
         <>
@@ -77,19 +91,19 @@ export default function ArtictonLandingPage({ onLogin }) {
             onSwitchToSignup={() => setActiveSection("signup")}
             onSuccessLogin={handleSuccessLogin}
           />
-          <Footer dark />
+          <Footer dark={!isLightPage} />
         </>
       )}
     </div>
   );
 }
 
-function Navbar({ isHome, onHome, onAbout, onOpenLogin, onSignup }) {
+function Navbar({ isHome, onHome, onAbout, onOpenLogin, onSignup, isLightPage, onToggleTheme }) {
   return (
    <motion.nav
       initial={{ y: -18, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
-      className="fixed top-0 z-50 w-full flex items-center justify-between px-6 md:px-10 lg:px-16 py-5 border-b border-white/10 backdrop-blur-xl bg-[#0a0e17]/80 shadow-[0_16px_40px_rgba(0,0,0,0.28)]"
+      className="articton-landing-nav articton-glass-nav fixed top-0 z-50 flex w-full items-center justify-between border-b border-white/10 bg-[#0a0e17]/80 px-6 py-5 shadow-[0_16px_40px_rgba(0,0,0,0.28)] backdrop-blur-xl md:px-10 lg:px-16"
     >
       <button className="flex items-center gap-3" onClick={onHome}>
         <img
@@ -97,16 +111,25 @@ function Navbar({ isHome, onHome, onAbout, onOpenLogin, onSignup }) {
           alt="Articton Logo"
           className="h-10 w-10 scale-300 object-contain mr-2"
         />
-        <h1 className="text-2xl font-bold tracking-wide text-white">Articton</h1>
+        <h1 className="articton-nav-label-optional text-2xl font-bold tracking-wide text-white">Articton</h1>
       </button>
 
-      <div className="flex gap-6 md:gap-8 text-sm text-white/80 items-center">
-        <button onClick={onHome} className="hover:text-white transition">Home</button>
-        <button onClick={onAbout} className="hover:text-white transition">About</button>
-        <button onClick={onOpenLogin} className="hover:text-white transition">Login</button>
+      <div className="articton-nav-links flex items-center gap-6 text-sm md:gap-8">
+        <button type="button" onClick={onHome} className="articton-nav-link">Home</button>
+        <button type="button" onClick={onAbout} className="articton-nav-link">About</button>
+        <button type="button" onClick={onOpenLogin} className="articton-nav-link">Login</button>
+        <button
+          type="button"
+          onClick={onToggleTheme}
+          aria-label={isLightPage ? "Switch to dark mode" : "Switch to light mode"}
+          title={isLightPage ? "Use dark mode" : "Use light mode"}
+          className="articton-theme-toggle flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/80 transition hover:border-[#00ffb4]/35 hover:bg-[#00ffb4]/10 hover:text-[#00ffb4]"
+        >
+          {isLightPage ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+        </button>
         <button
           onClick={onSignup}
-          className="rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/8 px-4 py-2 text-[#00ffb4] hover:bg-[#00ffb4]/14 transition"
+          className="articton-signup-button rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/8 px-4 py-2 text-[#00ffb4] transition hover:bg-[#00ffb4]/14"
         >
           Signup
         </button>
@@ -149,7 +172,7 @@ function HeroShowcaseFull({ onLogin, onSignup }) {
 
   
   return (
-  <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-[#0a0e17] px-6 pt-28 pb-16">
+  <section className="articton-landing-hero relative min-h-screen flex items-center justify-center overflow-hidden bg-[#0a0e17] px-6 pt-28 pb-16">
     <style>{`
       @keyframes greenWaveFlow {
         0% {
@@ -179,7 +202,7 @@ function HeroShowcaseFull({ onLogin, onSignup }) {
       {[0].map((delay, i) => (
         <div
           key={i}
-          className="absolute left-0 w-full"
+          className="articton-landing-wave absolute left-0 w-full"
           style={{
             top: "-80px",
             height: "200px",
@@ -304,7 +327,7 @@ function AmbientGlowLines() {
 
 function AnimatedGridBackground() {
   return (
-    <div className="absolute inset-0 opacity-100">
+    <div className="articton-landing-grid absolute inset-0 opacity-100">
       <div className="absolute inset-0 bg-[linear-gradient(rgba(0,255,180,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,180,0.03)_1px,transparent_1px)] bg-[size:60px_60px]" />
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(10,14,23,0)_0%,rgba(10,14,23,0.15)_70%,rgba(10,14,23,0.8)_100%)]" />
     </div>
@@ -324,7 +347,7 @@ function StatItem({ value, label }) {
 
 function AboutPage({ onJoin }) {
   return (
-    <section className="relative min-h-screen overflow-hidden bg-[#0a0e17] pt-28">
+    <section className="articton-landing-about relative min-h-screen overflow-hidden bg-[#0a0e17] pt-28">
       <AnimatedGridBackground />
       <AmbientGlowLines />
       <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_60%_50%_at_50%_20%,rgba(0,255,180,0.08),transparent)]" />
@@ -464,7 +487,7 @@ function SignupPage({ onBack, onSwitchToLogin, onAfterSignup }) {
   };
 
   return (
-    <section className="relative min-h-screen overflow-hidden bg-[#0a0e17] pt-32 pb-12">
+    <section className="articton-auth-section relative min-h-screen overflow-hidden bg-[#0a0e17] pt-32 pb-12">
       <AnimatedGridBackground />
       <AmbientGlowLines />
       <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_55%_45%_at_50%_18%,rgba(0,255,180,0.08),transparent)]" />
@@ -486,7 +509,7 @@ function SignupPage({ onBack, onSwitchToLogin, onAfterSignup }) {
           </button>
         </div>
 
-        <div className="relative overflow-hidden rounded-[28px] border border-[#1a2438] bg-[#0d1220]/95 p-8 shadow-[0_24px_80px_rgba(0,0,0,0.45)] md:p-10">
+        <div className="articton-auth-card relative overflow-hidden rounded-[28px] border border-[#1a2438] bg-[#0d1220]/95 p-8 shadow-[0_24px_80px_rgba(0,0,0,0.45)] md:p-10">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(0,255,180,0.06),transparent_40%)]" />
           <div className="relative">
             <div className="mb-8 text-center">
@@ -858,7 +881,7 @@ function LoginPage({ onBack, onSwitchToSignup, onSuccessLogin }) {
   };
 
   return (
-    <section className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0a0e17] px-4 pt-24 pb-12 md:px-6">
+    <section className="articton-auth-section relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0a0e17] px-4 pt-24 pb-12 md:px-6">
       <AnimatedGridBackground />
       <AmbientGlowLines />
       <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_55%_45%_at_50%_18%,rgba(0,255,180,0.08),transparent)]" />
@@ -880,7 +903,7 @@ function LoginPage({ onBack, onSwitchToSignup, onSuccessLogin }) {
           </button>
         </div>
 
-        <div className="relative overflow-hidden rounded-[28px] border border-[#1a2438] bg-[#0d1220]/95 shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
+        <div className="articton-auth-card relative overflow-hidden rounded-[28px] border border-[#1a2438] bg-[#0d1220]/95 shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(0,255,180,0.06),transparent_40%)]" />
 
           <div className="relative px-6 py-10 md:px-8">
@@ -1024,7 +1047,7 @@ function InputBlockLight({ label, value, onChange, placeholder, type = "text" })
           onChange={onChange}
           placeholder={placeholder}
           type={isPassword && show ? "text" : type}
-          className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 pr-10 text-sm text-[#e8ecf4] outline-none transition placeholder:text-[#7a8ba8]/45 focus:border-[#00ffb4]/30 focus:ring-2 focus:ring-[#00ffb4]/30"
+          className="articton-field w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 pr-10 text-sm text-[#e8ecf4] outline-none transition placeholder:text-[#7a8ba8]/45 focus:border-[#00ffb4]/30 focus:ring-2 focus:ring-[#00ffb4]/30"
         />
 
         {isPassword && (
@@ -1049,7 +1072,7 @@ function DatePickerLite({ value, onChange, max }) {
       value={value}
       onChange={onChange}
       max={max}
-      className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-[#e8ecf4] outline-none transition focus:border-[#00ffb4]/30 focus:ring-2 focus:ring-[#00ffb4]/30"
+      className="articton-field w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-[#e8ecf4] outline-none transition focus:border-[#00ffb4]/30 focus:ring-2 focus:ring-[#00ffb4]/30"
     />
   );
 }
@@ -1072,7 +1095,7 @@ function Dropdown({ value, onChange, options, placeholder = "Select" }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-[#e8ecf4] outline-none transition hover:bg-white/10"
+        className="articton-field flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-[#e8ecf4] outline-none transition hover:bg-white/10"
       >
         <span className={value ? "text-[#e8ecf4]" : "text-[#7a8ba8]/45"}>
           {value || placeholder}
@@ -1081,7 +1104,7 @@ function Dropdown({ value, onChange, options, placeholder = "Select" }) {
       </button>
 
       {open && (
-        <div className="absolute z-[80] mt-2 w-full overflow-hidden rounded-2xl border border-[#1a2438] bg-[#0d1220] shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
+        <div className="articton-dropdown-menu absolute z-[80] mt-2 w-full overflow-hidden rounded-2xl border border-[#1a2438] bg-[#0d1220] shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
           <div className="max-h-60 overflow-auto py-2">
             {options.map((opt) => (
               <button
@@ -1157,7 +1180,7 @@ function CanvasFallback() {
 function TrustSectionDark() {
   return (
     <section className="px-6 pb-6 pt-12 md:px-10 lg:px-16">
-      <div className="overflow-hidden rounded-[28px] border border-[#1a2438] bg-[#0d1220] shadow-[0_16px_42px_rgba(0,0,0,0.28)]">
+      <div className="articton-content-card overflow-hidden rounded-[28px] border border-[#1a2438] bg-[#0d1220] shadow-[0_16px_42px_rgba(0,0,0,0.28)]">
         <div className="grid grid-cols-1 md:grid-cols-3">
           <TrustPillDark label="Learning Mode" value="Guided + Free Explore" />
           <TrustPillDark label="Content Style" value="Accurate + Visual" />
@@ -1261,7 +1284,7 @@ function StepCardDark({ step, title, description }) {
       initial={{ opacity: 0, y: 18 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
-      className="relative rounded-3xl border border-[#1a2438] bg-[#0d1220] p-8 shadow-[0_14px_34px_rgba(0,0,0,0.28)]"
+      className="articton-content-card relative rounded-3xl border border-[#1a2438] bg-[#0d1220] p-8 shadow-[0_14px_34px_rgba(0,0,0,0.28)]"
     >
       <span className="absolute -top-4 left-6 rounded-full bg-[#00ffb4] px-4 py-1 text-sm font-bold text-[#0a0e17] shadow">
         {step}
@@ -1276,7 +1299,7 @@ function FeatureCardDark({ title, description }) {
   return (
     <motion.div
       whileHover={{ y: -6 }}
-      className="h-full rounded-3xl border border-[#1a2438] bg-[#0d1220] p-8 shadow-[0_14px_34px_rgba(0,0,0,0.28)]"
+      className="articton-content-card h-full rounded-3xl border border-[#1a2438] bg-[#0d1220] p-8 shadow-[0_14px_34px_rgba(0,0,0,0.28)]"
     >
       <h4 className="mb-3 text-xl font-semibold text-[#e8ecf4]">{title}</h4>
       <p className="text-sm leading-relaxed text-[#7a8ba8]">{description}</p>
@@ -1288,7 +1311,7 @@ function Footer({ dark = false }) {
   return (
     <footer
       className={[
-        "border-t px-6 py-10 md:px-10 lg:px-16",
+        "articton-landing-footer border-t px-6 py-10 md:px-10 lg:px-16",
         dark
           ? "border-[#1a2438] bg-[#080c14] text-[#4a5b78]"
           : "border-[#d7dfe3] bg-white text-[#4d5b64]",
