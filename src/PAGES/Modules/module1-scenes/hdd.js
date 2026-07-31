@@ -27,29 +27,6 @@ export const hddScene =    {
           },
         ],
         hotspots: [
-          {
-            id: "hdd-hs-1",
-            number: 1,
-            title: "Drive Casing",
-            position: [0, 0.12, 0],
-            frontAxis: [0, 1, 0],
-            en: "The metal casing protects the internal spinning platters and read/write mechanism.",
-          },
-          {
-            id: "hdd-hs-2",
-            number: 2,
-            title: "SATA Connectors",
-            position: [0.42, -0.08, 0.22],
-            frontAxis: [0, 1, 0],
-            en: "SATA data and power connectors link the drive to the motherboard and power supply.",
-          },
-          {
-            id: "hdd-hs-3",
-            number: 3,
-            title: "Mounting Points",
-            position: [-0.36, -0.08, -0.18],
-            frontAxis: [0, 1, 0],
-            en: "Mounting holes secure the HDD inside the case or drive bay to reduce movement and vibration.",
-          },
+      
         ],
       };

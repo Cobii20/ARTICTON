@@ -26,6 +26,263 @@ const THEME = {
   border: "#1a2438",
 };
 
+
+const COMPONENT_FULL_NAMES = {
+  cpu: "Central Processing Unit (CPU)",
+  motherboard: "Motherboard",
+  ram: "Random Access Memory (RAM)",
+  hdd: "Hard Disk Drive (HDD)",
+  ssd: "Solid-State Drive (SSD)",
+  psu: "Power Supply Unit (PSU)",
+  gpu: "Graphics Processing Unit (GPU)",
+  case: "Computer Case (PC Case)",
+  pccase: "Computer Case (PC Case)",
+  "pc-case": "Computer Case (PC Case)",
+};
+
+function getFullComponentName(component) {
+  if (!component) return "Hardware Component";
+
+  const key = String(component.key || "").trim().toLowerCase();
+  if (COMPONENT_FULL_NAMES[key]) {
+    return COMPONENT_FULL_NAMES[key];
+  }
+
+  const name = String(component.name || "").trim();
+  const normalizedName = name.toLowerCase();
+
+  const aliases = {
+    cpu: "Central Processing Unit (CPU)",
+    ram: "Random Access Memory (RAM)",
+    hdd: "Hard Disk Drive (HDD)",
+    ssd: "Solid-State Drive (SSD)",
+    psu: "Power Supply Unit (PSU)",
+    gpu: "Graphics Processing Unit (GPU)",
+    "pc case": "Computer Case (PC Case)",
+    case: "Computer Case (PC Case)",
+  };
+
+  return aliases[normalizedName] || name || "Hardware Component";
+}
+
+
+const COMPONENT_PARTS = {
+  cpu: [
+    {
+      part: "Integrated Heat Spreader (IHS)",
+      definition:
+        "A metal cover on top of the CPU die that transfers heat from the processor to the cooler while protecting the internal silicon.",
+    },
+    {
+      part: "CPU Pins / Contact Pads",
+      definition:
+        "Electrical connection points that allow the CPU to communicate power and data with the motherboard socket.",
+    },
+    {
+      part: "CPU Die",
+      definition:
+        "The silicon chip containing billions of transistors where calculations and processing operations happen.",
+    },
+    {
+      part: "Cache Memory",
+      definition:
+        "High-speed memory inside the CPU that stores frequently used data to reduce processing delays.",
+    },
+  ],
+  motherboard: [
+    {
+      part: "CPU Socket",
+      definition:
+        "The motherboard connector where the processor is installed and electrically connected.",
+    },
+    {
+      part: "RAM Slots (DIMM Slots)",
+      definition:
+        "Slots that hold memory modules and provide communication between RAM and the processor.",
+    },
+    {
+      part: "PCI Express Slots",
+      definition:
+        "Expansion connectors used for graphics cards, storage cards, and other high-speed devices.",
+    },
+    {
+      part: "Chipset",
+      definition:
+        "A controller that manages communication between the CPU, storage, USB devices, and expansion components.",
+    },
+  ],
+  ram: [
+    {
+      part: "Memory Chips",
+      definition:
+        "Integrated circuits that store temporary data used by the computer while programs are running.",
+    },
+    {
+      part: "Memory Module PCB",
+      definition:
+        "The circuit board that connects memory chips to the motherboard.",
+    },
+    {
+      part: "Gold Contacts",
+      definition:
+        "Conductive contacts that transfer electrical signals between RAM and the motherboard slot.",
+    },
+    {
+      part: "Heat Spreader",
+      definition:
+        "A protective cover that helps distribute heat away from memory chips.",
+    },
+  ],
+  ssd: [
+    {
+      part: "NAND Flash Memory",
+      definition:
+        "Non-volatile storage chips that keep data even when the computer is powered off.",
+    },
+    {
+      part: "Controller",
+      definition:
+        "A processor inside the SSD that manages data storage, reading, writing, and error correction.",
+    },
+    {
+      part: "Cache Memory",
+      definition:
+        "Fast temporary memory that improves SSD performance during data transfers.",
+    },
+    {
+      part: "PCB",
+      definition:
+        "The printed circuit board connecting all SSD electronic components.",
+    },
+  ],
+  hdd: [
+    {
+      part: "Platters",
+      definition:
+        "Magnetic disks where digital information is physically stored.",
+    },
+    {
+      part: "Read/Write Head",
+      definition:
+        "A component that reads and writes information on the magnetic platters.",
+    },
+    {
+      part: "Spindle Motor",
+      definition:
+        "A motor that spins the platters at high speed.",
+    },
+    {
+      part: "Actuator Arm",
+      definition:
+        "A mechanism that moves the read/write head across the platter surface.",
+    },
+  ],
+  gpu: [
+    {
+      part: "Graphics Processing Unit Core",
+      definition:
+        "The main processor responsible for rendering graphics and parallel computations.",
+    },
+    {
+      part: "VRAM",
+      definition:
+        "Dedicated memory that stores textures, frames, and graphics data.",
+    },
+    {
+      part: "Cooling System",
+      definition:
+        "Fans and heatsinks that remove heat generated during graphics processing.",
+    },
+    {
+      part: "PCIe Connector",
+      definition:
+        "The interface that connects the graphics card to the motherboard.",
+    },
+  ],
+  psu: [
+    {
+      part: "Transformer",
+      definition:
+        "Converts electrical energy into usable voltage levels for computer components.",
+    },
+    {
+      part: "Cooling Fan",
+      definition:
+        "Moves air through the power supply to maintain safe temperatures.",
+    },
+    {
+      part: "Capacitors",
+      definition:
+        "Store and regulate electrical energy to provide stable power delivery.",
+    },
+    {
+      part: "Power Connectors",
+      definition:
+        "Cables that deliver power to the motherboard, GPU, and storage devices.",
+    },
+  ],
+  case: [
+    {
+      part: "Chassis",
+      definition:
+        "The main frame that holds and protects all computer components.",
+    },
+    {
+      part: "Cooling Fans",
+      definition:
+        "Fans that control airflow and help maintain component temperatures.",
+    },
+    {
+      part: "Drive Bays",
+      definition:
+        "Mounting areas used for storage devices such as HDDs and SSDs.",
+    },
+    {
+      part: "Expansion Slots",
+      definition:
+        "Rear openings that allow installation of expansion cards.",
+    },
+  ],
+};
+
+function ComponentPartsPanel({ current }) {
+  const [open, setOpen] = useState(false);
+  const key = String(current?.key || "").toLowerCase();
+  const parts = COMPONENT_PARTS[key] || [];
+
+  return (
+    <div className="mt-5">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="rounded-full border border-[#00ffb4]/30 bg-[#00ffb4]/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-[#baffee]"
+      >
+        {open ? "Hide details" : "Click for more details"}
+      </button>
+
+      <AnimatePresence>
+        {open ? (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="mt-4 space-y-3 overflow-hidden"
+          >
+            {parts.map((item) => (
+              <div key={item.part} className="rounded-xl border border-[#00ffb4]/15 bg-black/20 p-3">
+                <div className="text-[12px] font-black text-[#00ffb4]">{item.part}</div>
+                <div className="mt-1 text-[11px] leading-5 text-[#dbe6f5]">
+                  {item.definition}
+                </div>
+              </div>
+            ))}
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 function IntroDeck({ slides, onDone }) {
   const [index, setIndex] = useState(0);
   useEffect(() => setIndex(0), [slides]);
@@ -38,7 +295,7 @@ function IntroDeck({ slides, onDone }) {
             id: "fallback-intro",
             title: "Component Overview",
             body: "Explore this component in the 3D hardware lab.",
-            points: ["Rotate the model.", "Zoom in for details.", "Select hotspots when available."],
+            points: ["Rotate the model.", "Zoom in for details."],
           },
         ];
   const slide = safeSlides[Math.min(index, safeSlides.length - 1)];
@@ -89,25 +346,9 @@ function IntroDeck({ slides, onDone }) {
                 </ul>
               ) : null}
 
-              <div className="mt-10 flex items-center justify-between gap-4">
-                <button
-                  type="button"
-                  onClick={() => setIndex((i) => Math.max(0, i - 1))}
-                  disabled={index === 0}
-                  className="h-12 rounded-2xl border border-[#1a2438] bg-white/[0.03] px-6 text-[16px] font-semibold text-[#dbe6f5] transition hover:bg-white/[0.06] disabled:opacity-40"
-                >
-                  ← Back
-                </button>
-
-                <div className="flex items-center gap-4">
-                  <button
-                    type="button"
-                    onClick={onDone}
-                    className="h-12 rounded-2xl border border-[#1a2438] bg-white/[0.03] px-6 text-[16px] font-semibold text-[#dbe6f5] transition hover:bg-white/[0.06]"
-                    title="Skip introduction"
-                  >
-                    Skip
-                  </button>
+              <div className="mt-10 flex items-center justify-end gap-4">
+                <div className="flex items-center justify-end gap-4">
+                 
 
                   <button
                     type="button"
@@ -358,14 +599,16 @@ function HotspotHologram({ hotspot, onClose }) {
   );
 }
 
-function LabEnvironment({ sceneName, activeHotspot, showLabels = true }) {
+function LabEnvironment() {
   const ringRef = useRef();
   const scanRef = useRef();
 
   useFrame((_, delta) => {
     if (ringRef.current) ringRef.current.rotation.z += delta * 0.22;
+
     if (scanRef.current) {
-      scanRef.current.position.y = 0.14 + Math.sin(Date.now() * 0.0016) * 0.035;
+      scanRef.current.position.y =
+        0.14 + Math.sin(Date.now() * 0.0016) * 0.035;
     }
   });
 
@@ -376,37 +619,126 @@ function LabEnvironment({ sceneName, activeHotspot, showLabels = true }) {
         <meshBasicMaterial color="#00ffb4" transparent opacity={0.045} />
       </mesh>
 
-      <mesh ref={ringRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.72, 0]}>
+      <mesh
+        ref={ringRef}
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[0, -0.72, 0]}
+      >
         <ringGeometry args={[1.35, 1.38, 96]} />
         <meshBasicMaterial color="#00ffb4" transparent opacity={0.34} />
       </mesh>
 
-      <gridHelper args={[7, 36, "#00ffb4", "#1d4450"]} position={[0, -0.78, 0]} />
+      <gridHelper
+        args={[7, 36, "#00ffb4", "#1d4450"]}
+        position={[0, -0.78, 0]}
+      />
 
-      <mesh ref={scanRef} position={[0, 0.15, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <mesh
+        ref={scanRef}
+        position={[0, 0.15, 0]}
+        rotation={[-Math.PI / 2, 0, 0]}
+      >
         <ringGeometry args={[1.05, 1.08, 96]} />
         <meshBasicMaterial color="#baffee" transparent opacity={0.18} />
       </mesh>
-
-      {showLabels ? (
-        <>
-          <Html position={[-1.95, 1.12, -0.75]} center distanceFactor={8} occlude={false}>
-            <div className="w-[250px] rounded-[14px] border border-[#00ffb4]/25 bg-[#06131b]/68 px-4 py-3 text-left shadow-[0_0_30px_rgba(0,255,180,0.14)] backdrop-blur-xl">
-              <div className="text-[10px] font-black uppercase tracking-[0.24em] text-[#00ffb4]">
-                Articton Lab
-              </div>
-              <div className="mt-1 text-[18px] font-black text-white">
-                {activeHotspot?.title || sceneName}
-              </div>
-              <div className="mt-2 text-[11px] leading-5 text-[#9fb0ca]">
-                {activeHotspot?.en ||
-                  "Select a glowing marker to inspect component details inside the 3D workspace."}
-              </div>
-            </div>
-          </Html>
-        </>
-      ) : null}
     </group>
+  );
+}
+
+function FixedLabInfoPanel({
+  current,
+  activeHotspot,
+  moduleIndex,
+  totalModules,
+  showIntro,
+  selectedPlatform,
+  afkAutoRotate,
+}) {
+  const componentName = getFullComponentName(current);
+  const componentDescription =
+    current?.slides?.[0]?.body ||
+    "Explore the component, rotate the model, zoom in, and select the glowing markers to inspect its parts.";
+
+  const panelContent = (
+    <div className="relative overflow-hidden rounded-[18px] border border-[#00ffb4]/25 bg-[#06131b]/88 p-5 shadow-[0_0_35px_rgba(0,255,180,0.13),0_24px_70px_rgba(0,0,0,0.42)] backdrop-blur-xl">
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(0,255,180,0.045)_1px,transparent_1px)] bg-[size:100%_18px]" />
+
+      <div className="relative">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="text-[10px] font-black uppercase tracking-[0.26em] text-[#00ffb4]">
+              Articton Lab Environment
+            </div>
+
+            <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[#8fa3bf]">
+              Module 1 · Page {moduleIndex + 1} of {totalModules}
+            </div>
+          </div>
+
+          <div className="rounded-full border border-[#00ffb4]/20 bg-[#00ffb4]/8 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#baffee]">
+            {selectedPlatform ? selectedPlatform.toUpperCase() : "PC"}
+          </div>
+        </div>
+
+        <h2 className="mt-3 text-[22px] font-black leading-tight text-white">
+          {componentName}
+        </h2>
+
+        <p className="mt-3 text-[12px] leading-6 text-[#9fb0ca]">
+          {componentDescription}
+        </p>
+
+        <div className="mt-4 rounded-xl border border-[#00ffb4]/14 bg-black/16 px-3 py-2 text-[11px] text-[#8fa3bf]">
+          {showIntro
+            ? "Hologram briefing active"
+            : afkAutoRotate
+            ? "Auto-rotate active"
+            : "Manual rotation active"}
+        </div>
+
+        <div className="my-5 h-px bg-[#00ffb4]/16" />
+
+        <AnimatePresence mode="wait">
+          {activeHotspot ? (
+            <motion.div
+              key={activeHotspot.id}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.18 }}
+            >
+              <div className="text-[10px] font-black uppercase tracking-[0.22em] text-[#00ffb4]">
+                Hotspot {activeHotspot.number}
+              </div>
+
+              <div className="mt-2 text-[16px] font-black leading-5 text-white">
+                {activeHotspot.title}
+              </div>
+
+              <div className="mt-2 text-[12px] leading-6 text-[#dbe6f5]">
+                {activeHotspot.en}
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="hotspot-instructions"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.18 }}
+            >
+              <ComponentPartsPanel current={current} />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="pointer-events-auto absolute left-3 top-3 z-[130] max-h-[calc(100%-1.5rem)] w-[340px] max-w-[calc(100%-1.5rem)] overflow-y-auto pr-1 md:left-6 md:top-6 md:max-h-[calc(100%-3rem)]">
+      {panelContent}
+    </div>
   );
 }
 
@@ -952,11 +1284,11 @@ export default function Module1Page({ onBack, onLogout }) {
   }, [moduleIndex, modules.length, safeModuleIndex]);
 
   useEffect(() => {
-    if (!current) return;
+    if (!current || experienceStep !== "components") return;
 
-    const isFinished = completedParts[current.key];
-    setShowIntro(!isFinished);
-  }, [current, completedParts]);
+    setShowIntro(true);
+    setActiveId(null);
+  }, [current?.key, experienceStep]);
 
   useEffect(() => {
     modules.forEach((m) => useGLTF.preload(m.url));
@@ -1151,11 +1483,11 @@ export default function Module1Page({ onBack, onLogout }) {
         ? Math.max(0, Math.min(nextPlatformProgress.currentPage - 1, modules.length - 1))
         : safeModuleIndex
     );
-    setShowIntro(!nextPlatformParts[current?.key]);
+    setShowIntro(true);
 
     await saveModule1Progress({
       page: safeModuleIndex + 1,
-      introDone: !nextPlatformParts[current?.key],
+      introDone: false,
       moduleKey: current?.key,
       completedParts: nextPlatformParts,
       replaceCompletedParts: true,
@@ -1283,17 +1615,16 @@ export default function Module1Page({ onBack, onLogout }) {
 
   const handleSelectModule = async (index) => {
     const key = modules[index].key;
-    const isFinished = completedParts[key];
 
     setCertificateWarning("");
     setActiveId(null);
     setLastCoords(null);
     setModuleIndex(index);
-    setShowIntro(!isFinished);
+    setShowIntro(true);
 
     await saveModule1Progress({
       page: index + 1,
-      introDone: isFinished,
+      introDone: false,
       moduleKey: key,
     });
   };
@@ -1430,11 +1761,24 @@ export default function Module1Page({ onBack, onLogout }) {
 
               <div className="min-h-0 flex-1 px-3 py-3 md:px-6 md:py-5">
                 <div className="relative h-full overflow-hidden rounded-[22px] border border-[#00ffb4]/18 bg-[#031018] shadow-[0_30px_100px_rgba(0,0,0,0.52)]">
-                  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_44%,rgba(0,255,180,0.12),transparent_36%),radial-gradient(circle_at_82%_18%,rgba(95,149,152,0.14),transparent_28%)]" />
-                  <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(0,255,180,0.032)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,180,0.032)_1px,transparent_1px)] bg-[size:48px_48px] opacity-75" />
-                  <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_150px_rgba(0,0,0,0.68)]" />
+                  <div className="relative h-full min-h-0 min-w-0 overflow-hidden">
+                    <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_44%,rgba(0,255,180,0.12),transparent_36%),radial-gradient(circle_at_82%_18%,rgba(95,149,152,0.14),transparent_28%)]" />
+                    <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(0,255,180,0.032)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,180,0.032)_1px,transparent_1px)] bg-[size:48px_48px] opacity-75" />
+                    <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_150px_rgba(0,0,0,0.68)]" />
 
-                  <motion.div
+                    {isComponentStage && !showIntro ? (
+                      <FixedLabInfoPanel
+                        current={current}
+                        activeHotspot={activeHotspot}
+                        moduleIndex={safeModuleIndex}
+                        totalModules={modules.length}
+                        showIntro={showIntro}
+                        selectedPlatform={selectedPlatform}
+                        afkAutoRotate={afkAutoRotate}
+                      />
+                    ) : null}
+
+                    <motion.div
                     key={`three-${current.key}`}
                     className="absolute inset-0"
                     initial={{ opacity: 0 }}
@@ -1454,11 +1798,7 @@ export default function Module1Page({ onBack, onLogout }) {
                       <pointLight position={[0, 1.2, 2.2]} intensity={0.75} color="#00ffb4" />
 
                       <Suspense fallback={null}>
-                        <LabEnvironment
-                          sceneName={isComponentStage ? current.name : "Processor Platform Lab"}
-                          activeHotspot={activeHotspot}
-                          showLabels={isComponentStage}
-                        />
+                        <LabEnvironment />
 
                         <ModuleIntroExperience
                           step={experienceStep}
@@ -1558,12 +1898,9 @@ export default function Module1Page({ onBack, onLogout }) {
 
                       <SceneControls
                         current={current}
-                        moduleIndex={safeModuleIndex}
                         totalModules={modules.length}
-                        showIntro={showIntro}
                         debug={debug}
                         lastCoords={lastCoords}
-                        selectedPlatform={selectedPlatform}
                         afkAutoRotate={afkAutoRotate}
                         completedParts={completedParts}
                         onWelcome={handleReturnToWelcome}
@@ -1572,6 +1909,7 @@ export default function Module1Page({ onBack, onLogout }) {
                       />
                     </>
                   ) : null}
+                  </div>
                 </div>
               </div>
               <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_120px_rgba(0,0,0,0.45)]" />
@@ -1646,12 +1984,9 @@ function PartsDock({
 
 function SceneControls({
   current,
-  moduleIndex,
   totalModules,
-  showIntro,
   debug,
   lastCoords,
-  selectedPlatform,
   afkAutoRotate,
   completedParts,
   onWelcome,
@@ -1660,25 +1995,6 @@ function SceneControls({
 }) {
   return (
     <>
-      <div className="pointer-events-none absolute left-4 top-4 z-[110] max-w-[calc(100vw-48px)] rounded-[16px] border border-[#00ffb4]/22 bg-[#06131b]/66 px-4 py-3 shadow-[0_18px_60px_rgba(0,0,0,0.35)] backdrop-blur-xl md:left-6 md:top-6">
-        <div className="text-[10px] font-black uppercase tracking-[0.24em] text-[#00ffb4]">
-          Module 1
-        </div>
-        <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <div className="text-[20px] font-black leading-none text-white">{current.name}</div>
-          <div className="text-[11px] font-semibold text-[#9fb0ca]">
-            Page {moduleIndex + 1} of {totalModules}
-          </div>
-        </div>
-        <div className="mt-2 text-[11px] text-[#8fa3bf]">
-          {showIntro
-            ? "Hologram briefing active"
-            : `${selectedPlatform ? selectedPlatform.toUpperCase() : "PC"} platform / ${
-                afkAutoRotate ? "auto-rotate active" : "select glowing pins"
-              }`}
-        </div>
-      </div>
-
       <div className="absolute right-4 top-4 z-[110] flex items-center gap-2 md:right-6 md:top-6">
         <button
           type="button"

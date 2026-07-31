@@ -18,14 +18,16 @@ export default function ArtictonLandingPage({ onLogin }) {
   const isLightPage = false;
 
   useEffect(() => {
-    const shouldLockScroll =
-      activeSection === "signup" || activeSection === "login";
+  // Allow vertical scrolling on every landing-page section.
+  // Hide only accidental horizontal overflow.
+  document.body.style.overflowX = "hidden";
+  document.body.style.overflowY = "auto";
 
-    document.body.style.overflow = shouldLockScroll ? "hidden" : "";
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [activeSection]);
+  return () => {
+    document.body.style.overflowX = "";
+    document.body.style.overflowY = "";
+  };
+}, []);
 
   const handleSuccessLogin = (profile) => {
     onLogin?.(profile);
@@ -464,7 +466,7 @@ function SignupPage({ onBack, onSwitchToLogin, onAfterSignup }) {
   };
 
   return (
-    <section className="relative min-h-screen overflow-hidden bg-[#0a0e17] pt-32 pb-12">
+    <section className="relative min-h-screen overflow-x-hidden bg-[#0a0e17] pt-32 pb-20">
       <AnimatedGridBackground />
       <AmbientGlowLines />
       <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_55%_45%_at_50%_18%,rgba(0,255,180,0.08),transparent)]" />
@@ -858,7 +860,7 @@ function LoginPage({ onBack, onSwitchToSignup, onSuccessLogin }) {
   };
 
   return (
-    <section className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0a0e17] px-4 pt-24 pb-12 md:px-6">
+   <section className="relative flex min-h-screen items-center justify-center overflow-x-hidden bg-[#0a0e17] px-4 pt-28 pb-16 md:px-6">
       <AnimatedGridBackground />
       <AmbientGlowLines />
       <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_55%_45%_at_50%_18%,rgba(0,255,180,0.08),transparent)]" />
@@ -907,7 +909,7 @@ function LoginPage({ onBack, onSwitchToSignup, onSuccessLogin }) {
             )}
 
             {step === "login" ? (
-              <form onSubmit={handleLogin} className="space-y-4">
+              <form onSubmit={handleLogin} className="space-y-5">
                 <div>
                   <label className="mb-2 block text-sm font-medium text-[#9fb0c9]">
                     Email
@@ -920,24 +922,28 @@ function LoginPage({ onBack, onSwitchToSignup, onSuccessLogin }) {
                   />
                 </div>
 
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-[#9fb0c9]">
-                    Password
-                  </label>
-                  <InputBlockLight
-                    value={pass}
-                    onChange={(e) => setPass(e.target.value)}
-                    placeholder="••••••••"
-                    type="password"
-                  />
-                </div>
+               <div>
+                <label className="mb-2 block text-sm font-medium text-[#9fb0c9]">
+                  Password
+                </label>
 
+                <InputBlockLight
+                  value={pass}
+                  onChange={(e) => setPass(e.target.value)}
+                  placeholder="••••••••"
+                  type="password"
+                />
+              </div>
+
+              <div className="pt-3">
                 <button
+                  type="submit"
                   disabled={loading}
-                  className="w-full rounded-xl bg-[#00ffb4] px-6 py-3 font-semibold text-[#0a0e17] transition hover:scale-[1.01] disabled:opacity-60"
+                  className="w-full rounded-xl bg-[#00ffb4] px-6 py-3 font-semibold text-[#0a0e17] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {loading ? "Checking..." : "Log In"}
                 </button>
+              </div>
 
                 {DEV_BYPASS_LOGIN && (
                   <button

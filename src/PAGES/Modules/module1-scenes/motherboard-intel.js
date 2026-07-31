@@ -30,29 +30,6 @@ export const motherboardSceneIntel = {
           },
         ],
         hotspots: [
-          {
-            id: "mb-hs-1",
-            number: 1,
-            title: "CPU Socket Area",
-            position: [0.2, 0.3, -0.8],
-            frontAxis: [0, 1, 0],
-            en: "The CPU socket holds and connects the processor to the motherboard.",
-          },
-          {
-            id: "mb-hs-2",
-            number: 2,
-            title: "RAM Slots",
-            position: [1.4, 0.32, -1],
-            frontAxis: [0, 1, 0],
-            en: "DIMM slots where memory modules are installed.",
-          },
-          {
-            id: "mb-hs-3",
-            number: 3,
-            title: "24-pin ATX Power Connector",
-            position: [2, 0.2, -0.55],
-            frontAxis: [0, 1, 0],
-            en: "Main power input from the PSU to the motherboard.",
-          },
+        
         ],
 };

@@ -47,8 +47,6 @@ service cloud.firestore {
         && request.resource.data.role == resource.data.role;
     }
 
-    // Compatibility for the current web client. These progress/result fields
-    // are written directly by the browser and are therefore not tamper-proof.
     function editableUserFieldsOnly() {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
         "firstName",
@@ -59,62 +57,8 @@ service cloud.firestore {
         "birthday",
         "program",
         "contactNumber",
-        "avatarUrl",
-        "moduleProgress",
-        "practicalTests",
-        "accountAchievements",
         "updatedAt"
       ]);
-    }
-
-    // Compatibility for the current mobile quiz/practice payload.
-    function scoreFieldsAreAllowed() {
-      return request.resource.data.keys().hasOnly([
-          "moduleId",
-          "moduleName",
-          "testType",
-          "practiceId",
-          "title",
-          "score",
-          "total",
-          "percentage",
-          "completed",
-          "timestamp"
-        ])
-        && (!("score" in request.resource.data)
-          || request.resource.data.score is int
-          || request.resource.data.score is float)
-        && (!("total" in request.resource.data)
-          || request.resource.data.total is int
-          || request.resource.data.total is float)
-        && (!("percentage" in request.resource.data)
-          || request.resource.data.percentage is int
-          || request.resource.data.percentage is float);
-    }
-
-    function scoreChangedFieldsAreAllowed() {
-      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-        "moduleId",
-        "moduleName",
-        "testType",
-        "practiceId",
-        "title",
-        "score",
-        "total",
-        "percentage",
-        "completed",
-        "timestamp"
-      ]);
-    }
-
-    function isValidNewScorePayload(uid) {
-      return isOwnUser(uid) && scoreFieldsAreAllowed();
-    }
-
-    function isValidUpdatedScorePayload(uid) {
-      return isOwnUser(uid)
-        && scoreFieldsAreAllowed()
-        && scoreChangedFieldsAreAllowed();
     }
 
     function isValidSupportTicket() {
@@ -179,25 +123,6 @@ service cloud.firestore {
         && request.resource.data.reviewedAt == request.time;
     }
 
-    function isValidUserActivity() {
-      return hasVerifiedOtp()
-        && request.resource.data.keys().hasOnly([
-          "uid",
-          "name",
-          "email",
-          "module",
-          "minutes",
-          "createdAt"
-        ])
-        && request.resource.data.uid == request.auth.uid
-        && request.resource.data.name is string
-        && request.resource.data.email == request.auth.token.email
-        && request.resource.data.module is string
-        && request.resource.data.minutes is int
-        && request.resource.data.minutes > 0
-        && request.resource.data.createdAt == request.time;
-    }
-
     match /otp_challenges/{uid} {
       allow read, write: if false;
     }
@@ -235,28 +160,18 @@ service cloud.firestore {
 
       match /module_scores/{scoreId} {
         allow read: if isAdmin() || isFaculty() || isOwnUser(uid);
-        allow create: if isValidNewScorePayload(uid);
-        allow update: if isValidUpdatedScorePayload(uid);
-        allow delete: if false;
+        allow create, update, delete: if false;
       }
 
       match /practice_scores/{scoreId} {
         allow read: if isAdmin() || isFaculty() || isOwnUser(uid);
-        allow create: if isValidNewScorePayload(uid);
-        allow update: if isValidUpdatedScorePayload(uid);
-        allow delete: if false;
+        allow create, update, delete: if false;
       }
 
       match /assessment_attempts/{attemptId} {
         allow read: if isAdmin() || isFaculty() || isOwnUser(uid);
         allow create, update, delete: if false;
       }
-    }
-
-    match /userActivities/{activityId} {
-      allow create: if isValidUserActivity();
-      allow read: if isAdmin() || isFaculty();
-      allow update, delete: if false;
     }
 
     match /module_content_cards/{cardId} {
@@ -274,6 +189,7 @@ service cloud.firestore {
         );
 
       allow update: if isValidModuleChangeReview();
+
       allow delete: if isAdmin();
     }
 

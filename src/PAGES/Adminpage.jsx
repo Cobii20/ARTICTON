@@ -464,7 +464,7 @@ export default function AdminPage({ adminUser, onLogout }) {
     return `${first} ${last}`.trim() || adminProfile.displayName || "Admin";
   }, [adminProfile]);
 
-  const adminEmail = adminProfile?.email || adminUser?.email || "No email";
+  const adminEmail = adminProfile?.email || adminUser?.email || "admin@email.com";
 
   useEffect(() => {
     fetchUsers();
