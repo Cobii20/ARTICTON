@@ -74,7 +74,7 @@ const RAM_HIGHLIGHT_POSITION = new THREE.Vector3(34.35, -20.69, 11.32);
 const RAM_START_ROTATION = new THREE.Euler(0, Math.PI / 2, 0);
 const RAM_TARGET_ROTATION = new THREE.Euler(0, Math.PI / 2, 0);
 
-const RAM_COLOR = "#00ffb4";
+const RAM_COLOR = "#FFD41C";
 
 function cloneScene(scene, transparent = false) {
   const clone = scene.clone(true);
@@ -136,7 +136,7 @@ function Scene({ onComplete }) {
 
   return (
     <>
-      <color attach="background" args={["#05080D"]} />
+      <color attach="background" args={[typeof document !== "undefined" && document.documentElement.classList.contains("articton-light") ? "#f8f9ff" : "#05080D"]} />
 
       <ambientLight intensity={0.55} />
 

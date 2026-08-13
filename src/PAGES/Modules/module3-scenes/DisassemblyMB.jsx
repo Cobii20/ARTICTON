@@ -183,7 +183,7 @@ function Scene({ placementApi, onComplete }) {
 
   return (
     <>
-      <color attach="background" args={["#05080D"]} />
+      <color attach="background" args={[typeof document !== "undefined" && document.documentElement.classList.contains("articton-light") ? "#f8f9ff" : "#05080D"]} />
 
       <ambientLight intensity={0.5} />
 
@@ -259,7 +259,7 @@ function TargetMarker() {
       <mesh ref={fillRef} position={[0, 0, 0.005]}>
         <circleGeometry args={[1.15, 64]} />
         <meshBasicMaterial
-          color="#00ffb4"
+          color="#FFD41C"
           transparent
           opacity={0.12}
           depthTest={false}
@@ -268,7 +268,7 @@ function TargetMarker() {
 
       <mesh ref={ringRef} position={[0, 0, 0.01]}>
         <ringGeometry args={[0.55, 0.85, 64]} />
-        <meshBasicMaterial color="#00ffb4" transparent opacity={0.9} />
+        <meshBasicMaterial color="#FFD41C" transparent opacity={0.9} />
       </mesh>
     </group>
   );

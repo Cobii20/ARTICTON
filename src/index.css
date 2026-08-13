@@ -2,24 +2,33 @@
 
 :root {
   color-scheme: dark;
-  --articton-bg: #07111b;
-  --articton-bg-deep: #050912;
-  --articton-surface: #0d1624;
-  --articton-surface-strong: #111c2c;
-  --articton-surface-muted: #0a1320;
+  --articton-nu-blue: #35408e;
+  --articton-nu-blue-deep: #161b49;
+  --articton-nu-blue-dark: #0b102f;
+  --articton-nu-gold: #ffd41c;
+  --articton-primary: #35408e;
+  --articton-primary-strong: #283270;
+  --articton-primary-soft: rgba(53, 64, 142, 0.18);
+  --articton-secondary: #ffd41c;
+  --articton-secondary-soft: rgba(255, 212, 28, 0.14);
+  --articton-bg: #080b1d;
+  --articton-bg-deep: #050716;
+  --articton-surface: #0e1430;
+  --articton-surface-strong: #151d3f;
+  --articton-surface-muted: #0a1029;
   --articton-surface-soft: rgba(255, 255, 255, 0.045);
-  --articton-border: #1b2a40;
-  --articton-border-strong: #2a3a52;
+  --articton-border: #26305f;
+  --articton-border-strong: #3b4780;
   --articton-border-soft: rgba(255, 255, 255, 0.1);
-  --articton-text: #f4f8fb;
-  --articton-text-muted: #9aacbf;
-  --articton-text-subtle: #71849d;
-  --articton-accent: #00eeb2;
-  --articton-accent-strong: #00c997;
-  --articton-accent-soft: rgba(0, 238, 178, 0.11);
-  --articton-accent-ink: #052219;
-  --articton-info: #8ec5ff;
-  --articton-warning: #ffd166;
+  --articton-text: #f7f8ff;
+  --articton-text-muted: #b6bdd9;
+  --articton-text-subtle: #858eb9;
+  --articton-accent: #FFD41C;
+  --articton-accent-strong: #e6bd00;
+  --articton-accent-soft: rgba(255, 212, 28, 0.14);
+  --articton-accent-ink: #14182f;
+  --articton-info: #9eb7ff;
+  --articton-warning: #FFD41C;
   --articton-danger: #ff8b82;
   --articton-shadow-sm: 0 10px 32px rgba(0, 0, 0, 0.26);
   --articton-shadow: 0 24px 72px rgba(0, 0, 0, 0.42);
@@ -28,27 +37,32 @@
 
 html.articton-light {
   color-scheme: light;
-  --articton-bg: #f3f7fa;
-  --articton-bg-deep: #e9f0f5;
+  --articton-bg: #f6f7fc;
+  --articton-bg-deep: #e9ecf8;
   --articton-surface: #ffffff;
-  --articton-surface-strong: #f8fbfd;
-  --articton-surface-muted: #eef4f7;
+  --articton-surface-strong: #f9faff;
+  --articton-surface-muted: #eef1fb;
   --articton-surface-soft: rgba(255, 255, 255, 0.86);
-  --articton-border: #d5e0e8;
-  --articton-border-strong: #bdccd8;
-  --articton-border-soft: rgba(61, 86, 109, 0.18);
-  --articton-text: #10253a;
-  --articton-text-muted: #51697d;
-  --articton-text-subtle: #71869a;
-  --articton-accent: #007d65;
-  --articton-accent-strong: #006852;
-  --articton-accent-soft: rgba(0, 125, 101, 0.105);
-  --articton-accent-ink: #ffffff;
-  --articton-info: #176da2;
-  --articton-warning: #8b5600;
+  --articton-border: #d6dbee;
+  --articton-border-strong: #b8c0df;
+  --articton-border-soft: rgba(53, 64, 142, 0.18);
+  --articton-text: #171d3d;
+  --articton-text-muted: #4d587e;
+  --articton-text-subtle: #70799e;
+  --articton-primary: #35408e;
+  --articton-primary-strong: #273277;
+  --articton-primary-soft: rgba(53, 64, 142, 0.12);
+  --articton-secondary: #ffd41c;
+  --articton-secondary-soft: rgba(255, 212, 28, 0.18);
+  --articton-accent: #FFD41C;
+  --articton-accent-strong: #e6bd00;
+  --articton-accent-soft: rgba(255, 212, 28, 0.18);
+  --articton-accent-ink: #35408e;
+  --articton-info: #35408E;
+  --articton-warning: #8a6b00;
   --articton-danger: #b42318;
-  --articton-shadow-sm: 0 10px 30px rgba(27, 54, 77, 0.09);
-  --articton-shadow: 0 24px 70px rgba(27, 54, 77, 0.13);
+  --articton-shadow-sm: 0 10px 30px rgba(53, 64, 142, 0.1);
+  --articton-shadow: 0 24px 70px rgba(53, 64, 142, 0.14);
 }
 
 * {
@@ -71,6 +85,18 @@ html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
   background: var(--articton-bg);
+}
+
+html[data-font-size="small"] {
+  font-size: clamp(13px, calc(12.5px + 0.14vw), 15px);
+}
+
+html[data-font-size="large"] {
+  font-size: clamp(16px, calc(15px + 0.18vw), 18px);
+}
+
+html[data-font-size="extra-large"] {
+  font-size: clamp(18px, calc(17px + 0.2vw), 20px);
 }
 
 body {
@@ -415,27 +441,153 @@ canvas {
   outline-offset: 2px;
 }
 
-/* The real 3D workspace intentionally remains dark in both themes. The
-   surrounding learning UI changes theme, but model visibility and authored
-   lighting stay stable. */
-.articton-3d-stage,
-html.articton-light .articton-3d-stage {
+html.articton-dark :where(.articton-app-shell, .articton-landing-page)
+  [class*="bg-[#FFD41C]"]:not([class*="bg-[#FFD41C]/"]) {
+  background:
+    linear-gradient(135deg, var(--articton-secondary) 0%, var(--articton-secondary) 74%, var(--articton-primary) 74%, var(--articton-primary) 100%) !important;
+}
+
+html.articton-dark :where(.articton-app-shell, .articton-landing-page)
+  [class*="bg-[#FFD41C]/"] {
+  background:
+    linear-gradient(135deg, rgba(255, 212, 28, 0.14), rgba(53, 64, 142, 0.22)) !important;
+}
+
+html.articton-dark :where(.articton-app-shell, .articton-landing-page)
+  [class*="border-[#FFD41C]/"] {
+  box-shadow: 0 0 0 1px rgba(53, 64, 142, 0.22) inset;
+}
+
+.articton-dashboard-page,
+.articton-admin-page,
+.articton-faculty-page {
+  min-width: 0;
+}
+
+.articton-dashboard-page :where(main, aside, section, div),
+.articton-admin-page :where(main, aside, section, div),
+.articton-faculty-page :where(main, aside, section, div) {
+  min-width: 0;
+}
+
+.articton-dashboard-page :where(h1, h2, h3, p, span, button, input, textarea),
+.articton-admin-page :where(h1, h2, h3, p, span, button, input, textarea),
+.articton-faculty-page :where(h1, h2, h3, p, span, button, input, textarea) {
+  overflow-wrap: anywhere;
+}
+
+.articton-faculty-page [class*="grid-cols-[1.4fr_1.4fr"],
+.articton-admin-page [class*="min-w-[1320px]"] {
+  min-width: min(100%, 70rem);
+}
+
+@media (max-width: 1024px), (max-height: 760px) {
+  .articton-dashboard-page,
+  .articton-admin-page,
+  .articton-faculty-page {
+    height: auto;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .articton-dashboard-page .h-screen {
+    height: auto !important;
+    min-height: 100dvh !important;
+  }
+
+  .articton-dashboard-page .articton-dashboard-viewport,
+  .articton-dashboard-page .articton-dashboard-frame,
+  .articton-dashboard-page .articton-dashboard-layout {
+    height: auto !important;
+    min-height: 100dvh !important;
+    overflow: visible !important;
+  }
+
+  .articton-dashboard-page [class*="grid-cols-[290px_1fr]"] {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .articton-dashboard-page .articton-dashboard-sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 80;
+    display: block;
+    width: min(86vw, 20rem);
+    max-width: 100%;
+    border-right: 1px solid var(--articton-border);
+    border-radius: 0 1.5rem 1.5rem 0;
+    box-shadow: 0 28px 90px rgba(0, 0, 0, 0.38);
+    transform: translateX(-105%);
+    transition: transform 220ms ease, box-shadow 220ms ease;
+  }
+
+  .articton-dashboard-page .articton-dashboard-sidebar.is-open {
+    transform: translateX(0);
+  }
+
+  .articton-dashboard-page .articton-sidebar-menu-button {
+    display: inline-flex;
+  }
+
+  .articton-dashboard-page .articton-dashboard-content {
+    height: auto !important;
+    min-height: 100dvh;
+    overflow: visible !important;
+    padding: clamp(1rem, 3vw, 1.5rem) !important;
+  }
+
+  .articton-dashboard-page main,
+  .articton-admin-page main,
+  .articton-faculty-page main {
+    overflow: visible;
+  }
+}
+
+@media (max-width: 760px) {
+  .articton-settings-dialog {
+    max-height: min(92dvh, 46rem);
+    overflow-y: auto !important;
+  }
+
+  .articton-faculty-page [class*="grid-cols-[1.4fr_1.4fr"] {
+    min-width: 48rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .articton-dashboard-page .articton-dashboard-sidebar {
+    transition: none;
+  }
+}
+
+/* 3D workspaces adapt with the page theme while keeping enough contrast for
+   hardware silhouettes and overlays. */
+.articton-3d-stage {
   color-scheme: dark;
   background: #070c14 !important;
   color: #e8ecf4 !important;
+}
+
+html.articton-light .articton-3d-stage {
+  color-scheme: light;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(255, 212, 28, 0.16), transparent 28rem),
+    linear-gradient(135deg, #ffffff 0%, #f3f6ff 58%, #fff8d6 100%) !important;
+  color: #171d3d !important;
 }
 
 html.articton-light .articton-3d-stage [class*="bg-[#070c14]"],
 html.articton-light .articton-3d-stage [class*="bg-[#0a0e17]"],
 html.articton-light .articton-3d-stage [class*="bg-[#0b1220]"],
 html.articton-light .articton-3d-stage [class*="bg-[#0d1220]"] {
-  background-color: #070c14 !important;
+  background-color: rgba(255, 255, 255, 0.78) !important;
 }
 
 html.articton-light .articton-3d-stage [class*="text-white"],
 html.articton-light .articton-3d-stage [class*="text-[#e8ecf4]"],
 html.articton-light .articton-3d-stage [class*="text-[#dbe6f5]"] {
-  color: #eef5fb !important;
+  color: #171d3d !important;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -446,24 +598,103 @@ html.articton-light,
 html.articton-light body,
 html.articton-light #root {
   background:
-    radial-gradient(circle at 12% -8%, rgba(0, 125, 101, 0.075), transparent 30rem),
-    radial-gradient(circle at 92% 0%, rgba(23, 109, 162, 0.055), transparent 28rem),
+    radial-gradient(circle at 10% -8%, rgba(53, 64, 142, 0.16), transparent 30rem),
+    radial-gradient(circle at 92% 0%, rgba(255, 212, 28, 0.18), transparent 28rem),
+    linear-gradient(135deg, rgba(53, 64, 142, 0.045), rgba(255, 212, 28, 0.04)),
     var(--articton-bg);
   color: var(--articton-text);
 }
 
 html.articton-light ::selection {
-  background: rgba(0, 125, 101, 0.2);
+  background: rgba(53, 64, 142, 0.2);
   color: #062e25;
 }
 
 html.articton-light .articton-app-shell,
 html.articton-light .articton-landing-page {
   background:
-    radial-gradient(circle at 8% -10%, rgba(0, 125, 101, 0.08), transparent 32rem),
-    radial-gradient(circle at 95% 8%, rgba(23, 109, 162, 0.055), transparent 30rem),
+    radial-gradient(circle at 8% -10%, rgba(53, 64, 142, 0.18), transparent 32rem),
+    radial-gradient(circle at 96% 6%, rgba(255, 212, 28, 0.18), transparent 30rem),
+    linear-gradient(135deg, rgba(53, 64, 142, 0.055), rgba(255, 212, 28, 0.045)),
     var(--articton-bg) !important;
   color: var(--articton-text) !important;
+}
+
+html.articton-light .articton-dashboard-frame,
+html.articton-light .articton-admin-page,
+html.articton-light .articton-faculty-page {
+  background:
+    radial-gradient(circle at 10% 0%, rgba(53, 64, 142, 0.18), transparent 30rem),
+    radial-gradient(circle at 88% 8%, rgba(255, 212, 28, 0.22), transparent 26rem),
+    linear-gradient(135deg, #f8f9ff 0%, #eef1fb 46%, #fff9dc 100%) !important;
+}
+
+html.articton-light .articton-dashboard-base {
+  background:
+    radial-gradient(circle at 18% 8%, rgba(53, 64, 142, 0.16), transparent 32rem),
+    radial-gradient(circle at 84% 12%, rgba(255, 212, 28, 0.22), transparent 30rem),
+    linear-gradient(115deg, #f8f9ff 0%, #eef1fb 54%, #fff8d6 100%) !important;
+}
+
+html.articton-light .articton-dashboard-glow--gold {
+  background-color: rgba(255, 212, 28, 0.18) !important;
+  opacity: 1;
+}
+
+html.articton-light .articton-dashboard-glow--blue {
+  background-color: rgba(53, 64, 142, 0.14) !important;
+  opacity: 1;
+}
+
+html.articton-light .articton-dashboard-grid {
+  background-image:
+    linear-gradient(rgba(174, 132, 0, 0.16) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(174, 132, 0, 0.16) 1px, transparent 1px),
+    linear-gradient(rgba(53, 64, 142, 0.055) 2px, transparent 2px),
+    linear-gradient(90deg, rgba(53, 64, 142, 0.055) 2px, transparent 2px) !important;
+  background-size: 58px 58px, 58px 58px, 174px 174px, 174px 174px !important;
+  opacity: 0.9 !important;
+}
+
+html.articton-light .articton-dashboard-scan--gold,
+html.articton-light .articton-dashboard-scan--blue,
+html.articton-light .articton-dashboard-frame-scan--gold,
+html.articton-light .articton-dashboard-frame-scan--blue {
+  background: linear-gradient(180deg, transparent, rgba(255, 212, 28, 0.96), transparent) !important;
+  opacity: 0.72 !important;
+  filter: drop-shadow(0 0 16px rgba(255, 212, 28, 0.8));
+}
+
+html.articton-light .articton-dashboard-frame-glow--gold {
+  background: radial-gradient(circle at 18% 10%, rgba(255, 212, 28, 0.2), transparent 36%) !important;
+  opacity: 1 !important;
+}
+
+html.articton-light .articton-dashboard-frame-glow--blue {
+  background: radial-gradient(circle at 88% 20%, rgba(53, 64, 142, 0.14), transparent 34%) !important;
+  opacity: 1 !important;
+}
+
+html.articton-light .articton-dashboard-frame-grid {
+  background-image:
+    linear-gradient(rgba(174, 132, 0, 0.15) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(174, 132, 0, 0.15) 1px, transparent 1px),
+    linear-gradient(rgba(53, 64, 142, 0.05) 2px, transparent 2px),
+    linear-gradient(90deg, rgba(53, 64, 142, 0.05) 2px, transparent 2px) !important;
+  background-size: 54px 54px, 54px 54px, 162px 162px, 162px 162px !important;
+  opacity: 0.88 !important;
+}
+
+html.articton-light .articton-dashboard-frame-vignette {
+  background: rgba(255, 255, 255, 0.04) !important;
+  box-shadow: inset 0 0 0 1px rgba(53, 64, 142, 0.08) !important;
+}
+
+html.articton-light .articton-dashboard-page
+  [class*="bg-[linear-gradient(135deg,#0d1220"],
+html.articton-light .articton-dashboard-page
+  [class*="bg-[linear-gradient(135deg,#0a0e17"] {
+  background-image: linear-gradient(135deg, #ffffff 0%, #f1f3fb 100%) !important;
 }
 
 /* Convert the recurring dark surfaces into a restrained white hierarchy. */
@@ -549,34 +780,51 @@ html.articton-light :where(.articton-app-shell, .articton-landing-page)
 
 html.articton-light :where(.articton-app-shell, .articton-landing-page)
   :where(
-    [class*="text-[#00ffb4]"],
+    [class*="text-[#FFD41C]"],
     [class*="text-[#73ffd4]"],
     [class*="text-[#b7fff0]"],
     [class*="text-[#9fdccb]"]
   ) {
-  color: var(--articton-accent) !important;
+  color: var(--articton-primary) !important;
 }
 
 html.articton-light :where(.articton-app-shell, .articton-landing-page)
-  [class*="bg-[#00ffb4]"] {
-  background-color: var(--articton-accent) !important;
+  [class*="bg-[#FFD41C]"]:not([class*="bg-[#FFD41C]/"]) {
+  background:
+    linear-gradient(135deg, var(--articton-primary) 0%, var(--articton-primary) 72%, var(--articton-secondary) 72%, var(--articton-secondary) 100%) !important;
 }
 
 html.articton-light :where(.articton-app-shell, .articton-landing-page)
-  :where([class*="bg-[#00ffb4]/"], [class*="bg-[#00b4ff]/"]) {
-  background-color: var(--articton-accent-soft) !important;
+  [class*="bg-[#FFD41C]/"],
+html.articton-light :where(.articton-app-shell, .articton-landing-page)
+  [class*="bg-[#00b4ff]/"] {
+  background:
+    linear-gradient(135deg, rgba(53, 64, 142, 0.1), rgba(255, 212, 28, 0.2)) !important;
 }
 
 html.articton-light :where(.articton-app-shell, .articton-landing-page)
-  [class*="border-[#00ffb4]/"] {
-  border-color: rgba(0, 125, 101, 0.32) !important;
+  [class*="border-[#FFD41C]/"] {
+  border-color: rgba(53, 64, 142, 0.32) !important;
+  box-shadow: 0 0 0 1px rgba(255, 212, 28, 0.2) inset;
 }
 
 /* Text sitting on a solid accent must remain high contrast. */
 html.articton-light :where(.articton-app-shell, .articton-landing-page)
-  [class*="bg-[#00ffb4]"][class*="text-[#07111d]"],
+  [class*="bg-[#FFD41C]"][class*="text-[#07111d]"],
 html.articton-light :where(.articton-app-shell, .articton-landing-page)
-  [class*="bg-[#00ffb4]"][class*="text-[#0a0e17]"] {
+  [class*="bg-[#FFD41C]"][class*="text-[#0a0e17]"],
+html.articton-light :where(.articton-app-shell, .articton-landing-page)
+  [class*="bg-[#FFD41C]"][class*="text-[#111633]"] {
+  color: #ffffff !important;
+}
+
+html.articton-light :where(.articton-app-shell, .articton-landing-page)
+  :where(button, span, div)[class*="bg-[#FFD41C]"]:not([class*="bg-[#FFD41C]/"]) {
+  color: #ffffff !important;
+}
+
+html.articton-light :where(.articton-app-shell, .articton-landing-page)
+  :where(button, span, div)[class*="bg-[#FFD41C]"]:not([class*="bg-[#FFD41C]/"]) * {
   color: #ffffff !important;
 }
 
@@ -622,8 +870,8 @@ html.articton-light :where(.articton-app-shell, .articton-landing-page)
 
 html.articton-light :where(.articton-app-shell, .articton-landing-page)
   :where(input, textarea, select, .articton-field):focus {
-  border-color: rgba(0, 125, 101, 0.58) !important;
-  box-shadow: 0 0 0 4px rgba(0, 125, 101, 0.11) !important;
+  border-color: rgba(53, 64, 142, 0.58) !important;
+  box-shadow: 0 0 0 4px rgba(53, 64, 142, 0.11) !important;
 }
 
 html.articton-light .articton-dropdown-menu {
@@ -668,7 +916,7 @@ html.articton-light :where(.articton-app-shell, .articton-landing-page)
 }
 
 html.articton-light :where(.articton-app-shell, .articton-landing-page)
-  [class*="bg-[linear-gradient(rgba(0,255,180"] {
+  [class*="bg-[linear-gradient(rgba(255,212,28"] {
   opacity: 0.34 !important;
 }
 
@@ -679,9 +927,549 @@ html.articton-light :where(.articton-app-shell, .articton-landing-page)
 html.articton-light .articton-dashboard-page aside,
 html.articton-light .articton-admin-page aside,
 html.articton-light .articton-faculty-page aside {
-  background: rgba(255, 255, 255, 0.93) !important;
+  background:
+    linear-gradient(180deg, rgba(53, 64, 142, 0.055), rgba(255, 212, 28, 0.055)),
+    rgba(255, 255, 255, 0.94) !important;
   border-color: var(--articton-border) !important;
   box-shadow: 14px 0 38px rgba(27, 54, 77, 0.055);
+}
+
+.articton-platform-shell {
+  min-width: 0;
+}
+
+.articton-platform-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.articton-platform-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 18% 10%, rgba(255, 212, 28, 0.16), transparent 34%),
+    radial-gradient(circle at 90% 20%, rgba(53, 64, 142, 0.22), transparent 38%);
+}
+
+.articton-platform-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.articton-platform-option {
+  min-height: 11rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.articton-platform-option::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(135deg, rgba(255, 212, 28, 0.08), transparent 42%),
+    radial-gradient(circle at 88% 12%, rgba(53, 64, 142, 0.18), transparent 34%);
+  opacity: 0.85;
+}
+
+.articton-platform-option > * {
+  position: relative;
+  z-index: 1;
+}
+
+html.articton-light .articton-module-selector-page,
+html.articton-light .articton-module-page,
+html.articton-light .articton-practice-page {
+  background:
+    radial-gradient(circle at 14% 0%, rgba(53, 64, 142, 0.16), transparent 30rem),
+    radial-gradient(circle at 88% 8%, rgba(255, 212, 28, 0.24), transparent 28rem),
+    linear-gradient(135deg, #f8f9ff 0%, #eef1fb 48%, #fff8d6 100%) !important;
+  color: #111633 !important;
+}
+
+html.articton-light :where(.articton-module-selector-page, .articton-module-page, .articton-practice-page)
+  .bg-gradient-to-b {
+  background-image:
+    radial-gradient(circle at 18% 8%, rgba(53, 64, 142, 0.13), transparent 30rem),
+    radial-gradient(circle at 86% 14%, rgba(255, 212, 28, 0.22), transparent 28rem),
+    linear-gradient(135deg, #f8f9ff 0%, #eef1fb 52%, #fff8d6 100%) !important;
+}
+
+html.articton-light :where(.articton-module-page, .articton-practice-page)
+  [class*="bg-[linear-gradient(135deg,#0a0e17"],
+html.articton-light :where(.articton-module-page, .articton-practice-page)
+  [class*="bg-[linear-gradient(135deg,#0d1220"] {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.86), rgba(255, 248, 214, 0.58)),
+    #ffffff !important;
+}
+
+html.articton-light :where(.articton-module-page, .articton-practice-page)
+  [class*="bg-[linear-gradient(rgba(255,212,28"] {
+  background-image:
+    linear-gradient(rgba(174, 132, 0, 0.14) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(174, 132, 0, 0.14) 1px, transparent 1px),
+    linear-gradient(rgba(53, 64, 142, 0.05) 2px, transparent 2px),
+    linear-gradient(90deg, rgba(53, 64, 142, 0.05) 2px, transparent 2px) !important;
+  background-size: 54px 54px, 54px 54px, 162px 162px, 162px 162px !important;
+  opacity: 0.86 !important;
+}
+
+html.articton-light :where(.articton-module-page, .articton-practice-page)
+  [class*="bg-black/10"] {
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+html.articton-light :where(.articton-module-page, .articton-practice-page)
+  :where(
+    [class*="bg-[#070c14]"],
+    [class*="bg-[#05080D]"],
+    [class*="bg-[#031018]"],
+    [class*="bg-[#06131b]"]
+  ) {
+  background:
+    radial-gradient(circle at 50% 42%, rgba(255, 212, 28, 0.14), transparent 28rem),
+    linear-gradient(135deg, #ffffff 0%, #f3f6ff 58%, #fff8d6 100%) !important;
+}
+
+html.articton-light :where(.articton-module-page, .articton-practice-page)
+  :where(
+    [class*="bg-[#070c14]"],
+    [class*="bg-[#05080D]"],
+    [class*="bg-[#031018]"],
+    [class*="bg-[#06131b]"]
+  )[class*="text-[#e8ecf4]"] {
+  color: #171d3d !important;
+}
+
+html.articton-light :where(.articton-module-page, .articton-practice-page)
+  [class*="shadow-[inset_0_0"] {
+  box-shadow: inset 0 0 0 1px rgba(53, 64, 142, 0.12) !important;
+}
+
+html.articton-light :where(.articton-module-page, .articton-practice-page)
+  :where(
+    [class*="bg-[#0b1220]/95"],
+    [class*="bg-[#0b1220]/94"],
+    [class*="bg-[#0b1220]/92"],
+    [class*="bg-[#0b1220]/90"],
+    [class*="bg-[#0d1220]/78"],
+    [class*="bg-[#0d1220]/90"],
+    [class*="bg-[#0d1220]/94"],
+    [class*="bg-[#0d1220]/95"],
+    [class*="bg-[#0d1220]/96"],
+    [class*="bg-[#0d1220]/97"],
+    [class*="bg-[#0d1220]/98"]
+  ) {
+  border-color: rgba(53, 64, 142, 0.18) !important;
+  background:
+    linear-gradient(135deg, rgba(53, 64, 142, 0.055), rgba(255, 212, 28, 0.075)),
+    rgba(255, 255, 255, 0.92) !important;
+  color: #171d3d !important;
+  box-shadow: 0 18px 54px rgba(53, 64, 142, 0.13) !important;
+}
+
+html.articton-light :where(.articton-module-page, .articton-practice-page)
+  :where(
+    [class*="bg-[#0b1220]/95"],
+    [class*="bg-[#0b1220]/94"],
+    [class*="bg-[#0b1220]/92"],
+    [class*="bg-[#0b1220]/90"],
+    [class*="bg-[#0d1220]/78"],
+    [class*="bg-[#0d1220]/90"],
+    [class*="bg-[#0d1220]/94"],
+    [class*="bg-[#0d1220]/95"],
+    [class*="bg-[#0d1220]/96"],
+    [class*="bg-[#0d1220]/97"],
+    [class*="bg-[#0d1220]/98"]
+  )
+  :where(.text-white, [class*="text-[#e8ecf4]"], [class*="text-[#dbe6f5]"], [class*="text-[#9fb0ca]"]) {
+  color: #171d3d !important;
+}
+
+html.articton-light :where(.articton-module-page, .articton-practice-page)
+  :where(
+    [class*="bg-[#0b1220]/95"],
+    [class*="bg-[#0b1220]/94"],
+    [class*="bg-[#0b1220]/92"],
+    [class*="bg-[#0b1220]/90"],
+    [class*="bg-[#0d1220]/78"],
+    [class*="bg-[#0d1220]/90"],
+    [class*="bg-[#0d1220]/94"],
+    [class*="bg-[#0d1220]/95"],
+    [class*="bg-[#0d1220]/96"],
+    [class*="bg-[#0d1220]/97"],
+    [class*="bg-[#0d1220]/98"]
+  )
+  :where([class*="text-[#7a8ba8]"], [class*="text-[#8fa3bf]"], [class*="text-[#b7c6dd]"]) {
+  color: #4d587e !important;
+}
+
+html.articton-light :where(.articton-module-page, .articton-practice-page)
+  :where(
+    [class*="bg-[#0b1220]/95"],
+    [class*="bg-[#0b1220]/94"],
+    [class*="bg-[#0b1220]/92"],
+    [class*="bg-[#0b1220]/90"],
+    [class*="bg-[#0d1220]/78"],
+    [class*="bg-[#0d1220]/90"],
+    [class*="bg-[#0d1220]/94"],
+    [class*="bg-[#0d1220]/95"],
+    [class*="bg-[#0d1220]/96"],
+    [class*="bg-[#0d1220]/97"],
+    [class*="bg-[#0d1220]/98"]
+  )
+  [class*="text-[#FFD41C]"] {
+  color: #35408e !important;
+}
+
+html.articton-light .articton-module1-info-card {
+  border-color: rgba(53, 64, 142, 0.24) !important;
+  background:
+    linear-gradient(rgba(174, 132, 0, 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(174, 132, 0, 0.08) 1px, transparent 1px),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(255, 248, 214, 0.82)) !important;
+  background-size: 32px 32px, 32px 32px, auto !important;
+  color: #171d3d !important;
+  box-shadow: 0 20px 56px rgba(53, 64, 142, 0.14) !important;
+}
+
+html.articton-light .articton-module1-info-card :where(h2, .text-white, [class*="text-[#dbe6f5]"], [class*="text-[#9fb0ca]"]) {
+  color: #171d3d !important;
+}
+
+html.articton-light .articton-module1-info-card :where([class*="text-[#8fa3bf]"], [class*="text-[#7a8ba8]"]) {
+  color: #4d587e !important;
+}
+
+html.articton-light .articton-module1-info-card [class*="text-[#FFD41C]"] {
+  color: #35408e !important;
+}
+
+html.articton-light .articton-module1-info-status,
+html.articton-light .articton-module1-detail-card {
+  border-color: rgba(53, 64, 142, 0.18) !important;
+  background: rgba(255, 255, 255, 0.72) !important;
+  color: #171d3d !important;
+}
+
+html.articton-light .articton-module1-details-toggle {
+  border-color: rgba(174, 132, 0, 0.34) !important;
+  background: linear-gradient(135deg, rgba(255, 212, 28, 0.26), rgba(255, 255, 255, 0.88)) !important;
+  color: #35408e !important;
+  box-shadow: 0 10px 28px rgba(53, 64, 142, 0.1) !important;
+}
+
+html.articton-light .articton-module1-bottom-nav {
+  border-color: rgba(53, 64, 142, 0.24) !important;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(255, 248, 214, 0.88)) !important;
+  box-shadow: 0 18px 48px rgba(53, 64, 142, 0.16) !important;
+}
+
+.articton-module1-bottom-nav {
+  max-width: min(72rem, calc(100vw - 2rem));
+  scrollbar-width: none;
+}
+
+.articton-module1-bottom-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.articton-module1-nav-button {
+  min-width: 3.4rem;
+}
+
+html.articton-light .articton-module1-nav-button {
+  border-color: rgba(53, 64, 142, 0.18) !important;
+  background: #ffffff !important;
+  color: #35408e !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.72);
+}
+
+html.articton-light .articton-module1-nav-button:hover {
+  border-color: rgba(174, 132, 0, 0.38) !important;
+  background: rgba(255, 212, 28, 0.16) !important;
+}
+
+html.articton-light .articton-module1-nav-button.is-active {
+  border-color: rgba(53, 64, 142, 0.38) !important;
+  background:
+    linear-gradient(135deg, #35408e 0%, #35408e 72%, #ffd41c 72%, #ffd41c 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 12px 30px rgba(53, 64, 142, 0.2) !important;
+}
+
+html.articton-light .articton-module1-nav-button.is-active * {
+  color: #ffffff !important;
+}
+
+html.articton-light .articton-module1-nav-index {
+  border-color: rgba(53, 64, 142, 0.2) !important;
+  background: rgba(53, 64, 142, 0.08) !important;
+  color: #35408e !important;
+}
+
+html.articton-light .articton-module1-nav-button.is-active .articton-module1-nav-index,
+html.articton-light .articton-module1-nav-index[class*="bg-[#FFD41C]"] {
+  background: #ffd41c !important;
+  color: #111633 !important;
+}
+
+html.articton-light :where(.articton-module-page, .articton-practice-page) .articton-ai-panel {
+  border-color: rgba(53, 64, 142, 0.22) !important;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(255, 248, 214, 0.84)) !important;
+  color: #171d3d !important;
+  box-shadow: 0 18px 52px rgba(53, 64, 142, 0.16) !important;
+}
+
+html.articton-light :where(.articton-module-page, .articton-practice-page) .articton-ai-panel :where(.text-white, [class*="text-[#dffef5]"], [class*="text-[#dbe6f5]"], [class*="text-[#c8d4e6]"]) {
+  color: #171d3d !important;
+}
+
+html.articton-light :where(.articton-module-page, .articton-practice-page) .articton-ai-panel :where([class*="text-[#7a8ba8]"], [class*="text-[#9fb0c9]"]) {
+  color: #4d587e !important;
+}
+
+html.articton-light :where(.articton-module-page, .articton-practice-page) .articton-ai-panel [class*="text-[#FFD41C]"] {
+  color: #35408e !important;
+}
+
+@media (max-width: 1100px), (max-height: 760px) {
+  .articton-module-page,
+  .articton-practice-page {
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+  }
+
+  .articton-module-page .h-screen,
+  .articton-practice-page .h-screen {
+    height: auto !important;
+    min-height: 100dvh !important;
+  }
+
+  .articton-module-page .articton-module1-info-panel {
+    left: 1rem !important;
+    right: 1rem !important;
+    top: 1rem !important;
+    width: min(28rem, calc(100% - 2rem)) !important;
+    max-height: min(48dvh, 28rem) !important;
+  }
+
+  .articton-module1-info-card {
+    padding: 1rem !important;
+  }
+
+  .articton-module1-info-card h2 {
+    font-size: clamp(1.25rem, 4vw, 1.8rem) !important;
+  }
+
+  .articton-module1-bottom-nav {
+    max-width: min(42rem, calc(100vw - 1.5rem)) !important;
+    border-radius: 1.25rem !important;
+    align-items: stretch;
+  }
+
+  .articton-module1-nav-button {
+    height: 2.55rem !important;
+    padding-inline: 0.65rem !important;
+    font-size: 0.75rem !important;
+  }
+
+  .articton-module1-nav-index {
+    height: 1.5rem !important;
+    width: 1.5rem !important;
+  }
+
+  .articton-ai-panel {
+    right: 1rem !important;
+    top: 1rem !important;
+    width: min(24rem, calc(100% - 2rem)) !important;
+    max-height: min(52dvh, 28rem) !important;
+  }
+}
+
+@media (max-width: 720px) {
+  .articton-module-page .articton-module1-info-panel {
+    position: absolute !important;
+    max-height: min(42dvh, 22rem) !important;
+  }
+
+  .articton-module1-bottom-nav {
+    justify-content: flex-start;
+  }
+
+  .articton-module1-nav-button span:last-child {
+    display: none !important;
+  }
+}
+
+html.articton-light .articton-platform-shell {
+  border-color: rgba(53, 64, 142, 0.2) !important;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.76), rgba(255, 248, 214, 0.72)),
+    linear-gradient(135deg, #ffffff 0%, #eef1fb 100%) !important;
+  box-shadow: 0 32px 90px rgba(53, 64, 142, 0.16) !important;
+}
+
+html.articton-light .articton-platform-glow {
+  background:
+    radial-gradient(circle at 20% 12%, rgba(255, 212, 28, 0.34), transparent 36%),
+    radial-gradient(circle at 88% 20%, rgba(53, 64, 142, 0.16), transparent 34%) !important;
+  opacity: 1 !important;
+}
+
+html.articton-light .articton-platform-grid {
+  background-image:
+    linear-gradient(rgba(174, 132, 0, 0.16) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(174, 132, 0, 0.16) 1px, transparent 1px),
+    linear-gradient(rgba(53, 64, 142, 0.055) 2px, transparent 2px),
+    linear-gradient(90deg, rgba(53, 64, 142, 0.055) 2px, transparent 2px) !important;
+  background-size: 54px 54px, 54px 54px, 162px 162px, 162px 162px !important;
+  opacity: 0.9 !important;
+}
+
+html.articton-light .articton-platform-card {
+  border-color: rgba(53, 64, 142, 0.22) !important;
+  background:
+    linear-gradient(135deg, rgba(53, 64, 142, 0.07), rgba(255, 212, 28, 0.14)),
+    rgba(255, 255, 255, 0.88) !important;
+  box-shadow:
+    0 24px 70px rgba(53, 64, 142, 0.14),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.7) !important;
+}
+
+html.articton-light .articton-platform-option {
+  border-color: rgba(53, 64, 142, 0.18) !important;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.88), rgba(255, 248, 214, 0.72)) !important;
+  box-shadow: 0 14px 32px rgba(53, 64, 142, 0.08) !important;
+}
+
+html.articton-light .articton-platform-option:hover {
+  border-color: rgba(174, 132, 0, 0.34) !important;
+  background:
+    linear-gradient(135deg, rgba(255, 212, 28, 0.22), rgba(255, 255, 255, 0.92)) !important;
+}
+
+html.articton-light .articton-platform-shell :where(.text-white, [class*="text-[#e8ecf4]"]),
+html.articton-light .articton-platform-card :where(.text-white, [class*="text-[#e8ecf4]"]) {
+  color: #111633 !important;
+}
+
+html.articton-light .articton-platform-shell :where([class*="text-[#dbe6f5]"], [class*="text-[#b7c6dd]"]),
+html.articton-light .articton-platform-card :where([class*="text-[#dbe6f5]"], [class*="text-[#b7c6dd]"]) {
+  color: #405078 !important;
+}
+
+html.articton-light .articton-dashboard-page .articton-side-item {
+  color: #35408e !important;
+}
+
+html.articton-light .articton-dashboard-page .articton-side-item:hover {
+  border-color: rgba(53, 64, 142, 0.2) !important;
+  background:
+    linear-gradient(135deg, rgba(53, 64, 142, 0.07), rgba(255, 212, 28, 0.12)) !important;
+}
+
+html.articton-light .articton-dashboard-page .articton-side-item[aria-current="page"] {
+  border-color: rgba(53, 64, 142, 0.28) !important;
+  background:
+    linear-gradient(135deg, rgba(53, 64, 142, 0.12), rgba(255, 212, 28, 0.22)) !important;
+  box-shadow: 0 16px 38px rgba(53, 64, 142, 0.1) !important;
+}
+
+html.articton-light .articton-dashboard-page .articton-side-label {
+  color: #33406f !important;
+}
+
+html.articton-light .articton-dashboard-page .articton-side-item[aria-current="page"] .articton-side-label {
+  color: #111633 !important;
+}
+
+html.articton-light .articton-dashboard-page .articton-side-icon {
+  border-color: rgba(53, 64, 142, 0.22) !important;
+  background: #ffffff !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.72),
+    0 8px 20px rgba(53, 64, 142, 0.08);
+}
+
+html.articton-light .articton-dashboard-page .articton-side-icon.is-active {
+  border-color: rgba(53, 64, 142, 0.28) !important;
+  background:
+    radial-gradient(circle at 50% 52%, rgba(255, 212, 28, 0.52), transparent 58%),
+    rgba(255, 212, 28, 0.18) !important;
+}
+
+html.articton-light .articton-dashboard-page .articton-icon-fill {
+  background: #35408e !important;
+}
+
+html.articton-light .articton-dashboard-page .articton-icon-soft {
+  background: rgba(53, 64, 142, 0.32) !important;
+}
+
+html.articton-light .articton-dashboard-page .articton-icon-fill.is-active {
+  background: #ffd41c !important;
+  box-shadow: 0 0 0 1px rgba(53, 64, 142, 0.18) inset;
+}
+
+html.articton-light .articton-dashboard-page .articton-icon-soft.is-active {
+  background: rgba(53, 64, 142, 0.22) !important;
+}
+
+html.articton-light .articton-dashboard-page .articton-side-icon .text-sm,
+html.articton-light .articton-dashboard-page .articton-side-icon .text-xs,
+html.articton-light .articton-dashboard-page .articton-side-icon .text-\[10px\],
+html.articton-light .articton-dashboard-page .articton-side-icon .text-\[9px\] {
+  color: #35408e !important;
+}
+
+html.articton-light .articton-dashboard-page .articton-side-icon.is-active .text-sm {
+  color: #8a7000 !important;
+}
+
+html.articton-light .articton-top-card-hero {
+  border-color: rgba(53, 64, 142, 0.18) !important;
+  background:
+    linear-gradient(135deg, rgba(53, 64, 142, 0.08), rgba(255, 212, 28, 0.1)),
+    linear-gradient(135deg, #ffffff 0%, #f6f8ff 54%, #fff8d6 100%) !important;
+  box-shadow: 0 24px 70px rgba(53, 64, 142, 0.13) !important;
+}
+
+html.articton-light .articton-dashboard-card,
+html.articton-light .articton-stat-card {
+  border-color: rgba(53, 64, 142, 0.16) !important;
+  background:
+    linear-gradient(135deg, rgba(53, 64, 142, 0.035), rgba(255, 212, 28, 0.06)),
+    rgba(255, 255, 255, 0.96) !important;
+}
+
+html.articton-light .articton-stat-card:nth-child(1) {
+  background:
+    linear-gradient(135deg, rgba(53, 64, 142, 0.08), rgba(255, 255, 255, 0.94)),
+    #ffffff !important;
+}
+
+html.articton-light .articton-stat-card:nth-child(2) {
+  background:
+    linear-gradient(135deg, rgba(255, 212, 28, 0.18), rgba(255, 255, 255, 0.94)),
+    #ffffff !important;
+}
+
+html.articton-light .articton-stat-card:nth-child(3) {
+  background:
+    linear-gradient(135deg, rgba(53, 64, 142, 0.08), rgba(255, 212, 28, 0.16)),
+    #ffffff !important;
+}
+
+html.articton-light .articton-dashboard-card::before,
+html.articton-light .articton-top-card-hero::before {
+  opacity: 0.64;
 }
 
 html.articton-light :where(.articton-dashboard-page, .articton-module-selector-page,
@@ -707,12 +1495,12 @@ html.articton-light .articton-practice-page [class*="bg-[#ff9f7d]/"] {
 
 html.articton-light .articton-instruction-overlay {
   background:
-    radial-gradient(circle at 50% 15%, rgba(0, 125, 101, 0.09), transparent 28rem),
+    radial-gradient(circle at 50% 15%, rgba(53, 64, 142, 0.09), transparent 28rem),
     rgba(227, 237, 243, 0.88) !important;
 }
 
 html.articton-light .articton-instruction-card {
-  border-color: rgba(0, 125, 101, 0.32) !important;
+  border-color: rgba(53, 64, 142, 0.32) !important;
   background: rgba(255, 255, 255, 0.985) !important;
   box-shadow: 0 32px 90px rgba(27, 54, 77, 0.18), 0 0 0 1px rgba(255, 255, 255, 0.72) inset !important;
 }
@@ -753,6 +1541,19 @@ html.articton-light .articton-setting-row {
   background: var(--articton-surface-strong) !important;
 }
 
+html.articton-light .articton-settings-dialog :where(h1, h2, h3, .text-white, [class*="text-[#e8ecf4]"]) {
+  color: #111633 !important;
+}
+
+html.articton-light .articton-settings-dialog :where(p, span, [class*="text-[#7a8ba8]"], [class*="text-[#9fb0c9]"]) {
+  color: #4d587e !important;
+}
+
+html.articton-light .articton-settings-dialog button[class*="bg-[#FFD41C]"],
+html.articton-light .articton-settings-dialog .articton-setting-row [class*="bg-[#FFD41C]"] {
+  color: #111633 !important;
+}
+
 /* -------------------------------------------------------------------------- */
 /* Landing page                                                               */
 /* -------------------------------------------------------------------------- */
@@ -763,10 +1564,176 @@ html.articton-light .articton-setting-row {
   color: var(--articton-text);
 }
 
+html.articton-dark .articton-hero-chip {
+  background:
+    linear-gradient(135deg, rgba(255, 212, 28, 0.1), rgba(53, 64, 142, 0.2)) !important;
+}
+
+html.articton-dark .articton-hero-model-panel {
+  background:
+    linear-gradient(135deg, rgba(53, 64, 142, 0.18), rgba(255, 212, 28, 0.06)),
+    rgba(13, 18, 32, 0.42) !important;
+  box-shadow:
+    0 30px 90px rgba(0, 0, 0, 0.28),
+    inset 0 0 0 1px rgba(255, 212, 28, 0.08);
+}
+
+.articton-hero-model-wrap {
+  min-width: 0;
+}
+
+.articton-hero-model-stage {
+  isolation: isolate;
+  height: clamp(27rem, 43vw, 36rem) !important;
+  max-width: min(44rem, 100%) !important;
+}
+
+.articton-hero-model-stage::before {
+  content: "";
+  position: absolute;
+  left: 9%;
+  right: 7%;
+  bottom: 12%;
+  z-index: 6;
+  height: 22%;
+  border-radius: 999px;
+  background:
+    radial-gradient(ellipse at center, rgba(53, 64, 142, 0.24), transparent 62%),
+    radial-gradient(ellipse at 58% 45%, rgba(255, 212, 28, 0.24), transparent 52%);
+  filter: blur(18px);
+  opacity: 0.82;
+  transform: perspective(720px) rotateX(62deg);
+  pointer-events: none;
+}
+
+.articton-hero-model-stage::after {
+  content: "";
+  position: absolute;
+  inset: 18% 9% 14% 12%;
+  z-index: 5;
+  border-radius: 38px;
+  border: 1px solid rgba(255, 212, 28, 0.24);
+  background:
+    linear-gradient(90deg, rgba(53, 64, 142, 0.12), transparent 36%, rgba(255, 212, 28, 0.1)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 60%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+  transform: perspective(900px) rotateY(-8deg) rotateZ(-1deg);
+  pointer-events: none;
+}
+
+.articton-hero-canvas-wrap {
+  inset: -7% -9% 1% -7% !important;
+}
+
+.articton-hero-model-panel {
+  inset: 13% 4% 11% 8% !important;
+  z-index: 4;
+  border-radius: 44px !important;
+  border-color: rgba(255, 212, 28, 0.26) !important;
+  background:
+    linear-gradient(rgba(255, 212, 28, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(53, 64, 142, 0.08) 1px, transparent 1px),
+    radial-gradient(circle at 52% 50%, rgba(255, 212, 28, 0.2), transparent 36%),
+    radial-gradient(circle at 42% 44%, rgba(53, 64, 142, 0.22), transparent 48%),
+    linear-gradient(135deg, rgba(53, 64, 142, 0.2), rgba(255, 212, 28, 0.06)),
+    rgba(13, 18, 32, 0.34) !important;
+  background-size: 42px 42px, 42px 42px, auto, auto, auto, auto;
+  transform: perspective(900px) rotateY(-8deg) rotateZ(-1deg);
+}
+
+.articton-dashboard-grid,
+.articton-dashboard-frame-grid {
+  opacity: 0.68;
+}
+
+.articton-dashboard-scan {
+  filter: drop-shadow(0 0 14px rgba(255, 212, 28, 0.55));
+}
+
+.articton-dashboard-frame-scan {
+  filter: drop-shadow(0 0 14px rgba(255, 212, 28, 0.48));
+}
+
+.articton-side-icon {
+  color: #ffd41c;
+}
+
+.articton-icon-fill {
+  background: rgba(255, 212, 28, 0.72);
+}
+
+.articton-icon-soft {
+  background: rgba(255, 212, 28, 0.24);
+}
+
+.articton-icon-fill.is-active {
+  background: rgba(255, 212, 28, 0.9);
+}
+
+.articton-icon-soft.is-active {
+  background: rgba(255, 212, 28, 0.4);
+}
+
+.articton-top-card-hero,
+.articton-dashboard-card,
+.articton-stat-card {
+  position: relative;
+}
+
+.articton-stat-card {
+  overflow: hidden;
+}
+
+.articton-stat-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 4px;
+  background: linear-gradient(90deg, #35408e, #ffd41c);
+  opacity: 0.9;
+}
+
+.articton-dashboard-card::before,
+.articton-top-card-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 18% 0%, rgba(255, 212, 28, 0.11), transparent 34%),
+    radial-gradient(circle at 92% 12%, rgba(53, 64, 142, 0.16), transparent 36%);
+  opacity: 0.8;
+}
+
+.articton-dashboard-card > *,
+.articton-top-card-hero > * {
+  position: relative;
+  z-index: 1;
+}
+
+.articton-hero-model-label {
+  left: clamp(1rem, 5vw, 4rem) !important;
+  right: auto !important;
+  top: clamp(1.4rem, 4vw, 3rem) !important;
+  z-index: 22 !important;
+}
+
+.articton-hero-model-caption {
+  left: auto !important;
+  right: clamp(1rem, 5vw, 4rem) !important;
+  bottom: clamp(1.2rem, 4vw, 2.8rem) !important;
+  z-index: 22 !important;
+  max-width: min(17rem, calc(100% - 2rem)) !important;
+  border-radius: 16px !important;
+}
+
 html.articton-light .articton-glass-nav {
-  border-color: rgba(71, 96, 118, 0.17) !important;
-  background: rgba(250, 253, 255, 0.88) !important;
-  box-shadow: 0 12px 34px rgba(27, 54, 77, 0.09) !important;
+  border-color: rgba(53, 64, 142, 0.18) !important;
+  background:
+    linear-gradient(90deg, rgba(53, 64, 142, 0.96), rgba(53, 64, 142, 0.88)),
+    rgba(250, 253, 255, 0.92) !important;
+  box-shadow: 0 14px 42px rgba(53, 64, 142, 0.18) !important;
 }
 
 /* Keep the landing navigation faithful to the original design. Home, About,
@@ -802,33 +1769,33 @@ html.articton-light .articton-glass-nav {
 }
 
 html.articton-light .articton-landing-nav .articton-nav-link {
-  color: #40556a;
+  color: rgba(255, 255, 255, 0.82);
 }
 
 html.articton-light .articton-landing-nav .articton-nav-link:hover,
 html.articton-light .articton-landing-nav .articton-nav-link:focus-visible {
-  color: #0f1f2e;
+  color: #ffffff;
 }
 
 html.articton-light .articton-landing-nav .articton-signup-button {
-  border-color: rgba(0, 125, 101, 0.28) !important;
-  background: rgba(0, 125, 101, 0.07) !important;
-  color: #007d65 !important;
+  border-color: rgba(255, 212, 28, 0.48) !important;
+  background: rgba(255, 212, 28, 0.14) !important;
+  color: #ffffff !important;
 }
 
 html.articton-light .articton-landing-nav .articton-signup-button:hover {
-  background: rgba(0, 125, 101, 0.12) !important;
+  background: rgba(255, 212, 28, 0.24) !important;
 }
 
 html.articton-light .articton-theme-toggle {
-  border-color: var(--articton-border) !important;
-  background: #ffffff !important;
-  color: var(--articton-text-muted) !important;
-  box-shadow: 0 5px 16px rgba(27, 54, 77, 0.08);
+  border-color: rgba(255, 212, 28, 0.34) !important;
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: #ffffff !important;
+  box-shadow: 0 5px 16px rgba(16, 24, 66, 0.16);
 }
 
 html.articton-light .articton-theme-toggle:hover {
-  border-color: rgba(0, 125, 101, 0.35) !important;
+  border-color: rgba(53, 64, 142, 0.35) !important;
   background: var(--articton-accent-soft) !important;
   color: var(--articton-accent) !important;
 }
@@ -837,23 +1804,178 @@ html.articton-light .articton-landing-hero,
 html.articton-light .articton-landing-about,
 html.articton-light .articton-auth-section {
   background:
-    radial-gradient(circle at 72% 30%, rgba(0, 125, 101, 0.105), transparent 26rem),
-    radial-gradient(circle at 20% 12%, rgba(23, 109, 162, 0.06), transparent 24rem),
-    linear-gradient(180deg, #f9fcfd 0%, #f1f6f9 100%) !important;
+    radial-gradient(circle at 70% 34%, rgba(255, 212, 28, 0.24), transparent 24rem),
+    radial-gradient(circle at 18% 18%, rgba(53, 64, 142, 0.18), transparent 26rem),
+    linear-gradient(115deg, #f8f9ff 0%, #eef1fb 52%, #fff8d6 100%) !important;
 }
 
 html.articton-light .articton-landing-grid > div:first-child {
   background-image:
-    linear-gradient(rgba(0, 125, 101, 0.052) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 125, 101, 0.052) 1px, transparent 1px) !important;
+    linear-gradient(rgba(174, 132, 0, 0.16) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(174, 132, 0, 0.16) 1px, transparent 1px),
+    linear-gradient(rgba(53, 64, 142, 0.055) 2px, transparent 2px),
+    linear-gradient(90deg, rgba(53, 64, 142, 0.055) 2px, transparent 2px) !important;
+  background-size: 60px 60px, 60px 60px, 180px 180px, 180px 180px !important;
 }
 
 html.articton-light .articton-landing-grid > div:last-child {
-  background-image: linear-gradient(180deg, rgba(243, 247, 250, 0), rgba(243, 247, 250, 0.28) 66%, rgba(243, 247, 250, 0.96)) !important;
+  background-image: linear-gradient(180deg, rgba(243, 247, 250, 0), rgba(243, 247, 250, 0.18) 66%, rgba(243, 247, 250, 0.82)) !important;
 }
 
 html.articton-light .articton-landing-wave {
-  background: linear-gradient(180deg, transparent 0%, rgba(0, 125, 101, 0.035) 45%, rgba(0, 125, 101, 0.085) 50%, rgba(0, 125, 101, 0.035) 55%, transparent 100%) !important;
+  background: linear-gradient(180deg, transparent 0%, rgba(255, 212, 28, 0.16) 45%, rgba(255, 212, 28, 0.34) 50%, rgba(255, 212, 28, 0.16) 55%, transparent 100%) !important;
+  opacity: 0.95 !important;
+}
+
+html.articton-light .articton-landing-scan {
+  background: linear-gradient(180deg, transparent, rgba(255, 212, 28, 0.95), transparent) !important;
+  opacity: 0.76 !important;
+  filter: drop-shadow(0 0 16px rgba(255, 212, 28, 0.72));
+}
+
+html.articton-light .articton-landing-hero h2 {
+  color: #171d3d !important;
+}
+
+html.articton-light .articton-landing-hero h2 span {
+  color: #35408e !important;
+  text-decoration: underline;
+  text-decoration-color: #ffd41c;
+  text-decoration-thickness: 0.12em;
+  text-underline-offset: 0.1em;
+}
+
+html.articton-light .articton-landing-hero p {
+  color: #4d587e !important;
+}
+
+html.articton-light .articton-landing-hero .inline-flex[class*="rounded-full"][class*="bg-[#FFD41C]/6"] {
+  border-color: rgba(53, 64, 142, 0.26) !important;
+  background: linear-gradient(90deg, rgba(53, 64, 142, 0.1), rgba(255, 212, 28, 0.22)) !important;
+}
+
+html.articton-light .articton-landing-hero .inline-flex[class*="rounded-full"][class*="bg-[#FFD41C]/6"] span:last-child {
+  color: #35408e !important;
+}
+
+html.articton-light .articton-primary-cta {
+  border: 1px solid rgba(255, 212, 28, 0.54);
+  background:
+    linear-gradient(135deg, #35408e 0%, #35408e 72%, #ffd41c 72%, #ffd41c 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 18px 44px rgba(53, 64, 142, 0.24);
+}
+
+html.articton-light .articton-secondary-cta {
+  border-color: rgba(53, 64, 142, 0.22) !important;
+  background: rgba(255, 255, 255, 0.74) !important;
+  color: #35408e !important;
+  box-shadow: 0 12px 32px rgba(53, 64, 142, 0.1);
+}
+
+html.articton-light .articton-secondary-cta:hover {
+  border-color: rgba(255, 212, 28, 0.72) !important;
+  background: #ffffff !important;
+  color: #273277 !important;
+}
+
+html.articton-light .articton-hero-chip {
+  border-color: rgba(53, 64, 142, 0.2) !important;
+  background:
+    linear-gradient(135deg, rgba(53, 64, 142, 0.09), rgba(255, 212, 28, 0.2)) !important;
+  color: #35408e !important;
+  box-shadow: 0 10px 26px rgba(53, 64, 142, 0.08);
+}
+
+html.articton-light .articton-hero-chip svg {
+  color: #35408e !important;
+}
+
+html.articton-light .articton-hero-model-glow {
+  background:
+    radial-gradient(circle at 58% 42%, rgba(255, 212, 28, 0.34), transparent 42%),
+    radial-gradient(circle at 42% 58%, rgba(53, 64, 142, 0.24), transparent 56%) !important;
+  opacity: 0.95;
+}
+
+html.articton-light .articton-hero-model-stage::before {
+  background:
+    radial-gradient(ellipse at center, rgba(53, 64, 142, 0.2), transparent 60%),
+    radial-gradient(ellipse at 58% 45%, rgba(255, 212, 28, 0.38), transparent 54%);
+  opacity: 0.88;
+}
+
+html.articton-light .articton-hero-model-stage::after {
+  border-color: rgba(53, 64, 142, 0.2);
+  background:
+    linear-gradient(rgba(174, 132, 0, 0.14) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(174, 132, 0, 0.14) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(53, 64, 142, 0.1), transparent 38%, rgba(255, 212, 28, 0.2)),
+    rgba(255, 255, 255, 0.34);
+  background-size: 44px 44px, 44px 44px, auto, auto;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.72),
+    0 24px 70px rgba(53, 64, 142, 0.12);
+}
+
+html.articton-light .articton-hero-model-panel {
+  border-color: rgba(53, 64, 142, 0.18) !important;
+  background:
+    linear-gradient(rgba(174, 132, 0, 0.18) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(174, 132, 0, 0.18) 1px, transparent 1px),
+    linear-gradient(rgba(53, 64, 142, 0.055) 2px, transparent 2px),
+    linear-gradient(90deg, rgba(53, 64, 142, 0.055) 2px, transparent 2px),
+    radial-gradient(circle at 52% 48%, rgba(255, 212, 28, 0.34), transparent 40%),
+    radial-gradient(circle at 38% 44%, rgba(53, 64, 142, 0.14), transparent 48%),
+    rgba(255, 255, 255, 0.42) !important;
+  background-size: 42px 42px, 42px 42px, 126px 126px, 126px 126px, auto, auto, auto;
+  box-shadow:
+    0 28px 80px rgba(53, 64, 142, 0.12),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.68);
+}
+
+html.articton-light .articton-hero-model-label,
+html.articton-light .articton-hero-model-caption {
+  border-color: rgba(53, 64, 142, 0.22) !important;
+  background: rgba(255, 255, 255, 0.82) !important;
+  color: #35408e !important;
+}
+
+@media (max-width: 1024px) {
+  .articton-hero-model-stage {
+    height: clamp(24rem, 64vw, 32rem) !important;
+    margin-inline: auto;
+  }
+
+  .articton-hero-canvas-wrap {
+    inset: -5% -7% 3% -7% !important;
+  }
+
+  .articton-hero-model-caption {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .articton-hero-model-stage {
+    height: clamp(21rem, 88vw, 27rem) !important;
+  }
+
+  .articton-hero-model-stage::after {
+    inset: 18% 4% 14% 6%;
+    border-radius: 30px;
+  }
+
+  .articton-hero-model-panel {
+    inset: 14% 1% 12% 4% !important;
+    border-radius: 32px !important;
+  }
+
+  .articton-hero-model-label {
+    max-width: calc(100% - 2rem);
+    white-space: normal;
+    text-align: center;
+  }
 }
 
 html.articton-light .articton-content-card,
@@ -868,7 +1990,7 @@ html.articton-light .articton-auth-card::before {
   position: absolute;
   inset: 0 0 auto;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(0, 125, 101, 0.32), transparent);
+  background: linear-gradient(90deg, transparent, rgba(53, 64, 142, 0.32), transparent);
   pointer-events: none;
 }
 

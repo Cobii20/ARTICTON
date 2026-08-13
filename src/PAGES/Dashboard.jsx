@@ -134,6 +134,7 @@ export default function Dashboard({
   const [isSupportOpen, setIsSupportOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isProfileEditOpen, setIsProfileEditOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
 
   const [settings, setSettings] = useState(getUserSettings);
@@ -166,6 +167,11 @@ export default function Dashboard({
       ...prev,
       [key]: value,
     }));
+  };
+
+  const openSection = (nextSection) => {
+    setSection(nextSection);
+    setIsSidebarOpen(false);
   };
 
   useEffect(() => {
@@ -874,7 +880,7 @@ const assemblyPracticalUnlocked =
       : section;
 
   return (
-    <div className="min-h-screen w-full overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased">
+    <div className="articton-app-shell articton-dashboard-page min-h-screen w-full overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased">
       <style>{`
         .scrollArea {
           scrollbar-width: none;
@@ -885,21 +891,46 @@ const assemblyPracticalUnlocked =
         }
       `}</style>
 
-      <div className="relative h-screen w-full overflow-hidden">
+      <div className="articton-dashboard-viewport relative h-screen w-full overflow-hidden">
         <DashboardBackground />
 
         <div className="relative h-full w-full overflow-hidden p-0 md:p-3">
-          <div className="relative h-full w-full overflow-hidden border border-[#1a2438] bg-[linear-gradient(135deg,#0a0e17,#0d1220,#101a2d)] shadow-[0_70px_180px_rgba(0,0,0,0.70)] md:rounded-[30px]">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(0,255,180,0.08),transparent_35%)]" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_88%_20%,rgba(0,255,180,0.05),transparent_30%)]" />
-            <div className="absolute inset-0 bg-[linear-gradient(rgba(0,255,180,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,180,0.025)_1px,transparent_1px)] bg-[size:54px_54px] opacity-60" />
-            <div className="absolute inset-0 bg-black/10 ring-1 ring-white/5" />
+          <div className="articton-dashboard-frame relative h-full w-full overflow-hidden border border-[#1a2438] bg-[linear-gradient(135deg,#0a0e17,#0d1220,#101a2d)] shadow-[0_70px_180px_rgba(0,0,0,0.70)] md:rounded-[30px]">
+            <div className="articton-dashboard-frame-glow articton-dashboard-frame-glow--gold absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(255,212,28,0.08),transparent_35%)]" />
+            <div className="articton-dashboard-frame-glow articton-dashboard-frame-glow--blue absolute inset-0 bg-[radial-gradient(circle_at_88%_20%,rgba(53,64,142,0.12),transparent_30%)]" />
+            <div className="articton-dashboard-frame-grid absolute inset-0 bg-[linear-gradient(rgba(255,212,28,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(255,212,28,0.025)_1px,transparent_1px)] bg-[size:54px_54px] opacity-60" />
+            <div className="articton-dashboard-frame-scan articton-dashboard-frame-scan--gold pointer-events-none absolute left-[17%] top-0 h-full w-[2px] bg-[linear-gradient(180deg,transparent,#FFD41C,transparent)] opacity-30" />
+            <div className="articton-dashboard-frame-scan articton-dashboard-frame-scan--blue pointer-events-none absolute right-[22%] top-0 h-full w-[2px] bg-[linear-gradient(180deg,transparent,#35408E,transparent)] opacity-30" />
+            <div className="articton-dashboard-frame-vignette absolute inset-0 bg-black/10 ring-1 ring-white/5" />
 
-            <div className="relative grid h-full grid-cols-1 overflow-hidden lg:grid-cols-[290px_1fr] xl:grid-cols-[310px_1fr]">
-              <aside className="h-full overflow-hidden border-r border-[#1a2438] bg-[#0b1220]/86 backdrop-blur-xl">
-                <div className="flex h-full flex-col overflow-hidden p-6">
+            <div
+              className={[
+                "articton-sidebar-backdrop fixed inset-0 z-[70] bg-black/45 backdrop-blur-sm transition lg:hidden",
+                isSidebarOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0",
+              ].join(" ")}
+              onClick={() => setIsSidebarOpen(false)}
+            />
+
+            {/* small-screen close button is inside the sidebar (shown only when sidebar is open) */}
+
+            <div className="articton-dashboard-layout relative grid h-full grid-cols-1 overflow-hidden lg:grid-cols-[290px_1fr] xl:grid-cols-[310px_1fr]">
+              <aside
+                className={[
+                  "articton-dashboard-sidebar h-full min-h-0 lg:sticky lg:top-3 overflow-auto border-r border-[#1a2438] bg-[#0b1220]/86 backdrop-blur-xl",
+                  isSidebarOpen ? "is-open" : "",
+                ].join(" ")}
+              >
+                <div className="relative flex h-full flex-col min-h-0 overflow-auto p-6">
+                  <button
+                    type="button"
+                    aria-label="Close menu"
+                    onClick={() => setIsSidebarOpen(false)}
+                    className={`${isSidebarOpen ? 'inline-flex' : 'hidden'} lg:hidden absolute right-3 top-3 z-[110] h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-[#FFD41C] text-[#0a0e17] hover:bg-[#e6bd00] focus:outline-none`}
+                  >
+                    <span className="text-lg font-bold">✕</span>
+                  </button>
                   <div className="mb-8 flex items-center gap-3 px-2">
-                    <button onClick={() => setSection("Dashboard")} className="flex items-center gap-3">
+                    <button onClick={() => openSection("Dashboard")} className="flex items-center gap-3">
                       <img
                         src="/PNG/Articton.png"
                         alt="Articton Logo"
@@ -908,7 +939,7 @@ const assemblyPracticalUnlocked =
 
                       <div>
                         <div className="text-lg font-bold tracking-wide text-white">Articton</div>
-                        <div className="text-[11px] uppercase tracking-[0.24em] text-[#00ffb4]">
+                        <div className="text-[11px] uppercase tracking-[0.24em] text-[#FFD41C]">
                           Control Panel
                         </div>
                       </div>
@@ -916,20 +947,20 @@ const assemblyPracticalUnlocked =
                   </div>
 
                   <div className="space-y-2">
-                    <SideItem label="Dashboard" active={sectionLabel} onClick={() => setSection("Dashboard")} icon="home" />
-                    <SideItem label="3D Modules" active={sectionLabel} onClick={() => setSection("Modules")} icon="modules" />
-                    <SideItem label="Practice Tests" active={sectionLabel} onClick={() => setSection("Practice Tests")} icon="tests" />
-                    <SideItem label="Achievements" active={sectionLabel} onClick={() => setSection("Achievements")} icon="trophy" />
-                    <SideItem label="Profile" active={sectionLabel} onClick={() => setSection("Profile")} icon="profile" />
+                    <SideItem label="Dashboard" active={sectionLabel} onClick={() => openSection("Dashboard")} icon="home" />
+                    <SideItem label="3D Modules" active={sectionLabel} onClick={() => openSection("Modules")} icon="modules" />
+                    <SideItem label="Practice Tests" active={sectionLabel} onClick={() => openSection("Practice Tests")} icon="tests" />
+                    <SideItem label="Achievements" active={sectionLabel} onClick={() => openSection("Achievements")} icon="trophy" />
+                    <SideItem label="Profile" active={sectionLabel} onClick={() => openSection("Profile")} icon="profile" />
                   </div>
 
                   <div className="mt-6 rounded-[24px] border border-[#1a2438] bg-[#0d1220] p-4 shadow-[0_20px_50px_rgba(0,0,0,0.28)]">
-                    <div className="text-[11px] uppercase tracking-[0.25em] text-[#00ffb4]">Current focus</div>
+                    <div className="text-[11px] uppercase tracking-[0.25em] text-[#FFD41C]">Current focus</div>
                     <div className="mt-3 text-sm font-semibold text-white">{stats.nextUp?.title || "No module yet"}</div>
                     <div className="mt-1 text-xs text-[#7a8ba8]">{stats.nextUp?.subtitle || "Choose a module to begin learning."}</div>
 
                     <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/8">
-                      <div className="h-full rounded-full bg-[#00ffb4]" style={{ width: `${stats.nextUp?.progress || 0}%` }} />
+                      <div className="h-full rounded-full bg-[#FFD41C]" style={{ width: `${stats.nextUp?.progress || 0}%` }} />
                     </div>
 
                     <div className="mt-2 text-[11px] text-[#7a8ba8]">{stats.nextUp?.progress || 0}% complete</div>
@@ -947,12 +978,12 @@ const assemblyPracticalUnlocked =
               <main className="h-full overflow-hidden">
                 <div
                   className={[
-                    "grid h-full gap-4 overflow-hidden p-6 lg:p-8",
+                    "articton-dashboard-content grid h-full gap-4 overflow-hidden p-6 lg:p-8",
                     isFullPracticalSection ? "grid-rows-[1fr]" : "grid-rows-[auto_1fr]",
                   ].join(" ")}
                 >
                   {isFullPracticalSection ? null : (
-                    <HeaderBar section={section} sectionLabel={sectionLabel} user={user} onSettings={() => setIsSettingsOpen(true)} onLogout={onLogout} />
+                    <HeaderBar section={section} sectionLabel={sectionLabel} user={user} onMenu={() => setIsSidebarOpen(true)} onSettings={() => setIsSettingsOpen(true)} onLogout={onLogout} />
                   )}
 
                   <div
@@ -1095,22 +1126,37 @@ function PageMotion({ keyName, reduce, children, className = "" }) {
 function DashboardBackground() {
   return (
     <>
-      <div className="pointer-events-none absolute -left-44 -top-44 h-[720px] w-[720px] rounded-full bg-[#00ffb4]/10 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-56 -right-52 h-[820px] w-[820px] rounded-full bg-[#00ffb4]/6 blur-3xl" />
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#0a0e17] via-[#0a0e17] to-[#0d1220]" />
-      <div className="pointer-events-none absolute left-[14%] top-[8%] h-[58%] w-[2px] animate-pulse bg-[linear-gradient(180deg,transparent,#00ffb4,transparent)] opacity-30" />
-      <div className="pointer-events-none absolute right-[20%] top-[6%] h-[62%] w-[2px] animate-pulse bg-[linear-gradient(180deg,transparent,#00b4ff,transparent)] opacity-20" />
+      <div className="articton-dashboard-glow articton-dashboard-glow--gold pointer-events-none absolute -left-44 -top-44 h-[720px] w-[720px] rounded-full bg-[#FFD41C]/10 blur-3xl" />
+      <div className="articton-dashboard-glow articton-dashboard-glow--blue pointer-events-none absolute -bottom-56 -right-52 h-[820px] w-[820px] rounded-full bg-[#35408E]/16 blur-3xl" />
+      <div className="articton-dashboard-base pointer-events-none absolute inset-0 bg-gradient-to-b from-[#0a0e17] via-[#0a0e17] to-[#0d1220]" />
+      <div className="articton-dashboard-grid pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,212,28,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,212,28,0.035)_1px,transparent_1px)] bg-[size:58px_58px]" />
+      <div className="articton-dashboard-scan articton-dashboard-scan--gold pointer-events-none absolute left-[14%] top-[8%] h-[58%] w-[2px] animate-pulse bg-[linear-gradient(180deg,transparent,#FFD41C,transparent)] opacity-35" />
+      <div className="articton-dashboard-scan articton-dashboard-scan--blue pointer-events-none absolute right-[20%] top-[6%] h-[62%] w-[2px] animate-pulse bg-[linear-gradient(180deg,transparent,#35408E,transparent)] opacity-35" />
     </>
   );
 }
 
-function HeaderBar({ section, sectionLabel, user, onSettings, onLogout }) {
+function HeaderBar({ section, sectionLabel, user, onMenu, onSettings, onLogout }) {
   return (
     <div className="flex items-start justify-between gap-6">
-      <div>
-        <div className="inline-flex items-center gap-2 rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/6 px-4 py-1.5">
-          <span className="h-2 w-2 rounded-full bg-[#00ffb4]" />
-          <span className="text-[11px] font-medium uppercase tracking-[0.25em] text-[#00ffb4]">
+      <div className="flex min-w-0 items-start gap-4">
+        <button
+          type="button"
+          onClick={onMenu}
+          aria-label="Open dashboard menu"
+          className="articton-sidebar-menu-button mt-1 hidden h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[#FFD41C]/30 bg-[#FFD41C]/10 text-[#FFD41C] shadow-[0_16px_44px_rgba(255,212,28,0.14)] transition hover:-translate-y-0.5 hover:bg-[#FFD41C]/16 focus:outline-none focus:ring-2 focus:ring-[#FFD41C]/25"
+        >
+          <span className="relative block h-4 w-5">
+            <span className="absolute left-0 top-0 h-0.5 w-5 rounded-full bg-current transition" />
+            <span className="absolute left-0 top-[7px] h-0.5 w-4 rounded-full bg-current transition" />
+            <span className="absolute left-0 bottom-0 h-0.5 w-5 rounded-full bg-current transition" />
+          </span>
+        </button>
+
+      <div className="min-w-0">
+        <div className="inline-flex items-center gap-2 rounded-full border border-[#FFD41C]/25 bg-[#FFD41C]/6 px-4 py-1.5">
+          <span className="h-2 w-2 rounded-full bg-[#FFD41C]" />
+          <span className="text-[11px] font-medium uppercase tracking-[0.25em] text-[#FFD41C]">
             {section === "Dashboard" ? "Learning Dashboard" : sectionLabel}
           </span>
         </div>
@@ -1125,12 +1171,13 @@ function HeaderBar({ section, sectionLabel, user, onSettings, onLogout }) {
             : "Track progress, launch modules, and stay in control."}
         </div>
       </div>
+      </div>
 
       <div className="relative z-50">
         <details className="group">
           <summary className="list-none cursor-pointer rounded-2xl border border-[#1a2438] bg-[#0d1220]/95 px-4 py-3 transition hover:bg-[#111b2f]">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/10 text-sm font-bold text-[#00ffb4]">
+              <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-[#FFD41C]/25 bg-[#FFD41C]/10 text-sm font-bold text-[#FFD41C]">
                 {user.avatarUrl ? (
                   <img src={user.avatarUrl} alt="Profile" className="h-full w-full object-cover" />
                 ) : (
@@ -1191,7 +1238,7 @@ function ErrorState({ error, onRetry, onSupport }) {
           <button
             type="button"
             onClick={onRetry}
-            className="rounded-xl border border-[#00ffb4]/30 bg-[#00ffb4]/12 px-5 py-2.5 text-sm font-semibold text-[#00ffb4] transition hover:bg-[#00ffb4]/18 focus:outline-none focus:ring-2 focus:ring-[#00ffb4]/25"
+            className="rounded-xl border border-[#FFD41C]/30 bg-[#FFD41C]/12 px-5 py-2.5 text-sm font-semibold text-[#FFD41C] transition hover:bg-[#FFD41C]/18 focus:outline-none focus:ring-2 focus:ring-[#FFD41C]/25"
           >
             Retry
           </button>
@@ -1199,7 +1246,7 @@ function ErrorState({ error, onRetry, onSupport }) {
           <button
             type="button"
             onClick={onSupport}
-            className="rounded-xl border border-[#1a2438] bg-white/[0.03] px-5 py-2.5 text-sm font-semibold text-[#dbe6f5] transition hover:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-[#00ffb4]/25"
+            className="rounded-xl border border-[#1a2438] bg-white/[0.03] px-5 py-2.5 text-sm font-semibold text-[#dbe6f5] transition hover:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-[#FFD41C]/25"
           >
             Contact support
           </button>
@@ -1376,20 +1423,20 @@ function CustomerServiceModal({ isOpen, onClose, user }) {
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   placeholder="Describe your issue or concern..."
-                  className="mt-2 w-full resize-none rounded-2xl border border-[#1a2438] bg-white/[0.03] px-4 py-3 text-sm text-white outline-none focus:border-[#00ffb4]/40 focus:ring-2 focus:ring-[#00ffb4]/15"
+                  className="mt-2 w-full resize-none rounded-2xl border border-[#1a2438] bg-white/[0.03] px-4 py-3 text-sm text-white outline-none focus:border-[#FFD41C]/40 focus:ring-2 focus:ring-[#FFD41C]/15"
                 />
               </div>
 
               <div>
                 <label className="text-xs font-semibold uppercase tracking-[0.2em] text-[#7a8ba8]">Screenshot / Snippet</label>
-                <label className="mt-2 flex cursor-pointer items-center justify-center rounded-2xl border border-dashed border-[#1a2438] bg-white/[0.03] px-4 py-6 text-sm text-[#9fb0c9] transition hover:border-[#00ffb4]/40 hover:bg-white/[0.05]">
+                <label className="mt-2 flex cursor-pointer items-center justify-center rounded-2xl border border-dashed border-[#1a2438] bg-white/[0.03] px-4 py-6 text-sm text-[#9fb0c9] transition hover:border-[#FFD41C]/40 hover:bg-white/[0.05]">
                   <input type="file" accept="image/*" className="hidden" onChange={(e) => setScreenshot(e.target.files?.[0] || null)} />
                   {screenshot ? screenshot.name : "Upload screenshot"}
                 </label>
               </div>
 
               {submitted ? (
-                <div className="rounded-2xl border border-[#00ffb4]/25 bg-[#00ffb4]/10 px-4 py-3 text-sm font-semibold text-[#00ffb4]">
+                <div className="rounded-2xl border border-[#FFD41C]/25 bg-[#FFD41C]/10 px-4 py-3 text-sm font-semibold text-[#FFD41C]">
                   Support request submitted successfully ✓
                 </div>
               ) : null}
@@ -1399,7 +1446,7 @@ function CustomerServiceModal({ isOpen, onClose, user }) {
                   Cancel
                 </button>
 
-                <button type="button" onClick={handleSubmit} className="rounded-xl bg-[#00ffb4] px-5 py-2.5 text-sm font-bold text-[#0a0e17] transition hover:scale-[1.02]">
+                <button type="button" onClick={handleSubmit} className="rounded-xl bg-[#FFD41C] px-5 py-2.5 text-sm font-bold text-[#0a0e17] transition hover:scale-[1.02]">
                   {uploading ? "Submitting..." : "Submit Ticket"}
                 </button>
               </div>
@@ -1432,7 +1479,7 @@ function FormField({ label, value, onChange, placeholder }) {
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="mt-2 w-full rounded-2xl border border-[#1a2438] bg-white/[0.03] px-4 py-3 text-sm text-white outline-none focus:border-[#00ffb4]/40 focus:ring-2 focus:ring-[#00ffb4]/15"
+        className="mt-2 w-full rounded-2xl border border-[#1a2438] bg-white/[0.03] px-4 py-3 text-sm text-white outline-none focus:border-[#FFD41C]/40 focus:ring-2 focus:ring-[#FFD41C]/15"
       />
     </div>
   );
@@ -1490,7 +1537,7 @@ function PracticalScoresCard({ tests = [], onViewAll }) {
   const completedTests = tests.filter((test) => test.completed);
 
   return (
-    <div className="rounded-[28px] border border-[#1a2438] bg-[#0d1220] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.42)]">
+    <div className="articton-dashboard-card articton-dashboard-card--exams rounded-[28px] border border-[#1a2438] bg-[#0d1220] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.42)]">
       <div className="flex items-center justify-between gap-4">
         <div>
           <div className="text-lg font-bold tracking-tight text-white">
@@ -1506,7 +1553,7 @@ function PracticalScoresCard({ tests = [], onViewAll }) {
         <button
           type="button"
           onClick={onViewAll}
-          className="rounded-xl border border-[#00ffb4]/30 bg-[#00ffb4]/10 px-4 py-2 text-sm font-semibold text-[#00ffb4] transition hover:bg-[#00ffb4]/20"
+          className="rounded-xl border border-[#FFD41C]/30 bg-[#FFD41C]/10 px-4 py-2 text-sm font-semibold text-[#FFD41C] transition hover:bg-[#FFD41C]/20"
         >
           View Tests →
         </button>
@@ -1533,7 +1580,7 @@ function PracticalScoresCard({ tests = [], onViewAll }) {
                 </div>
 
                 <div className="mt-4 flex items-end gap-1">
-                  <span className="text-3xl font-black text-[#00ffb4]">
+                  <span className="text-3xl font-black text-[#FFD41C]">
                     {score}
                   </span>
 
@@ -1550,7 +1597,7 @@ function PracticalScoresCard({ tests = [], onViewAll }) {
                   <span
                     className={
                       passed
-                        ? "text-[#00ffb4]"
+                        ? "text-[#FFD41C]"
                         : "text-yellow-300"
                     }
                   >
@@ -1560,7 +1607,7 @@ function PracticalScoresCard({ tests = [], onViewAll }) {
 
                 <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
                   <div
-                    className="h-full rounded-full bg-[#00ffb4]"
+                    className="h-full rounded-full bg-[#FFD41C]"
                     style={{
                       width: `${Math.min(100, Math.max(0, score))}%`,
                     }}
@@ -1592,7 +1639,7 @@ function MobileLearningSummaryCard({ mobileLearning }) {
   const passedExams = exams.filter((exam) => exam.passed).length;
 
   return (
-    <div className="rounded-[28px] border border-[#1a2438] bg-[#0d1220] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.42)]">
+    <div className="articton-dashboard-card articton-dashboard-card--mobile rounded-[28px] border border-[#1a2438] bg-[#0d1220] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.42)]">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <div className="text-lg font-bold tracking-tight text-white">Mobile Learning Summary</div>
@@ -1620,12 +1667,12 @@ function SummaryPill({ label, status, passed }) {
       className={[
         "min-w-[92px] rounded-2xl border px-3 py-2 text-center",
         passed
-          ? "border-[#00ffb4]/25 bg-[#00ffb4]/10"
+          ? "border-[#FFD41C]/25 bg-[#FFD41C]/10"
           : "border-white/10 bg-white/[0.03]",
       ].join(" ")}
     >
       <div className="text-xs font-semibold text-white">{label}</div>
-      <div className={passed ? "mt-1 text-[11px] text-[#00ffb4]" : "mt-1 text-[11px] text-[#7a8ba8]"}>
+      <div className={passed ? "mt-1 text-[11px] text-[#FFD41C]" : "mt-1 text-[11px] text-[#7a8ba8]"}>
         {status}
       </div>
     </div>
@@ -1689,7 +1736,7 @@ function MobileStatusChip({ label, item, large = false }) {
         large ? "bg-white/[0.03]" : "bg-[#0b1220]",
         completed
           ? passed
-            ? "border-[#00ffb4]/25 text-[#b7fff0]"
+            ? "border-[#FFD41C]/25 text-[#b7fff0]"
             : "border-yellow-300/25 text-yellow-200"
           : "border-white/10 text-[#9fb0c9]",
       ].join(" ")}
@@ -1712,7 +1759,7 @@ function ModulesSelection({ modules, onBack, onOpenModule }) {
     <div className="w-full">
       <div className="mx-auto max-w-6xl">
         <div className="mb-5 flex items-center justify-between gap-4">
-          <button type="button" onClick={onBack} className="rounded-2xl border border-[#1a2438] bg-white/[0.03] px-4 py-2.5 text-sm text-[#dbe6f5] transition hover:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-[#00ffb4]/25">
+          <button type="button" onClick={onBack} className="rounded-2xl border border-[#1a2438] bg-white/[0.03] px-4 py-2.5 text-sm text-[#dbe6f5] transition hover:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-[#FFD41C]/25">
             Back to Dashboard
           </button>
 
@@ -1742,7 +1789,7 @@ function ModulesSelection({ modules, onBack, onOpenModule }) {
                  <button
                   type="button"
                   onClick={() => onOpenModule?.(m.id)}
-                  className="mt-4 inline-flex items-center gap-2 rounded-2xl border border-[#00ffb4]/30 bg-[#00ffb4]/12 px-7 py-2.5 text-sm font-semibold text-[#00ffb4]"
+                  className="mt-4 inline-flex items-center gap-2 rounded-2xl border border-[#FFD41C]/30 bg-[#FFD41C]/12 px-7 py-2.5 text-sm font-semibold text-[#FFD41C]"
                 >
                   {m.selectionCta}
                   <span className="text-[#b7fff0]">→</span>
@@ -1751,7 +1798,7 @@ function ModulesSelection({ modules, onBack, onOpenModule }) {
                 </div>
 
                 <div className="relative h-[150px] overflow-hidden rounded-2xl border border-[#1a2438] bg-[#0a0e17] shadow-[inset_0_0_38px_rgba(0,0,0,0.52)] sm:h-[170px] lg:h-[180px]">
-                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(0,255,180,0.12),transparent_60%)]" />
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(255,212,28,0.12),transparent_60%)]" />
                   <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent" />
 
                   {!broken[m.id] ? (
@@ -1829,7 +1876,7 @@ function AssessmentList({ title, subtitle, items, onOpen, openLabel, retakeLabel
                 locked
                   ? "border-[#1a2438] bg-[#0d1220]/70 opacity-80"
                   : completed
-                  ? "border-[#00ffb4]/22 bg-[#0d1220] shadow-[0_30px_90px_rgba(0,255,180,0.06)]"
+                  ? "border-[#FFD41C]/22 bg-[#0d1220] shadow-[0_30px_90px_rgba(255,212,28,0.06)]"
                   : "border-[#1a2438] bg-[#0d1220]",
               ].join(" ")}
             >
@@ -1839,11 +1886,11 @@ function AssessmentList({ title, subtitle, items, onOpen, openLabel, retakeLabel
                   <div className="mt-1 text-sm text-[#7a8ba8]">{item.desc}</div>
 
                   {completed ? (
-                    <div className="mt-4 inline-flex flex-wrap items-center gap-2 rounded-2xl border border-[#00ffb4]/25 bg-[#00ffb4]/10 px-4 py-2 text-[12px] font-semibold text-[#b7fff0]">
+                    <div className="mt-4 inline-flex flex-wrap items-center gap-2 rounded-2xl border border-[#FFD41C]/25 bg-[#FFD41C]/10 px-4 py-2 text-[12px] font-semibold text-[#b7fff0]">
                       <span>Previous Score: {scoreText}</span>
-                      <span className="text-[#00ffb4]/65">•</span>
+                      <span className="text-[#FFD41C]/65">•</span>
                       <span>{completionText}</span>
-                      <span className="text-[#00ffb4]/65">•</span>
+                      <span className="text-[#FFD41C]/65">•</span>
                       <span>{scorePercentText}</span>
                       <span className={item.progress?.passed ? "text-[#b7fff0]" : "text-yellow-100"}>
                         {item.progress?.passed ? "Passed" : "Completed"}
@@ -1858,7 +1905,7 @@ function AssessmentList({ title, subtitle, items, onOpen, openLabel, retakeLabel
                       {item.staticReason || "This assessment is static for now."}
                     </div>
                   ) : item.unlockHint ? (
-                    <div className="mt-3 rounded-2xl border border-[#00ffb4]/20 bg-[#00ffb4]/8 px-4 py-2 text-[12px] text-[#b7fff0]">
+                    <div className="mt-3 rounded-2xl border border-[#FFD41C]/20 bg-[#FFD41C]/8 px-4 py-2 text-[12px] text-[#b7fff0]">
                       {item.unlockHint}
                     </div>
                   ) : null}
@@ -1876,7 +1923,7 @@ function AssessmentList({ title, subtitle, items, onOpen, openLabel, retakeLabel
                   locked
                     ? "cursor-not-allowed border-[#1a2438] bg-white/[0.02] text-[#7a8ba8]"
                     : completed
-                    ? "border-[#00ffb4]/30 bg-[#00ffb4]/12 text-[#00ffb4] hover:bg-[#00ffb4]/18"
+                    ? "border-[#FFD41C]/30 bg-[#FFD41C]/12 text-[#FFD41C] hover:bg-[#FFD41C]/18"
                     : "border-[#1a2438] bg-white/[0.03] text-[#dbe6f5] hover:bg-white/[0.06]",
                 ].join(" ")}
               >
@@ -1896,9 +1943,9 @@ function StatusBadge({ status, locked, completed }) {
       className={[
         "shrink-0 rounded-full border px-3 py-1.5 text-[11px]",
         completed
-          ? "border-[#00ffb4]/30 bg-[#00ffb4]/12 text-[#00ffb4]"
+          ? "border-[#FFD41C]/30 bg-[#FFD41C]/12 text-[#FFD41C]"
           : !locked
-          ? "border-[#00ffb4]/30 bg-[#00ffb4]/12 text-[#00ffb4]"
+          ? "border-[#FFD41C]/30 bg-[#FFD41C]/12 text-[#FFD41C]"
           : "border-[#1a2438] bg-white/[0.03] text-[#7a8ba8]",
       ].join(" ")}
     >
@@ -1911,7 +1958,7 @@ function ComingSoonAssessment({ title, onBack }) {
   return (
     <div className="flex min-h-[520px] items-center justify-center">
       <div className="w-full max-w-xl rounded-[30px] border border-[#1a2438] bg-[#0d1220] p-8 text-center shadow-[0_30px_90px_rgba(0,0,0,0.42)]">
-        <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/10 text-2xl text-[#00ffb4]">✓</div>
+        <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full border border-[#FFD41C]/25 bg-[#FFD41C]/10 text-2xl text-[#FFD41C]">✓</div>
         <div className="text-2xl font-black text-white">{title}</div>
         <div className="mt-3 text-sm leading-7 text-[#7a8ba8]">This assessment file will be connected once it is created.</div>
         <button type="button" onClick={onBack} className="mt-7 rounded-2xl border border-[#1a2438] bg-white/[0.03] px-6 py-3 text-sm font-semibold text-[#dbe6f5] transition hover:bg-white/[0.06]">
@@ -2047,7 +2094,7 @@ function ProfilePage({
     <>
       <div className="w-full">
         <div className="relative min-h-[280px] w-full overflow-hidden rounded-[28px] border border-[#1a2438] bg-[#0d1220] shadow-[0_26px_80px_rgba(0,0,0,0.38)]">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_8%_0%,rgba(0,255,180,0.09),transparent_34%)]" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_8%_0%,rgba(255,212,28,0.09),transparent_34%)]" />
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_92%_15%,rgba(0,180,255,0.04),transparent_30%)]" />
 
           <div className="relative grid min-h-[280px] grid-cols-1 xl:grid-cols-[380px_minmax(0,1fr)]">
@@ -2065,7 +2112,7 @@ function ProfilePage({
                 <button
                   type="button"
                   onClick={() => setIsEditOpen(true)}
-                  className="rounded-xl border border-[#00ffb4]/25 bg-[#00ffb4]/10 px-3.5 py-2 text-xs font-semibold text-[#00ffb4] transition hover:bg-[#00ffb4]/16 focus:outline-none focus:ring-2 focus:ring-[#00ffb4]/25"
+                  className="rounded-xl border border-[#FFD41C]/25 bg-[#FFD41C]/10 px-3.5 py-2 text-xs font-semibold text-[#FFD41C] transition hover:bg-[#FFD41C]/16 focus:outline-none focus:ring-2 focus:ring-[#FFD41C]/25"
                 >
                   Edit Profile
                 </button>
@@ -2112,7 +2159,7 @@ function ProfilePage({
                   </div>
                 </div>
 
-                <span className="rounded-full border border-[#00ffb4]/20 bg-[#00ffb4]/10 px-3 py-1.5 text-xs font-semibold text-[#00ffb4]">
+                <span className="rounded-full border border-[#FFD41C]/20 bg-[#FFD41C]/10 px-3 py-1.5 text-xs font-semibold text-[#FFD41C]">
                   {achievements.length} unlocked
                 </span>
               </div>
@@ -2170,7 +2217,7 @@ function ProfilePage({
                   <ProfileAvatar image={previewImage} fallback={(firstName || "U").charAt(0).toUpperCase()} large />
 
                   <div>
-                    <label className="inline-flex cursor-pointer rounded-xl border border-[#00ffb4]/30 bg-[#00ffb4]/12 px-4 py-2.5 text-sm font-semibold text-[#00ffb4] transition hover:bg-[#00ffb4]/18">
+                    <label className="inline-flex cursor-pointer rounded-xl border border-[#FFD41C]/30 bg-[#FFD41C]/12 px-4 py-2.5 text-sm font-semibold text-[#FFD41C] transition hover:bg-[#FFD41C]/18">
                       Upload picture
                       <input type="file" accept="image/*" onChange={handleImageChange} disabled={isSavingProfile} className="hidden" />
                     </label>
@@ -2189,7 +2236,7 @@ function ProfilePage({
                   <FormField label="Last Name" value={lastName} onChange={setLastName} placeholder="Last name" />
                   <div>
                     <label className="text-xs font-semibold uppercase tracking-[0.2em] text-[#7a8ba8]">MI</label>
-                    <input value={mi} maxLength={1} onChange={(e) => setMi(e.target.value.toUpperCase())} className="mt-2 w-full rounded-2xl border border-[#1a2438] bg-white/[0.03] px-4 py-3 text-center text-sm text-white outline-none focus:border-[#00ffb4]/40 focus:ring-2 focus:ring-[#00ffb4]/15" placeholder="M" />
+                    <input value={mi} maxLength={1} onChange={(e) => setMi(e.target.value.toUpperCase())} className="mt-2 w-full rounded-2xl border border-[#1a2438] bg-white/[0.03] px-4 py-3 text-center text-sm text-white outline-none focus:border-[#FFD41C]/40 focus:ring-2 focus:ring-[#FFD41C]/15" placeholder="M" />
                   </div>
                 </div>
 
@@ -2202,7 +2249,7 @@ function ProfilePage({
                     Cancel
                   </button>
 
-                  <button type="button" onClick={handleSave} disabled={isSavingProfile} className="rounded-xl bg-[#00ffb4] px-5 py-2.5 text-sm font-bold text-[#0a0e17] transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:scale-100">
+                  <button type="button" onClick={handleSave} disabled={isSavingProfile} className="rounded-xl bg-[#FFD41C] px-5 py-2.5 text-sm font-bold text-[#0a0e17] transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:scale-100">
                     {isSavingProfile ? "Saving..." : "Save changes"}
                   </button>
                 </div>
@@ -2217,7 +2264,7 @@ function ProfilePage({
 
 function ProfileAvatar({ image, fallback, large = false }) {
   return (
-    <div className={`${large ? "h-20 w-20 text-2xl" : "h-12 w-12 text-base"} flex items-center justify-center overflow-hidden rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/10 font-bold text-[#00ffb4]`}>
+    <div className={`${large ? "h-20 w-20 text-2xl" : "h-12 w-12 text-base"} flex items-center justify-center overflow-hidden rounded-full border border-[#FFD41C]/25 bg-[#FFD41C]/10 font-bold text-[#FFD41C]`}>
       {image ? <img src={image} alt="Profile" className="h-full w-full object-cover" /> : fallback}
     </div>
   );
@@ -2239,18 +2286,18 @@ function SideItem({ label, active, onClick, icon }) {
     <button
       onClick={onClick}
       className={[
-        "w-full rounded-2xl border px-4 py-3 text-left transition focus:outline-none focus:ring-2 focus:ring-[#00ffb4]/25",
+        "articton-side-item w-full rounded-2xl border px-4 py-3 text-left transition focus:outline-none focus:ring-2 focus:ring-[#FFD41C]/25",
         isActive
-          ? "border-[#00ffb4]/25 bg-[#00ffb4]/10 shadow-[0_18px_50px_rgba(0,255,180,0.08)]"
+          ? "border-[#FFD41C]/25 bg-[#FFD41C]/10 shadow-[0_18px_50px_rgba(255,212,28,0.08)]"
           : "border-transparent bg-transparent hover:border-[#1a2438] hover:bg-white/[0.03]",
       ].join(" ")}
       aria-current={isActive ? "page" : undefined}
     >
       <div className="flex items-center gap-3">
-        <span className={["flex h-10 w-10 items-center justify-center rounded-2xl border", isActive ? "border-[#00ffb4]/25 bg-[#00ffb4]/10" : "border-[#1a2438] bg-[#0d1220]"].join(" ")}>
+        <span className={["articton-side-icon flex h-10 w-10 items-center justify-center rounded-2xl border", isActive ? "is-active border-[#FFD41C]/25 bg-[#FFD41C]/10" : "border-[#1a2438] bg-[#0d1220]"].join(" ")}>
           <Icon kind={icon} active={isActive} />
         </span>
-        <span className={isActive ? "text-sm font-semibold text-white" : "text-sm font-semibold text-[#c8d4e6]"}>{label}</span>
+        <span className={isActive ? "articton-side-label text-sm font-semibold text-white" : "articton-side-label text-sm font-semibold text-[#c8d4e6]"}>{label}</span>
       </div>
     </button>
   );
@@ -2260,11 +2307,11 @@ function SidebarUtilityButton({ icon, label, onClick }) {
   return (
     <button
       type="button"
-      className="w-full rounded-2xl border border-[#1a2438] bg-white/[0.03] px-4 py-3 text-left text-sm font-semibold text-[#c8d4e6] transition hover:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-[#00ffb4]/25"
+      className="w-full rounded-2xl border border-[#1a2438] bg-white/[0.03] px-4 py-3 text-left text-sm font-semibold text-[#c8d4e6] transition hover:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-[#FFD41C]/25"
       onClick={onClick}
     >
       <div className="flex items-center gap-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-2xl border border-[#1a2438] bg-[#0d1220]">
+        <span className="articton-side-icon flex h-10 w-10 items-center justify-center rounded-2xl border border-[#1a2438] bg-[#0d1220]">
           <Icon kind={icon} />
         </span>
         <span>{label}</span>
@@ -2295,10 +2342,10 @@ function TopCardHero({ title, headline, sub, meta, button, imageSrc, onClick }) 
       type="button"
       onClick={onClick}
       {...motionPreset}
-      className="relative w-full overflow-hidden rounded-[30px] border border-[#1a2438] bg-[linear-gradient(135deg,#0d1220,#111d33)] text-left shadow-[0_34px_110px_rgba(0,0,0,0.46)] focus:outline-none focus:ring-2 focus:ring-[#00ffb4]/25"
+      className="articton-top-card-hero relative w-full overflow-hidden rounded-[30px] border border-[#1a2438] bg-[linear-gradient(135deg,#0d1220,#111d33)] text-left shadow-[0_34px_110px_rgba(0,0,0,0.46)] focus:outline-none focus:ring-2 focus:ring-[#FFD41C]/25"
       aria-label={`${title}: ${headline}`}
     >
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_0%,rgba(0,255,180,0.08),transparent_35%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_0%,rgba(255,212,28,0.08),transparent_35%)]" />
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.04),transparent)]" />
 
       <div className="flex min-h-[250px] items-center gap-8 p-9 lg:min-h-[285px] lg:p-10">
@@ -2308,7 +2355,7 @@ function TopCardHero({ title, headline, sub, meta, button, imageSrc, onClick }) 
           <div className="mt-1 text-[14px] text-[#9fb0c9] lg:text-[15px]">{sub}</div>
           <div className="mt-5 text-[12.5px] text-[#7a8ba8]">{meta}</div>
 
-          <div className="mt-6 inline-flex items-center gap-2 rounded-2xl border border-[#00ffb4]/30 bg-[#00ffb4]/12 px-12 py-4 text-[14px] font-semibold text-[#00ffb4] transition hover:bg-[#00ffb4]/18 lg:text-[15px]">
+          <div className="mt-6 inline-flex items-center gap-2 rounded-2xl border border-[#FFD41C]/30 bg-[#FFD41C]/12 px-12 py-4 text-[14px] font-semibold text-[#FFD41C] transition hover:bg-[#FFD41C]/18 lg:text-[15px]">
             {button}
             <span className="text-[#b7fff0]">→</span>
           </div>
@@ -2317,7 +2364,7 @@ function TopCardHero({ title, headline, sub, meta, button, imageSrc, onClick }) 
         <div className="relative h-[200px] w-[320px] flex-shrink-0 overflow-hidden rounded-2xl border border-[#1a2438] bg-[#0a0e17] shadow-[inset_0_0_46px_rgba(0,0,0,0.50)] sm:h-[220px] sm:w-[360px] lg:h-[240px] lg:w-[420px]">
           <img src={imageSrc} alt="" className="absolute inset-0 h-full w-full object-contain p-6 lg:p-7" />
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 to-transparent" />
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_45%_35%,rgba(0,255,180,0.20),transparent_62%)]" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_45%_35%,rgba(255,212,28,0.20),transparent_62%)]" />
         </div>
       </div>
     </motion.button>
@@ -2326,7 +2373,7 @@ function TopCardHero({ title, headline, sub, meta, button, imageSrc, onClick }) 
 
 function ProgressCardFillHeight({ overall, modules, onModuleClick }) {
   return (
-    <div className="scrollArea h-full min-h-0 overflow-hidden rounded-[28px] border border-[#1a2438] bg-[#0d1220] shadow-[0_30px_90px_rgba(0,0,0,0.42)]">
+    <div className="articton-dashboard-card articton-progress-card scrollArea h-full min-h-0 overflow-hidden rounded-[28px] border border-[#1a2438] bg-[#0d1220] shadow-[0_30px_90px_rgba(0,0,0,0.42)]">
       <div className="flex h-full min-h-0 flex-col p-8">
         <div className="text-lg font-bold tracking-tight text-[#e8ecf4]">My Progress</div>
 
@@ -2334,10 +2381,10 @@ function ProgressCardFillHeight({ overall, modules, onModuleClick }) {
           <DonutAnimated value={overall} />
 
           <div className="relative overflow-hidden rounded-2xl border border-[#1a2438] bg-white/[0.03] p-6">
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_80%_40%,rgba(0,255,180,0.10),transparent_55%)]" />
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_80%_40%,rgba(255,212,28,0.10),transparent_55%)]" />
             <div className="relative">
               <div className="mt-2 flex items-center gap-2 text-sm text-[#9fb0c9]">
-                <span className="h-2 w-2 rounded-full bg-[#00ffb4]" />
+                <span className="h-2 w-2 rounded-full bg-[#FFD41C]" />
                 Overall Progress
               </div>
               <div className="mt-4">
@@ -2382,8 +2429,8 @@ function ModuleProgressRow({ title, subtitle, progress, lessonsCompleted, lesson
       onClick={onClick}
       {...motionPreset}
       className={[
-        "relative w-full overflow-hidden rounded-2xl border p-5 text-left transition focus:outline-none focus:ring-2 focus:ring-[#00ffb4]/25",
-        completedStyle ? "border-[#00ffb4]/25 bg-[#00ffb4]/8" : "border-[#1a2438] bg-white/[0.03]",
+        "relative w-full overflow-hidden rounded-2xl border p-5 text-left transition focus:outline-none focus:ring-2 focus:ring-[#FFD41C]/25",
+        completedStyle ? "border-[#FFD41C]/25 bg-[#FFD41C]/8" : "border-[#1a2438] bg-white/[0.03]",
       ].join(" ")}
       aria-label={`${title} — ${cta}`}
     >
@@ -2394,7 +2441,7 @@ function ModuleProgressRow({ title, subtitle, progress, lessonsCompleted, lesson
           <div>
             <div className="flex items-center gap-2 text-sm font-semibold text-white">
               {title}
-              {completedStyle ? <span className="rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/10 px-2 py-0.5 text-[11px] text-[#00ffb4]">✓ Done</span> : null}
+              {completedStyle ? <span className="rounded-full border border-[#FFD41C]/25 bg-[#FFD41C]/10 px-2 py-0.5 text-[11px] text-[#FFD41C]">✓ Done</span> : null}
             </div>
             <div className="mt-1 text-[12px] text-[#7a8ba8]">{subtitle}</div>
           </div>
@@ -2420,14 +2467,14 @@ function AnimatedBar({ percent = 0 }) {
 
   return (
     <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10" aria-label={`Progress bar ${percent}%`}>
-      <div className="h-full bg-[#00ffb4] transition-[width] duration-[900ms] ease-out" style={{ width: ready ? `${percent}%` : "0%" }} />
+      <div className="h-full bg-[#FFD41C] transition-[width] duration-[900ms] ease-out" style={{ width: ready ? `${percent}%` : "0%" }} />
     </div>
   );
 }
 
 function AchievementsCardCompact({ achievements, onClick }) {
   return (
-    <div className="overflow-hidden rounded-[28px] border border-[#1a2438] bg-[#0d1220] shadow-[0_30px_90px_rgba(0,0,0,0.42)]">
+    <div className="articton-dashboard-card articton-achievements-card overflow-hidden rounded-[28px] border border-[#1a2438] bg-[#0d1220] shadow-[0_30px_90px_rgba(0,0,0,0.42)]">
       <div className="p-7">
         <div className="flex items-center justify-between gap-3">
           <div className="text-lg font-bold tracking-tight text-[#e8ecf4]">Achievements</div>
@@ -2505,21 +2552,21 @@ function AchievementRow({
   const interactive = typeof onClick === "function";
 
   return (
-    <motion.button type="button" onClick={onClick} {...motionPreset} className="flex h-full w-full items-start gap-4 rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4 text-left focus:outline-none focus:ring-2 focus:ring-[#00ffb4]/25 disabled:cursor-default" aria-label={`Open achievement ${title}`} disabled={!interactive}>
-      <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[#00ffb4]/18 bg-[#00ffb4]/10">
+    <motion.button type="button" onClick={onClick} {...motionPreset} className="flex h-full w-full items-start gap-4 rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4 text-left focus:outline-none focus:ring-2 focus:ring-[#FFD41C]/25 disabled:cursor-default" aria-label={`Open achievement ${title}`} disabled={!interactive}>
+      <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[#FFD41C]/18 bg-[#FFD41C]/10">
         <Icon kind={icon} active />
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <div className="min-w-0 text-sm font-semibold text-white">{title}</div>
-          <span className="rounded-full border border-[#00ffb4]/20 bg-[#00ffb4]/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-[#00ffb4]">
+          <span className="rounded-full border border-[#FFD41C]/20 bg-[#FFD41C]/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-[#FFD41C]">
             {category}
           </span>
         </div>
         <div className="mt-1 text-[12px] leading-5 text-[#7a8ba8]">{subtitle}</div>
         <div className="mt-3 flex flex-wrap gap-2">
           {statusText ? (
-            <span className={passed ? "rounded-full bg-[#00ffb4]/10 px-2 py-1 text-[11px] font-bold text-[#00ffb4]" : "rounded-full bg-yellow-300/10 px-2 py-1 text-[11px] font-bold text-yellow-200"}>
+            <span className={passed ? "rounded-full bg-[#FFD41C]/10 px-2 py-1 text-[11px] font-bold text-[#FFD41C]" : "rounded-full bg-yellow-300/10 px-2 py-1 text-[11px] font-bold text-yellow-200"}>
               {statusText}
             </span>
           ) : null}
@@ -2549,7 +2596,7 @@ function RecentActivityFill({ items, onClick }) {
         <div className="text-lg font-bold tracking-tight text-[#e8ecf4]">Recent Activity</div>
         <div className="scrollArea mt-5 min-h-0 flex-1 space-y-3 overflow-auto pr-1">
           {items.map((item) => (
-            <button key={item.id} type="button" onClick={() => onClick?.(item.id)} className="w-full rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4 text-left transition hover:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-[#00ffb4]/25">
+            <button key={item.id} type="button" onClick={() => onClick?.(item.id)} className="w-full rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4 text-left transition hover:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-[#FFD41C]/25">
               <div className="text-sm font-semibold text-white">{item.t}</div>
               <div className="mt-1 text-[12px] text-[#7a8ba8]">{item.d}</div>
             </button>
@@ -2573,7 +2620,7 @@ function DonutAnimated({ value = 0 }) {
 
   return (
     <div className="flex items-center justify-center">
-      <div className="relative flex h-[200px] w-[200px] items-center justify-center rounded-full transition-all duration-[900ms] ease-out" style={{ background: `conic-gradient(#00ffb4 ${angle}deg, rgba(255,255,255,0.08) 0deg)` }}>
+      <div className="relative flex h-[200px] w-[200px] items-center justify-center rounded-full transition-all duration-[900ms] ease-out" style={{ background: `conic-gradient(#FFD41C ${angle}deg, rgba(255,255,255,0.08) 0deg)` }}>
         <div className="absolute inset-[14px] rounded-full bg-[#0d1220]" />
         <div className="relative text-center">
           <div className="text-4xl font-black text-white">{value}%</div>
@@ -2616,7 +2663,7 @@ function StaggerList({ children }) {
 
 function StatCard({ title, value, hint }) {
   return (
-    <div className="rounded-[22px] border border-[#1a2438] bg-[#0d1220] p-5 shadow-[0_18px_60px_rgba(0,0,0,0.30)]">
+    <div className="articton-stat-card rounded-[22px] border border-[#1a2438] bg-[#0d1220] p-5 shadow-[0_18px_60px_rgba(0,0,0,0.30)]">
       <div className="text-[12px] text-[#7a8ba8]">{title}</div>
       <div className="mt-2 text-2xl font-extrabold tracking-tight text-white">{value}</div>
       <div className="mt-1 text-[12px] text-[#7a8ba8]">{hint}</div>
@@ -2662,8 +2709,8 @@ function useOptionalNavigate() {
 }
 
 function Icon({ kind, active = false }) {
-  const fill = active ? "bg-[#00ffb4]/70" : "bg-white/25";
-  const soft = active ? "bg-[#00ffb4]/45" : "bg-white/20";
+  const fill = active ? "articton-icon-fill is-active" : "articton-icon-fill";
+  const soft = active ? "articton-icon-soft is-active" : "articton-icon-soft";
 
   if (kind === "home") {
     return (
@@ -2701,14 +2748,14 @@ function Icon({ kind, active = false }) {
     );
   }
 
-  if (kind === "help") return <div className="text-sm font-black text-[#00ffb4]">?</div>;
-  if (kind === "support") return <div className="text-sm font-black text-[#00ffb4]">CS</div>;
-  if (kind === "trophy") return <div className="text-sm font-black text-[#00ffb4]">★</div>;
-  if (kind === "badge") return <div className="text-sm font-black text-[#00ffb4]">✓</div>;
+  if (kind === "help") return <div className="text-sm font-black text-[#FFD41C]">?</div>;
+  if (kind === "support") return <div className="text-sm font-black text-[#FFD41C]">CS</div>;
+  if (kind === "trophy") return <div className="text-sm font-black text-[#FFD41C]">★</div>;
+  if (kind === "badge") return <div className="text-sm font-black text-[#FFD41C]">✓</div>;
 
-  if (kind === "mobile") return <div className="text-xs font-black text-[#00ffb4]">MB</div>;
-  if (kind === "pre") return <div className="text-[10px] font-black text-[#00ffb4]">PRE</div>;
-  if (kind === "post") return <div className="text-[9px] font-black text-[#00ffb4]">POST</div>;
+  if (kind === "mobile") return <div className="text-xs font-black text-[#FFD41C]">MB</div>;
+  if (kind === "pre") return <div className="text-[10px] font-black text-[#FFD41C]">PRE</div>;
+  if (kind === "post") return <div className="text-[9px] font-black text-[#FFD41C]">POST</div>;
 
   return <div className={`h-4 w-4 rounded ${fill}`} />;
 }

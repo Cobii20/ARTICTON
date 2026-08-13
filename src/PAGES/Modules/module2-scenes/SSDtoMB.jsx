@@ -144,7 +144,7 @@ function Scene({ onComplete }) {
 
   return (
     <>
-      <color attach="background" args={["#05080D"]} />
+      <color attach="background" args={[typeof document !== "undefined" && document.documentElement.classList.contains("articton-light") ? "#f8f9ff" : "#05080D"]} />
 
       <ambientLight intensity={0.55} />
 

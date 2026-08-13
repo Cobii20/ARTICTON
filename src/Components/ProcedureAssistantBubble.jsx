@@ -96,7 +96,7 @@ export default function ProcedureAssistantBubble({
 
   if (open) {
     return (
-      <div className="absolute right-5 top-5 z-[500] flex h-[min(560px,calc(100%-2.5rem))] w-[min(380px,calc(100%-2.5rem))] flex-col overflow-hidden rounded-[24px] border border-[#1a2438] bg-[#0b1220]/95 shadow-[0_30px_80px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+      <div className="articton-ai-panel absolute right-5 top-5 z-[500] flex h-[min(560px,calc(100%-2.5rem))] w-[min(380px,calc(100%-2.5rem))] flex-col overflow-hidden rounded-[24px] border border-[#1a2438] bg-[#0b1220]/95 shadow-[0_30px_80px_rgba(0,0,0,0.45)] backdrop-blur-xl">
         <div className="flex items-center justify-between border-b border-[#1a2438] px-4 py-3">
           <div>
             <div className="text-sm font-bold text-white">{title}</div>
@@ -111,7 +111,7 @@ export default function ProcedureAssistantBubble({
                   onClick={() => setAutoRead((value) => !value)}
                   className={`grid h-8 w-8 place-items-center rounded-lg border transition ${
                     autoRead
-                      ? "border-[#00ffb4]/40 bg-[#00ffb4]/12 text-[#00ffb4]"
+                      ? "border-[#FFD41C]/40 bg-[#FFD41C]/12 text-[#FFD41C]"
                       : "border-white/10 bg-white/5 text-[#7a8ba8] hover:text-white"
                   }`}
                 >
@@ -141,8 +141,8 @@ export default function ProcedureAssistantBubble({
 
         <div className="border-b border-[#1a2438] bg-[#07111d]/70 p-4">
           <div className="mb-2 flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-[#00ffb4]" />
-            <div className="text-[11px] font-black uppercase tracking-[0.18em] text-[#00ffb4]">
+            <span className="h-2 w-2 rounded-full bg-[#FFD41C]" />
+            <div className="text-[11px] font-black uppercase tracking-[0.18em] text-[#FFD41C]">
               Current Procedure
             </div>
           </div>
@@ -161,7 +161,7 @@ export default function ProcedureAssistantBubble({
               key={index}
               className={`rounded-2xl px-4 py-3 text-sm leading-6 ${
                 message.role === "assistant"
-                  ? "bg-[#00ffb4]/10 text-[#dffef5]"
+                  ? "bg-[#FFD41C]/10 text-[#dffef5]"
                   : "bg-white/5 text-white"
               }`}
             >
@@ -176,7 +176,7 @@ export default function ProcedureAssistantBubble({
                     onClick={() =>
                       isSpeaking ? stopSpeech() : speakText(message.content, messageKey)
                     }
-                    className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/5 text-[#9fb0c9] transition hover:border-[#00ffb4]/35 hover:text-[#00ffb4]"
+                    className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/5 text-[#9fb0c9] transition hover:border-[#FFD41C]/35 hover:text-[#FFD41C]"
                   >
                     {isSpeaking ? <Square size={13} /> : <Volume2 size={14} />}
                   </button>
@@ -194,12 +194,12 @@ export default function ProcedureAssistantBubble({
               value={input}
               onChange={(event) => onInputChange?.(event.target.value)}
               placeholder="Ask about this step..."
-              className="min-w-0 flex-1 rounded-xl border border-[#1a2438] bg-[#111827] px-4 py-3 text-sm text-white outline-none transition focus:border-[#00ffb4]/35"
+              className="min-w-0 flex-1 rounded-xl border border-[#1a2438] bg-[#111827] px-4 py-3 text-sm text-white outline-none transition focus:border-[#FFD41C]/35"
             />
             <button
               type="submit"
               disabled={loading}
-              className="rounded-xl bg-[#00ffb4] px-4 py-3 text-sm font-bold text-[#0a0e17] transition hover:scale-[1.03] disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-xl bg-[#FFD41C] px-4 py-3 text-sm font-bold text-[#0a0e17] transition hover:scale-[1.03] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading ? "..." : "Send"}
             </button>
@@ -213,12 +213,12 @@ export default function ProcedureAssistantBubble({
     <button
       type="button"
       onClick={onToggle}
-      className="absolute right-5 top-5 z-[500] w-[min(390px,calc(100%-2.5rem))] rounded-[22px] border border-[#00ffb4]/25 bg-[#07111d]/92 p-4 text-left shadow-[0_24px_70px_rgba(0,0,0,0.48)] backdrop-blur-xl transition hover:scale-[1.01] hover:border-[#00ffb4]/45"
+      className="articton-ai-panel articton-ai-panel-closed absolute right-5 top-5 z-[500] w-[min(390px,calc(100%-2.5rem))] rounded-[22px] border border-[#FFD41C]/25 bg-[#07111d]/92 p-4 text-left shadow-[0_24px_70px_rgba(0,0,0,0.48)] backdrop-blur-xl transition hover:scale-[1.01] hover:border-[#FFD41C]/45"
     >
       <div className="mb-2 flex items-center gap-2">
-        <span className="h-2 w-2 rounded-full bg-[#00ffb4]" />
+        <span className="h-2 w-2 rounded-full bg-[#FFD41C]" />
         <div>
-          <div className="text-[11px] font-black uppercase tracking-[0.18em] text-[#00ffb4]">
+          <div className="text-[11px] font-black uppercase tracking-[0.18em] text-[#FFD41C]">
             AI Procedure Guide
           </div>
           <div className="text-[11px] text-[#7a8ba8]">
@@ -228,7 +228,7 @@ export default function ProcedureAssistantBubble({
       </div>
       <div className="text-sm font-bold text-white">{note.title}</div>
       <p className="mt-2 text-xs leading-5 text-[#c8d4e6]">{note.text}</p>
-      <div className="mt-3 inline-flex rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/10 px-3 py-1.5 text-[11px] font-bold text-[#b7fff0]">
+      <div className="mt-3 inline-flex rounded-full border border-[#FFD41C]/25 bg-[#FFD41C]/10 px-3 py-1.5 text-[11px] font-bold text-[#b7fff0]">
         Ask a question
       </div>
     </button>

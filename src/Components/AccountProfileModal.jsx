@@ -138,7 +138,7 @@ export default function AccountProfileModal({ isOpen, onClose, profile, onProfil
   return (
     <AnimatePresence>
       {isOpen ? (
-        <MotionDiv className="fixed inset-0 z-[999] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+        <MotionDiv className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
           <MotionDiv initial={{ opacity: 0, y: 18, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 12, scale: 0.97 }} transition={{ duration: 0.18 }} className="w-full max-w-lg overflow-hidden rounded-[28px] border border-[#1a2438] bg-[#0d1220] shadow-[0_30px_100px_rgba(0,0,0,0.65)]">
             <div className="flex items-center justify-between border-b border-[#1a2438] px-6 py-5">
               <div>
@@ -156,8 +156,8 @@ export default function AccountProfileModal({ isOpen, onClose, profile, onProfil
                 <AccountAvatar image={previewImage} fallback={getProfileInitial(currentProfile)} large />
                 <div>
                   <div className="text-base font-bold text-white">{getProfileName(currentProfile)}</div>
-                  <div className="mt-1 text-xs uppercase tracking-[0.18em] text-[#00ffb4]">{currentProfile.role || "Account"}</div>
-                  <label className="mt-4 inline-flex cursor-pointer rounded-xl border border-[#00ffb4]/30 bg-[#00ffb4]/12 px-4 py-2.5 text-sm font-semibold text-[#00ffb4] transition hover:bg-[#00ffb4]/18">
+                  <div className="mt-1 text-xs uppercase tracking-[0.18em] text-[#FFD41C]">{currentProfile.role || "Account"}</div>
+                  <label className="mt-4 inline-flex cursor-pointer rounded-xl border border-[#FFD41C]/30 bg-[#FFD41C]/12 px-4 py-2.5 text-sm font-semibold text-[#FFD41C] transition hover:bg-[#FFD41C]/18">
                     Upload picture
                     <input type="file" accept="image/*" onChange={handleImageChange} disabled={isSaving} className="hidden" />
                   </label>
@@ -186,7 +186,7 @@ export default function AccountProfileModal({ isOpen, onClose, profile, onProfil
                 <button type="button" onClick={onClose} disabled={isSaving} className="rounded-xl border border-[#1a2438] bg-white/[0.03] px-5 py-2.5 text-sm font-semibold text-[#dbe6f5] transition hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-60">
                   Cancel
                 </button>
-                <button type="button" onClick={handleSave} disabled={isSaving} className="rounded-xl bg-[#00ffb4] px-5 py-2.5 text-sm font-bold text-[#0a0e17] transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:scale-100">
+                <button type="button" onClick={handleSave} disabled={isSaving} className="rounded-xl bg-[#FFD41C] px-5 py-2.5 text-sm font-bold text-[#0a0e17] transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:scale-100">
                   {isSaving ? "Saving..." : "Save changes"}
                 </button>
               </div>
@@ -202,14 +202,14 @@ function ProfileField({ label, value, onChange, placeholder, maxLength, centered
   return (
     <div>
       <label className="text-xs font-semibold uppercase tracking-[0.2em] text-[#7a8ba8]">{label}</label>
-      <input value={value} maxLength={maxLength} onChange={(event) => onChange(event.target.value)} className={["mt-2 w-full rounded-2xl border border-[#1a2438] bg-white/[0.03] px-4 py-3 text-sm text-white outline-none focus:border-[#00ffb4]/40 focus:ring-2 focus:ring-[#00ffb4]/15", centered ? "text-center" : ""].join(" ")} placeholder={placeholder} />
+      <input value={value} maxLength={maxLength} onChange={(event) => onChange(event.target.value)} className={["mt-2 w-full rounded-2xl border border-[#1a2438] bg-white/[0.03] px-4 py-3 text-sm text-white outline-none focus:border-[#FFD41C]/40 focus:ring-2 focus:ring-[#FFD41C]/15", centered ? "text-center" : ""].join(" ")} placeholder={placeholder} />
     </div>
   );
 }
 
 function AccountAvatar({ image, fallback, large = false }) {
   return (
-    <div className={`${large ? "h-20 w-20 text-2xl" : "h-10 w-10 text-sm"} flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/10 font-bold text-[#00ffb4]`}>
+    <div className={`${large ? "h-20 w-20 text-2xl" : "h-10 w-10 text-sm"} flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-[#FFD41C]/25 bg-[#FFD41C]/10 font-bold text-[#FFD41C]`}>
       {image ? <img src={image} alt="Profile" className="h-full w-full object-cover" /> : fallback}
     </div>
   );

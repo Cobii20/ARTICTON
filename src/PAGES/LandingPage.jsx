@@ -116,24 +116,24 @@ function Navbar({ isHome, onHome, onAbout, onOpenLogin, onSignup, isLightPage, o
         <h1 className="articton-nav-label-optional text-2xl font-bold tracking-wide text-white">Articton</h1>
       </button>
 
-      <div className="articton-nav-links flex items-center gap-6 text-sm md:gap-8">
+        <div className="articton-nav-links flex items-center gap-6 text-sm md:gap-8">
         <button type="button" onClick={onHome} className="articton-nav-link">Home</button>
         <button type="button" onClick={onAbout} className="articton-nav-link">About</button>
         <button type="button" onClick={onOpenLogin} className="articton-nav-link">Login</button>
+        <button
+          onClick={onSignup}
+          className="articton-signup-button rounded-full border border-[#FFD41C]/25 bg-[#FFD41C]/8 px-4 py-2 text-[#FFD41C] transition hover:bg-[#FFD41C]/14"
+        >
+          Signup
+        </button>
         <button
           type="button"
           onClick={onToggleTheme}
           aria-label={isLightPage ? "Switch to dark mode" : "Switch to light mode"}
           title={isLightPage ? "Use dark mode" : "Use light mode"}
-          className="articton-theme-toggle flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/80 transition hover:border-[#00ffb4]/35 hover:bg-[#00ffb4]/10 hover:text-[#00ffb4]"
+          className="articton-theme-toggle flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/80 transition hover:border-[#FFD41C]/35 hover:bg-[#FFD41C]/10 hover:text-[#FFD41C]"
         >
           {isLightPage ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
-        </button>
-        <button
-          onClick={onSignup}
-          className="articton-signup-button rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/8 px-4 py-2 text-[#00ffb4] transition hover:bg-[#00ffb4]/14"
-        >
-          Signup
         </button>
       </div>
     </motion.nav>
@@ -209,7 +209,7 @@ function HeroShowcaseFull({ onLogin, onSignup }) {
             top: "-80px",
             height: "200px",
             background:
-              "linear-gradient(180deg, transparent 0%, rgba(0,255,180,0.10) 45%, rgba(0,255,180,0.16) 50%, rgba(0,255,180,0.10) 55%, transparent 100%)",
+              "linear-gradient(180deg, transparent 0%, rgba(255,212,28,0.10) 45%, rgba(255,212,28,0.16) 50%, rgba(255,212,28,0.10) 55%, transparent 100%)",
             animation: "greenWaveFlow 5.5s linear infinite",
             animationDelay: `${delay}s`,
             filter: "blur(10px)",
@@ -217,16 +217,16 @@ function HeroShowcaseFull({ onLogin, onSignup }) {
         />
       ))}
     </div>
-      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_60%_50%_at_50%_50%,rgba(0,255,180,0.08),transparent)]" />
+      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_60%_50%_at_50%_50%,rgba(255,212,28,0.08),transparent)]" />
       <div className="relative z-10 mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-2 lg:gap-20">
         <div className="text-center lg:text-left">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/6 px-4 py-1.5"
+            className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#FFD41C]/25 bg-[#FFD41C]/6 px-4 py-1.5"
           >
-            <span className="h-2 w-2 rounded-full bg-[#00ffb4]" />
-            <span className="text-xs font-medium uppercase tracking-[0.25em] text-[#00ffb4]">
+            <span className="h-2 w-2 rounded-full bg-[#FFD41C]" />
+            <span className="text-xs font-medium uppercase tracking-[0.25em] text-[#FFD41C]">
               Interactive 3D Experience
             </span>
           </motion.div>
@@ -239,7 +239,7 @@ function HeroShowcaseFull({ onLogin, onSignup }) {
           >
             Learn PC Hardware.
             <br />
-            <span className="text-[#00ffb4]">Build Confidence in 3D.</span>
+            <span className="text-[#FFD41C]">Build Confidence in 3D.</span>
           </motion.h2>
 
           <motion.p
@@ -256,21 +256,32 @@ function HeroShowcaseFull({ onLogin, onSignup }) {
             initial={{ opacity: 0, y: 28 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.24 }}
-            className="mt-10 flex flex-col justify-center gap-4 sm:flex-row lg:justify-start"
+            className="articton-hero-actions mt-10 flex flex-col justify-center gap-4 sm:flex-row lg:justify-start"
           >
             <button
               onClick={onLogin}
-              className="group relative overflow-hidden rounded-xl bg-[#00ffb4] px-8 py-4 text-lg font-semibold tracking-wide text-[#0a0e17] transition hover:scale-[1.02]"
+              className="articton-primary-cta group relative overflow-hidden rounded-xl bg-[#FFD41C] px-8 py-4 text-lg font-semibold tracking-wide text-[#0a0e17] transition hover:scale-[1.02]"
             >
               <span className="absolute inset-0 -translate-x-full bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.18),transparent)] transition duration-500 group-hover:translate-x-full" />
-              <span className="relative">Start Learning →</span>
+              <span className="relative">Start Learning</span>
             </button>
             <button
               onClick={onSignup}
-              className="rounded-xl border border-white/12 px-8 py-4 text-lg font-semibold text-[#7a8ba8] transition hover:bg-white/5 hover:text-white"
+              className="articton-secondary-cta rounded-xl border border-white/12 px-8 py-4 text-lg font-semibold text-[#7a8ba8] transition hover:bg-white/5 hover:text-white"
             >
               Create Account
             </button>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.36 }}
+            className="articton-hero-chips mt-7 flex flex-wrap justify-center gap-3 lg:justify-start"
+          >
+            <HeroChip icon={Rotate3d} label="3D Guided Modules" />
+            <HeroChip icon={MousePointerClick} label="Interactive Practice" />
+            <HeroChip icon={GraduationCap} label="Progress Tracking" />
           </motion.div>
 
         
@@ -280,10 +291,17 @@ function HeroShowcaseFull({ onLogin, onSignup }) {
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.18 }}
-            className="relative flex justify-center lg:justify-end lg:pl-10 xl:pl-28"
+            className="articton-hero-model-wrap relative flex justify-center lg:justify-end lg:pl-10 xl:pl-28"
           >
-          <div className="absolute right-[-90px] top-1/2 h-[700px] w-[620px] -translate-y-1/2 rounded-[120px] bg-[radial-gradient(circle_at_center,rgba(0,255,180,0.18),transparent_70%)] blur-3xl" />
-          <div className="relative h-[460px] w-full max-w-[760px] sm:h-[540px] lg:h-[640px] xl:h-[700px]">
+          <div className="articton-hero-model-glow absolute right-[-90px] top-1/2 h-[700px] w-[620px] -translate-y-1/2 rounded-[120px] bg-[radial-gradient(circle_at_center,rgba(255,212,28,0.18),transparent_70%)] blur-3xl" />
+          <div className="articton-hero-model-stage relative h-[460px] w-full max-w-[760px] sm:h-[540px] lg:h-[640px] xl:h-[700px]">
+            <div className="articton-hero-model-panel pointer-events-none absolute inset-x-6 top-10 bottom-10 rounded-[42px] border border-[#FFD41C]/20 bg-white/[0.03]" />
+            <div className="articton-hero-model-label pointer-events-none absolute right-8 top-12 z-20 rounded-full border border-[#FFD41C]/25 bg-[#0d1220]/80 px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] text-[#FFD41C] shadow-[0_14px_36px_rgba(0,0,0,0.22)] backdrop-blur-xl">
+              Live 3D Workspace
+            </div>
+            <div className="articton-hero-model-caption pointer-events-none absolute bottom-12 left-8 z-20 max-w-[260px] rounded-2xl border border-white/10 bg-[#0d1220]/78 px-4 py-3 text-sm leading-6 text-[#c8d4e6] shadow-[0_14px_34px_rgba(0,0,0,0.24)] backdrop-blur-xl">
+              Guided hardware exploration with a real-time PC model.
+            </div>
             
             <div className="absolute inset-0 z-10">
               <Canvas
@@ -317,12 +335,21 @@ function HeroShowcaseFull({ onLogin, onSignup }) {
   );
 }
 
+function HeroChip({ icon: Icon, label }) {
+  return (
+    <div className="articton-hero-chip inline-flex items-center gap-2 rounded-full border border-[#FFD41C]/20 bg-[#FFD41C]/8 px-4 py-2 text-sm font-semibold text-[#c8d4e6]">
+      <Icon className="h-4 w-4 text-[#FFD41C]" />
+      <span>{label}</span>
+    </div>
+  );
+}
+
 function AmbientGlowLines() {
   return (
     <>
-      <div className="absolute left-[15%] top-[10%] h-[60%] w-[2px] animate-pulse bg-[linear-gradient(180deg,transparent,#00ffb4,transparent)] opacity-40" />
-      <div className="absolute right-[20%] top-[5%] h-[60%] w-[2px] animate-pulse bg-[linear-gradient(180deg,transparent,#00b4ff,transparent)] opacity-30" />
-      <div className="absolute left-[60%] top-[15%] h-[60%] w-[2px] animate-pulse bg-[linear-gradient(180deg,transparent,#00ffb4,transparent)] opacity-30" />
+      <div className="articton-landing-scan absolute left-[15%] top-[10%] h-[60%] w-[2px] animate-pulse bg-[linear-gradient(180deg,transparent,#FFD41C,transparent)] opacity-40" />
+      <div className="articton-landing-scan absolute right-[20%] top-[5%] h-[60%] w-[2px] animate-pulse bg-[linear-gradient(180deg,transparent,#FFD41C,transparent)] opacity-30" />
+      <div className="articton-landing-scan absolute left-[60%] top-[15%] h-[60%] w-[2px] animate-pulse bg-[linear-gradient(180deg,transparent,#FFD41C,transparent)] opacity-30" />
     </>
   );
 }
@@ -330,7 +357,7 @@ function AmbientGlowLines() {
 function AnimatedGridBackground() {
   return (
     <div className="articton-landing-grid absolute inset-0 opacity-100">
-      <div className="absolute inset-0 bg-[linear-gradient(rgba(0,255,180,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,180,0.03)_1px,transparent_1px)] bg-[size:60px_60px]" />
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(255,212,28,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,212,28,0.03)_1px,transparent_1px)] bg-[size:60px_60px]" />
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(10,14,23,0)_0%,rgba(10,14,23,0.15)_70%,rgba(10,14,23,0.8)_100%)]" />
     </div>
   );
@@ -352,19 +379,19 @@ function AboutPage({ onJoin }) {
     <section className="articton-landing-about relative min-h-screen overflow-hidden bg-[#0a0e17] pt-28">
       <AnimatedGridBackground />
       <AmbientGlowLines />
-      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_60%_50%_at_50%_20%,rgba(0,255,180,0.08),transparent)]" />
+      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_60%_50%_at_50%_20%,rgba(255,212,28,0.08),transparent)]" />
 
       <div className="relative z-10 px-6 py-12 text-center md:px-10 lg:px-16">
-        <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/6 px-4 py-1.5">
-          <span className="h-2 w-2 rounded-full bg-[#00ffb4]" />
-          <span className="text-xs font-medium uppercase tracking-[0.25em] text-[#00ffb4]">
+        <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#FFD41C]/25 bg-[#FFD41C]/6 px-4 py-1.5">
+          <span className="h-2 w-2 rounded-full bg-[#FFD41C]" />
+          <span className="text-xs font-medium uppercase tracking-[0.25em] text-[#FFD41C]">
             About Articton
           </span>
         </div>
 
         <h2 className="mb-4 text-4xl font-bold text-[#e8ecf4] md:text-5xl">
           Learn Hardware the
-          <span className="block text-[#00ffb4]">Immersive Way</span>
+          <span className="block text-[#FFD41C]">Immersive Way</span>
         </h2>
 
         <p className="mx-auto max-w-3xl text-base text-[#7a8ba8] md:text-lg">
@@ -492,7 +519,7 @@ function SignupPage({ onBack, onSwitchToLogin, onAfterSignup }) {
     <section className="articton-auth-section relative min-h-screen overflow-hidden bg-[#0a0e17] pt-32 pb-12">
       <AnimatedGridBackground />
       <AmbientGlowLines />
-      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_55%_45%_at_50%_18%,rgba(0,255,180,0.08),transparent)]" />
+      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_55%_45%_at_50%_18%,rgba(255,212,28,0.08),transparent)]" />
 
       <div className="relative z-10 mx-auto w-full max-w-5xl px-6 md:px-10 lg:px-16">
         <div className="mb-10 flex items-center justify-between gap-4">
@@ -505,19 +532,19 @@ function SignupPage({ onBack, onSwitchToLogin, onAfterSignup }) {
 
           <button
             onClick={onSwitchToLogin}
-            className="rounded-lg border border-[#00ffb4]/25 bg-[#00ffb4]/8 px-4 py-2 text-sm text-[#00ffb4] transition hover:bg-[#00ffb4]/14"
+            className="rounded-lg border border-[#FFD41C]/25 bg-[#FFD41C]/8 px-4 py-2 text-sm text-[#FFD41C] transition hover:bg-[#FFD41C]/14"
           >
             Login
           </button>
         </div>
 
         <div className="articton-auth-card relative overflow-hidden rounded-[28px] border border-[#1a2438] bg-[#0d1220]/95 p-8 shadow-[0_24px_80px_rgba(0,0,0,0.45)] md:p-10">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(0,255,180,0.06),transparent_40%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,212,28,0.06),transparent_40%)]" />
           <div className="relative">
             <div className="mb-8 text-center">
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/6 px-4 py-1.5">
-                <span className="h-2 w-2 rounded-full bg-[#00ffb4]" />
-                <span className="text-xs font-medium uppercase tracking-[0.25em] text-[#00ffb4]">
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#FFD41C]/25 bg-[#FFD41C]/6 px-4 py-1.5">
+                <span className="h-2 w-2 rounded-full bg-[#FFD41C]" />
+                <span className="text-xs font-medium uppercase tracking-[0.25em] text-[#FFD41C]">
                   Student Access
                 </span>
               </div>
@@ -656,7 +683,7 @@ function SignupPage({ onBack, onSwitchToLogin, onAfterSignup }) {
                     type="checkbox"
                     checked={agree}
                     onChange={(e) => setAgree(e.target.checked)}
-                    className="h-4 w-4 accent-[#00ffb4]"
+                    className="h-4 w-4 accent-[#FFD41C]"
                   />
                   <span className="text-sm text-[#7a8ba8]">
                     I agree to the terms and conditions
@@ -665,7 +692,7 @@ function SignupPage({ onBack, onSwitchToLogin, onAfterSignup }) {
 
                 <button
                   disabled={loading}
-                  className="rounded-xl bg-[#00ffb4] px-8 py-3 font-semibold text-[#0a0e17] transition hover:scale-[1.02] disabled:opacity-60"
+                  className="rounded-xl bg-[#FFD41C] px-8 py-3 font-semibold text-[#0a0e17] transition hover:scale-[1.02] disabled:opacity-60"
                 >
                   {loading ? "Signing up..." : "Sign Up"}
                 </button>
@@ -777,12 +804,11 @@ function LoginPage({ onBack, onSwitchToSignup, onSuccessLogin }) {
 
       if (
         error.code === "auth/invalid-credential" ||
-        error.code === "auth/wrong-password" ||
-        error.code === "auth/user-not-found"
+        error.code === "auth/wrong-password"
       ) {
-        setErr(
-          "Invalid email or password. Make sure this email exists in Firebase Authentication, not only in Firestore."
-        );
+        setErr("Invalid email or password.");
+      } else if (error.code === "auth/user-not-found") {
+        setErr("No account found with that email.");
       } else if (error.code === "auth/too-many-requests") {
         setErr("Too many failed login attempts. Please wait a moment before trying again.");
       } else if (error.code === "auth/user-disabled") {
@@ -886,7 +912,7 @@ function LoginPage({ onBack, onSwitchToSignup, onSuccessLogin }) {
     <section className="articton-auth-section relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0a0e17] px-4 pt-24 pb-12 md:px-6">
       <AnimatedGridBackground />
       <AmbientGlowLines />
-      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_55%_45%_at_50%_18%,rgba(0,255,180,0.08),transparent)]" />
+      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_55%_45%_at_50%_18%,rgba(255,212,28,0.08),transparent)]" />
 
       <div className="relative z-10 w-full max-w-md">
         <div className="mb-6 flex items-center justify-between gap-4">
@@ -899,20 +925,20 @@ function LoginPage({ onBack, onSwitchToSignup, onSuccessLogin }) {
 
           <button
             onClick={onSwitchToSignup}
-            className="rounded-lg border border-[#00ffb4]/25 bg-[#00ffb4]/8 px-4 py-2 text-sm text-[#00ffb4] transition hover:bg-[#00ffb4]/14"
+            className="rounded-lg border border-[#FFD41C]/25 bg-[#FFD41C]/8 px-4 py-2 text-sm text-[#FFD41C] transition hover:bg-[#FFD41C]/14"
           >
             Signup
           </button>
         </div>
 
         <div className="articton-auth-card relative overflow-hidden rounded-[28px] border border-[#1a2438] bg-[#0d1220]/95 shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(0,255,180,0.06),transparent_40%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,212,28,0.06),transparent_40%)]" />
 
           <div className="relative px-6 py-10 md:px-8">
             <div className="mb-6">
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/6 px-4 py-1.5">
-                <span className="h-2 w-2 rounded-full bg-[#00ffb4]" />
-                <span className="text-xs font-medium uppercase tracking-[0.25em] text-[#00ffb4]">
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#FFD41C]/25 bg-[#FFD41C]/6 px-4 py-1.5">
+                <span className="h-2 w-2 rounded-full bg-[#FFD41C]" />
+                <span className="text-xs font-medium uppercase tracking-[0.25em] text-[#FFD41C]">
                   Login
                 </span>
               </div>
@@ -962,7 +988,7 @@ function LoginPage({ onBack, onSwitchToSignup, onSuccessLogin }) {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full rounded-xl bg-[#00ffb4] px-6 py-3 font-semibold text-[#0a0e17] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="w-full rounded-xl bg-[#FFD41C] px-6 py-3 font-semibold text-[#0a0e17] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {loading ? "Checking..." : "Log In"}
                 </button>
@@ -972,7 +998,7 @@ function LoginPage({ onBack, onSwitchToSignup, onSuccessLogin }) {
                   <button
                     type="button"
                     onClick={handleDevBypass}
-                    className="w-full rounded-xl border border-[#00ffb4]/25 bg-[#00ffb4]/8 px-6 py-3 font-semibold text-[#00ffb4] transition hover:bg-[#00ffb4]/14"
+                    className="w-full rounded-xl border border-[#FFD41C]/25 bg-[#FFD41C]/8 px-6 py-3 font-semibold text-[#FFD41C] transition hover:bg-[#FFD41C]/14"
                   >
                     Continue as Dev
                   </button>
@@ -1009,7 +1035,7 @@ function LoginPage({ onBack, onSwitchToSignup, onSuccessLogin }) {
 
                 <button
                   disabled={loading}
-                  className="w-full rounded-xl bg-[#00ffb4] px-6 py-3 font-semibold text-[#0a0e17] transition hover:scale-[1.01] disabled:opacity-60"
+                  className="w-full rounded-xl bg-[#FFD41C] px-6 py-3 font-semibold text-[#0a0e17] transition hover:scale-[1.01] disabled:opacity-60"
                 >
                   {loading ? "Verifying..." : "Verify OTP"}
                 </button>
@@ -1018,7 +1044,7 @@ function LoginPage({ onBack, onSwitchToSignup, onSuccessLogin }) {
                   type="button"
                   onClick={handleResendOtp}
                   disabled={loading || resendLoading || resendSeconds > 0}
-                  className="w-full rounded-xl border border-[#00ffb4]/25 bg-[#00ffb4]/8 px-6 py-3 font-semibold text-[#00ffb4] transition hover:bg-[#00ffb4]/14 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="w-full rounded-xl border border-[#FFD41C]/25 bg-[#FFD41C]/8 px-6 py-3 font-semibold text-[#FFD41C] transition hover:bg-[#FFD41C]/14 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {resendLoading
                     ? "Sending..."
@@ -1053,7 +1079,7 @@ function InputBlockLight({ label, value, onChange, placeholder, type = "text" })
           onChange={onChange}
           placeholder={placeholder}
           type={isPassword && show ? "text" : type}
-          className="articton-field w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 pr-10 text-sm text-[#e8ecf4] outline-none transition placeholder:text-[#7a8ba8]/45 focus:border-[#00ffb4]/30 focus:ring-2 focus:ring-[#00ffb4]/30"
+          className="articton-field w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 pr-10 text-sm text-[#e8ecf4] outline-none transition placeholder:text-[#7a8ba8]/45 focus:border-[#FFD41C]/30 focus:ring-2 focus:ring-[#FFD41C]/30"
         />
 
         {isPassword && (
@@ -1078,7 +1104,7 @@ function DatePickerLite({ value, onChange, max }) {
       value={value}
       onChange={onChange}
       max={max}
-      className="articton-field w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-[#e8ecf4] outline-none transition focus:border-[#00ffb4]/30 focus:ring-2 focus:ring-[#00ffb4]/30"
+      className="articton-field w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-[#e8ecf4] outline-none transition focus:border-[#FFD41C]/30 focus:ring-2 focus:ring-[#FFD41C]/30"
     />
   );
 }
@@ -1123,7 +1149,7 @@ function Dropdown({ value, onChange, options, placeholder = "Select" }) {
                 className={[
                   "w-full px-4 py-2.5 text-left text-sm transition",
                   opt === value
-                    ? "bg-[#00ffb4]/10 font-medium text-[#00ffb4]"
+                    ? "bg-[#FFD41C]/10 font-medium text-[#FFD41C]"
                     : "text-[#e8ecf4] hover:bg-white/5",
                 ].join(" ")}
               >
@@ -1144,7 +1170,7 @@ function ModelOnlyScene({ mouse }) {
       <directionalLight position={[6, 7, 5]} intensity={2.25} />
       <directionalLight position={[-6, 3.5, -4]} intensity={0.9} />
       <directionalLight position={[0, 4, -8]} intensity={0.8} />
-      <Bounds fit clip margin={1.2}>
+      <Bounds fit clip margin={1.5}>
         <MouseFollowModel mouse={mouse} />
       </Bounds>
     </>
@@ -1200,7 +1226,7 @@ function TrustSectionDark() {
 function TrustPillDark({ label, value }) {
   return (
     <div className="border-[#1a2438] p-7 md:border-r md:p-8 md:last:border-r-0">
-      <p className="mb-2 text-[11px] tracking-widest text-[#00ffb4]">{label}</p>
+      <p className="mb-2 text-[11px] tracking-widest text-[#FFD41C]">{label}</p>
       <p className="text-xl font-semibold text-[#e8ecf4]">{value}</p>
     </div>
   );
@@ -1268,7 +1294,7 @@ function CTASectionDark({ onJoin }) {
       </p>
       <button
         onClick={onJoin}
-        className="rounded-2xl bg-[#00ffb4] px-12 py-4 font-bold text-[#0a0e17] transition hover:scale-[1.02]"
+        className="rounded-2xl bg-[#FFD41C] px-12 py-4 font-bold text-[#0a0e17] transition hover:scale-[1.02]"
       >
         Join Articton
       </button>
@@ -1292,7 +1318,7 @@ function StepCardDark({ step, title, description }) {
       viewport={{ once: true }}
       className="articton-content-card relative rounded-3xl border border-[#1a2438] bg-[#0d1220] p-8 shadow-[0_14px_34px_rgba(0,0,0,0.28)]"
     >
-      <span className="absolute -top-4 left-6 rounded-full bg-[#00ffb4] px-4 py-1 text-sm font-bold text-[#0a0e17] shadow">
+      <span className="absolute -top-4 left-6 rounded-full bg-[#FFD41C] px-4 py-1 text-sm font-bold text-[#0a0e17] shadow">
         {step}
       </span>
       <h4 className="mb-3 mt-4 text-xl font-semibold text-[#e8ecf4]">{title}</h4>
@@ -1325,7 +1351,7 @@ function Footer({ dark = false }) {
     >
       <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 text-center sm:flex-row sm:text-left">
         <div className="flex items-center gap-2">
-          {dark ? <Cpu className="h-5 w-5 text-[#00ffb4]" /> : null}
+          {dark ? <Cpu className="h-5 w-5 text-[#FFD41C]" /> : null}
           <span className={dark ? "font-bold tracking-tight text-[#e8ecf4]" : ""}>
             © 2026 Articton — 3D Computer Hardware Learning Platform
           </span>

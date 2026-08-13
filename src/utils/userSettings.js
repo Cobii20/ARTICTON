@@ -3,6 +3,7 @@ export const DEFAULT_USER_SETTINGS = {
   animations: true,
   aiVoiceover: false,
   darkMode: true,
+  fontSize: "medium",
 };
 
 const SETTINGS_STORAGE_KEY = "artictonUserSettings";
@@ -32,10 +33,12 @@ export function applyThemeSettings(settings = getUserSettings()) {
   if (!canUseDOM()) return;
 
   const darkMode = settings.darkMode ?? DEFAULT_USER_SETTINGS.darkMode;
+  const fontSize = settings.fontSize || DEFAULT_USER_SETTINGS.fontSize;
 
   document.documentElement.classList.toggle("articton-light", !darkMode);
   document.documentElement.classList.toggle("articton-dark", darkMode);
   document.documentElement.dataset.theme = darkMode ? "dark" : "light";
+  document.documentElement.dataset.fontSize = fontSize;
   document.documentElement.style.colorScheme = darkMode ? "dark" : "light";
 }
 

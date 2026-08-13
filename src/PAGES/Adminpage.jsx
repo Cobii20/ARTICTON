@@ -6,7 +6,7 @@ import {
   FileText,
   LogOut,
   RefreshCw,
-  Settings,
+  Settings as SettingsIcon,
   ShieldCheck,
   UserCog,
 } from "lucide-react";
@@ -20,6 +20,8 @@ import { httpsCallable } from "firebase/functions";
 import { fetchMobileScoreDocs, mergeMobileScoresIntoProfile } from "../utils/mobileScores";
 import ModuleContentWorkspace from "../Components/ModuleContentWorkspace";
 import AccountProfileModal from "../Components/AccountProfileModal";
+import SettingsModal from "../Components/Settings";
+import { getUserSettings } from "../utils/userSettings";
 
 const QUIZ_KEYS = [
   { key: "module1", label: "Module 1" },
@@ -402,7 +404,7 @@ function StudentAvatar({ student, size = "md" }) {
   const fallback = (student?.name || student?.email || "S").charAt(0).toUpperCase();
 
   return (
-    <div className={`${dimension} flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/10 font-bold text-[#00ffb4]`}>
+    <div className={`${dimension} flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-[#FFD41C]/25 bg-[#FFD41C]/10 font-bold text-[#FFD41C]`}>
       {student?.avatarUrl ? (
         <img src={student.avatarUrl} alt={`${student.name || "Student"} profile`} className="h-full w-full object-cover" />
       ) : (
@@ -420,7 +422,7 @@ function AdminNavButton({ active, onClick, icon: Icon, label }) {
       className={[
         "flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left text-sm font-semibold transition",
         active
-          ? "border-[#00ffb4]/30 bg-[#00ffb4]/10 text-white shadow-[0_16px_40px_rgba(0,255,180,0.08)]"
+          ? "border-[#FFD41C]/30 bg-[#FFD41C]/10 text-white shadow-[0_16px_40px_rgba(255,212,28,0.08)]"
           : "border-transparent text-[#c8d4e6] hover:border-[#1a2438] hover:bg-white/[0.04]",
       ].join(" ")}
     >
@@ -428,7 +430,7 @@ function AdminNavButton({ active, onClick, icon: Icon, label }) {
         className={[
           "flex h-10 w-10 items-center justify-center rounded-2xl border",
           active
-            ? "border-[#00ffb4]/25 bg-[#00ffb4]/10 text-[#00ffb4]"
+            ? "border-[#FFD41C]/25 bg-[#FFD41C]/10 text-[#FFD41C]"
             : "border-[#1a2438] bg-[#0d1220] text-[#7a8ba8]",
         ].join(" ")}
       >
@@ -436,6 +438,48 @@ function AdminNavButton({ active, onClick, icon: Icon, label }) {
       </span>
       {label}
     </button>
+  );
+}
+
+function LineChart({ data = [], height = 160 }) {
+  if (!data || !data.length) return null;
+
+  const pointCount = data.length;
+  const width = Math.max(600, pointCount * 80);
+  const max = 100;
+
+  const points = data.map((d, i) => {
+    const x = (i / Math.max(1, pointCount - 1)) * (width - 40) + 20;
+    const y = height - (Number(d.percent || 0) / max) * (height - 30) - 10;
+    return { x, y, ...d };
+  });
+
+  const pathD = points
+    .map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`)
+    .join(' ');
+
+  return (
+    <div className="w-full overflow-auto">
+      <svg viewBox={`0 0 ${width} ${height}`} width={width} height={height} className="block">
+        <defs>
+          <linearGradient id="lineGrad" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="#FFD41C" stopOpacity="0.9" />
+            <stop offset="100%" stopColor="#FFD41C" stopOpacity="0.15" />
+          </linearGradient>
+        </defs>
+
+        <path d={pathD} fill="none" stroke="#FFD41C" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+
+        {points.map((p, idx) => (
+          <g key={idx}>
+            <circle cx={p.x} cy={p.y} r="4" fill="#0a0e17" stroke="#FFD41C" strokeWidth="2" />
+            <text x={p.x} y={p.y - 8} fontSize="11" textAnchor="middle" fill="#9fb0c9">
+              {p.percent}%
+            </text>
+          </g>
+        ))}
+      </svg>
+    </div>
   );
 }
 
@@ -451,7 +495,13 @@ export default function AdminPage({ adminUser, onLogout }) {
   const [activeTab, setActiveTab] = useState("accounts");
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settings, setSettings] = useState(getUserSettings);
   const [adminProfile, setAdminProfile] = useState(adminUser || null);
+
+  const handleSettingChange = (key, value) => {
+    setSettings((previous) => ({ ...previous, [key]: value }));
+  };
 
   useEffect(() => {
     setAdminProfile(adminUser || null);
@@ -627,14 +677,14 @@ export default function AdminPage({ adminUser, onLogout }) {
   }, [accounts]);
 
   return (
-    <div className="min-h-screen bg-[#0a0e17] text-[#e8ecf4]">
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_18%_8%,rgba(0,255,180,0.08),transparent_34%)]" />
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_92%_18%,rgba(0,255,180,0.05),transparent_30%)]" />
-      <div className="pointer-events-none fixed inset-0 bg-[linear-gradient(rgba(0,255,180,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,180,0.025)_1px,transparent_1px)] bg-[size:54px_54px] opacity-60" />
+    <div className="articton-app-shell articton-admin-page h-screen overflow-hidden bg-[#0a0e17] text-[#e8ecf4]">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_18%_8%,rgba(255,212,28,0.08),transparent_34%)]" />
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_92%_18%,rgba(255,212,28,0.05),transparent_30%)]" />
+      <div className="pointer-events-none fixed inset-0 bg-[linear-gradient(rgba(255,212,28,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(255,212,28,0.025)_1px,transparent_1px)] bg-[size:54px_54px] opacity-60" />
 
-      <div className="relative flex min-h-screen p-3 md:p-5">
+      <div className="relative flex h-full min-h-0 p-3 md:p-5">
       {/* SIDEBAR */}
-      <aside className="hidden w-[282px] shrink-0 flex-col justify-between overflow-hidden rounded-[30px] border border-[#1a2438] bg-[#0b1220]/90 p-5 shadow-[0_40px_120px_rgba(0,0,0,0.42)] backdrop-blur-xl lg:flex">
+      <aside className="hidden lg:sticky lg:top-3 lg:h-[calc(100vh-24px)] min-h-0 w-[min(282px,22vw)] max-w-[282px] shrink-0 flex-col justify-between overflow-auto rounded-[30px] border border-[#1a2438] bg-[#0b1220]/90 p-5 shadow-[0_40px_120px_rgba(0,0,0,0.42)] backdrop-blur-xl lg:flex">
         <div>
           <div className="mb-10 flex items-center gap-4 px-2 pt-1">
             <img
@@ -644,7 +694,7 @@ export default function AdminPage({ adminUser, onLogout }) {
             />
             <div>
               <span className="block text-xl font-bold tracking-wide text-white">Articton</span>
-              <span className="text-xs uppercase tracking-[0.25em] text-[#00ffb4]/70">Admin</span>
+              <span className="text-xs uppercase tracking-[0.25em] text-[#FFD41C]/70">Admin</span>
             </div>
           </div>
 
@@ -674,7 +724,7 @@ export default function AdminPage({ adminUser, onLogout }) {
 
         <div className="mt-auto rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#00ffb4]/25 bg-[#00ffb4]/10 text-[#00ffb4]">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#FFD41C]/25 bg-[#FFD41C]/10 text-[#FFD41C]">
               <ShieldCheck className="h-5 w-5" />
             </div>
             <div className="min-w-0">
@@ -686,9 +736,9 @@ export default function AdminPage({ adminUser, onLogout }) {
       </aside>
 
       {/* MAIN PANEL */}
-      <main className="relative min-w-0 flex-1 px-0 py-1 lg:pl-5">
+      <main className="relative h-full min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden px-0 py-1 lg:pl-5">
         {/* HEADER */}
-        <div className="mb-6 rounded-[28px] border border-[#1a2438] bg-[#0d1220]/88 p-5 shadow-[0_28px_80px_rgba(0,0,0,0.34)] backdrop-blur-xl md:p-6">
+        <div className="relative z-[1000] mb-6 rounded-[28px] border border-[#1a2438] bg-[#0d1220]/88 p-5 shadow-[0_28px_80px_rgba(0,0,0,0.34)] backdrop-blur-xl md:p-6">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
           <div>
             <div className="mb-3 flex items-center gap-3 lg:hidden">
@@ -699,7 +749,7 @@ export default function AdminPage({ adminUser, onLogout }) {
               />
               <span className="text-xl font-bold text-white">Articton</span>
             </div>
-            <div className="text-xs font-semibold uppercase tracking-[0.28em] text-[#00ffb4]/70">
+            <div className="text-xs font-semibold uppercase tracking-[0.28em] text-[#FFD41C]/70">
               Administrator Console
             </div>
             <h1 className="mt-3 text-3xl font-black tracking-tight text-white md:text-4xl">
@@ -724,7 +774,7 @@ export default function AdminPage({ adminUser, onLogout }) {
                 className={[
                   "rounded-xl px-4 py-2 text-sm font-semibold transition",
                   activeTab === "accounts"
-                    ? "bg-[#00ffb4] text-[#0a0e17]"
+                    ? "bg-[#FFD41C] text-[#0a0e17]"
                     : "text-[#9fb0c9] hover:text-white",
                 ].join(" ")}
               >
@@ -736,7 +786,7 @@ export default function AdminPage({ adminUser, onLogout }) {
                 className={[
                   "rounded-xl px-4 py-2 text-sm font-semibold transition",
                   activeTab === "analytics"
-                    ? "bg-[#00ffb4] text-[#0a0e17]"
+                    ? "bg-[#FFD41C] text-[#0a0e17]"
                     : "text-[#9fb0c9] hover:text-white",
                 ].join(" ")}
               >
@@ -748,7 +798,7 @@ export default function AdminPage({ adminUser, onLogout }) {
                 className={[
                   "rounded-xl px-4 py-2 text-sm font-semibold transition",
                   activeTab === "content"
-                    ? "bg-[#00ffb4] text-[#0a0e17]"
+                    ? "bg-[#FFD41C] text-[#0a0e17]"
                     : "text-[#9fb0c9] hover:text-white",
                 ].join(" ")}
               >
@@ -759,19 +809,19 @@ export default function AdminPage({ adminUser, onLogout }) {
               type="button"
               onClick={fetchUsers}
               disabled={loading}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#00ffb4]/30 bg-[#00ffb4]/10 px-4 py-3 text-sm font-semibold text-[#00ffb4] transition hover:bg-[#00ffb4]/16 disabled:opacity-50"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#FFD41C]/30 bg-[#FFD41C]/10 px-4 py-3 text-sm font-semibold text-[#FFD41C] transition hover:bg-[#FFD41C]/16 disabled:opacity-50"
             >
               <RefreshCw className={["h-4 w-4", loading ? "animate-spin" : ""].join(" ")} />
               {loading ? "Refreshing..." : "Refresh"}
             </button>
 
             {/* Dropdown */}
-            <div className="relative">
+            <div className="relative z-[1010]">
               <button
                 className="flex items-center gap-3 rounded-2xl border border-[#1a2438] bg-[#0b1220] px-4 py-3 text-sm text-[#dbe6f5] transition hover:bg-white/[0.04]"
                 onClick={() => setDropdownOpen(!dropdownOpen)}
               >
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-[#00ffb4]/25 bg-[#00ffb4]/10 text-sm font-bold uppercase text-[#00ffb4]">
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-[#FFD41C]/25 bg-[#FFD41C]/10 text-sm font-bold uppercase text-[#FFD41C]">
                   {adminProfile?.avatarUrl ? (
                     <img src={adminProfile.avatarUrl} alt="Admin profile" className="h-full w-full rounded-xl object-cover" />
                   ) : (
@@ -783,7 +833,7 @@ export default function AdminPage({ adminUser, onLogout }) {
               </button>
 
               {dropdownOpen && (
-                <div className="absolute right-0 z-20 mt-2 w-52 overflow-hidden rounded-2xl border border-[#1a2438] bg-[#0b1220] shadow-[0_24px_60px_rgba(0,0,0,0.42)]">
+                <div className="absolute right-0 z-[1020] mt-2 w-52 overflow-hidden rounded-2xl border border-[#1a2438] bg-[#0b1220] shadow-[0_24px_60px_rgba(0,0,0,0.42)]">
                   <button
                     className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-[#dbe6f5] transition hover:bg-white/[0.05]"
                     onClick={() => {
@@ -791,8 +841,18 @@ export default function AdminPage({ adminUser, onLogout }) {
                       setIsProfileOpen(true);
                     }}
                   >
-                    <Settings className="h-4 w-4 text-[#7a8ba8]" />
+                    <SettingsIcon className="h-4 w-4 text-[#7a8ba8]" />
                     Profile
+                  </button>
+                  <button
+                    className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-[#dbe6f5] transition hover:bg-white/[0.05]"
+                    onClick={() => {
+                      setDropdownOpen(false);
+                      setIsSettingsOpen(true);
+                    }}
+                  >
+                    <SettingsIcon className="h-4 w-4 text-[#7a8ba8]" />
+                    Settings
                   </button>
                   <button
                     className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-red-200 transition hover:bg-red-500/10"
@@ -813,6 +873,13 @@ export default function AdminPage({ adminUser, onLogout }) {
           onClose={() => setIsProfileOpen(false)}
           profile={adminProfile}
           onProfileUpdated={setAdminProfile}
+        />
+        <SettingsModal
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+          settings={settings}
+          onChange={handleSettingChange}
+          onEditProfile={() => setIsProfileOpen(true)}
         />
 
         {/* ACCOUNT MANAGEMENT */}
@@ -858,14 +925,14 @@ export default function AdminPage({ adminUser, onLogout }) {
                                   value={editFirstName}
                                   onChange={(e) => setEditFirstName(e.target.value)}
                                   placeholder="First Name"
-                                  className="rounded-xl border border-[#1a2438] bg-[#0b1220] px-3 py-2 text-sm text-white outline-none focus:border-[#00ffb4]/40 focus:ring-2 focus:ring-[#00ffb4]/15"
+                                  className="rounded-xl border border-[#1a2438] bg-[#0b1220] px-3 py-2 text-sm text-white outline-none focus:border-[#FFD41C]/40 focus:ring-2 focus:ring-[#FFD41C]/15"
                                 />
                                 <input
                                   type="text"
                                   value={editLastName}
                                   onChange={(e) => setEditLastName(e.target.value)}
                                   placeholder="Last Name"
-                                  className="rounded-xl border border-[#1a2438] bg-[#0b1220] px-3 py-2 text-sm text-white outline-none focus:border-[#00ffb4]/40 focus:ring-2 focus:ring-[#00ffb4]/15"
+                                  className="rounded-xl border border-[#1a2438] bg-[#0b1220] px-3 py-2 text-sm text-white outline-none focus:border-[#FFD41C]/40 focus:ring-2 focus:ring-[#FFD41C]/15"
                                 />
                               </div>
                             ) : (
@@ -903,7 +970,7 @@ export default function AdminPage({ adminUser, onLogout }) {
                           </div>
 
                           <div>
-                            <span className="rounded-full border border-[#00ffb4]/20 bg-[#00ffb4]/10 px-3 py-1.5 text-sm font-bold text-[#00ffb4]">
+                            <span className="rounded-full border border-[#FFD41C]/20 bg-[#FFD41C]/10 px-3 py-1.5 text-sm font-bold text-[#FFD41C]">
                               {account.averageScore}%
                             </span>
                           </div>
@@ -915,7 +982,7 @@ export default function AdminPage({ adminUser, onLogout }) {
                                   type="button"
                                   onClick={() => saveEdit(account.id)}
                                   disabled={savingId === account.id}
-                                  className="rounded-xl bg-[#00ffb4] px-3 py-2 text-sm font-bold text-[#0a0e17] transition hover:scale-[1.01] disabled:opacity-60"
+                                  className="rounded-xl bg-[#FFD41C] px-3 py-2 text-sm font-bold text-[#0a0e17] transition hover:scale-[1.01] disabled:opacity-60"
                                 >
                                   {savingId === account.id ? "Saving..." : "Save"}
                                 </button>
@@ -931,7 +998,7 @@ export default function AdminPage({ adminUser, onLogout }) {
                               <button
                                 type="button"
                                 onClick={() => startEdit(account)}
-                                className="rounded-xl border border-[#00ffb4]/30 bg-[#00ffb4]/10 px-4 py-2 text-sm font-semibold text-[#00ffb4] transition hover:bg-[#00ffb4]/16"
+                                className="rounded-xl border border-[#FFD41C]/30 bg-[#FFD41C]/10 px-4 py-2 text-sm font-semibold text-[#FFD41C] transition hover:bg-[#FFD41C]/16"
                               >
                                 Update
                               </button>
@@ -1001,23 +1068,7 @@ export default function AdminPage({ adminUser, onLogout }) {
 
                 <div className="overflow-x-auto pb-2">
                   <div className="min-w-[1120px]">
-                    <div className="flex h-48 items-end gap-3">
-                      {analyticsData.completionTrend.map((item) => (
-                        <div
-                          key={item.key}
-                          className="flex flex-1 flex-col items-center justify-end gap-2"
-                        >
-                          <div
-                            className="w-full rounded-t-md bg-[#00ffb4] shadow-[0_0_24px_rgba(0,255,180,0.18)] transition-all duration-300"
-                            style={{ height: `${Math.max(item.percent, 4)}%` }}
-                            title={`${item.completed}/${item.total} completed`}
-                          />
-                          <span className="text-xs text-[#9fb0c9]">
-                            {item.percent}%
-                          </span>
-                        </div>
-                      ))}
-                    </div>
+                    <LineChart data={analyticsData.completionTrend} height={160} />
 
                     <div className="mt-3 flex justify-between text-xs text-[#7a8ba8]">
                       {analyticsData.completionTrend.map((item) => (
@@ -1048,7 +1099,7 @@ export default function AdminPage({ adminUser, onLogout }) {
                         </div>
                       </div>
 
-                      <div className="shrink-0 rounded-xl border border-[#00ffb4]/20 bg-[#00ffb4]/10 px-4 py-2 font-bold text-[#00ffb4]">
+                      <div className="shrink-0 rounded-xl border border-[#FFD41C]/20 bg-[#FFD41C]/10 px-4 py-2 font-bold text-[#FFD41C]">
                         {analyticsData.userOverview.averageScore}%
                       </div>
                     </div>

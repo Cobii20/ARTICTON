@@ -99,7 +99,7 @@ function Scene({ placementApi, onComplete }) {
 
   return (
     <>
-      <color attach="background" args={["#05080D"]} />
+      <color attach="background" args={[typeof document !== "undefined" && document.documentElement.classList.contains("articton-light") ? "#f8f9ff" : "#05080D"]} />
       <ambientLight intensity={0.5} />
       <directionalLight
         position={[6, 10, 6]}
@@ -164,17 +164,17 @@ function PulsingRing() {
     >
       <mesh ref={innerFillRef}>
         <planeGeometry args={[CELL_SIZE * 0.1, CELL_SIZE * 0.1]} />
-        <meshBasicMaterial color="#00ffb4" transparent opacity={0.15} />
+        <meshBasicMaterial color="#FFD41C" transparent opacity={0.15} />
       </mesh>
 
       <mesh ref={outerRef} position={[0, 0, 0.01]}>
         <ringGeometry args={[0.045, 0.08, 48]} />
-        <meshBasicMaterial color="#00ffb4" transparent opacity={0.9} />
+        <meshBasicMaterial color="#FFD41C" transparent opacity={0.9} />
       </mesh>
 
       <mesh position={[0, 0, 0.02]}>
         <ringGeometry args={[0.018, 0.04, 48]} />
-        <meshBasicMaterial color="#00ffb4" transparent opacity={0.5} />
+        <meshBasicMaterial color="#FFD41C" transparent opacity={0.5} />
       </mesh>
     </group>
   );

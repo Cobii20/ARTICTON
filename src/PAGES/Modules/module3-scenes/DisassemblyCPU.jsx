@@ -98,7 +98,7 @@ function Scene({ placementApi, onComplete }) {
 
   return (
     <>
-      <color attach="background" args={["#05080D"]} />
+      <color attach="background" args={[typeof document !== "undefined" && document.documentElement.classList.contains("articton-light") ? "#f8f9ff" : "#05080D"]} />
 
       <ambientLight intensity={0.5} />
 
@@ -167,7 +167,7 @@ function PulsingRing() {
     >
       <mesh ref={ringRef} position={[0, 0, 0.01]}>
         <ringGeometry args={[0.18, 0.32, 48]} />
-        <meshBasicMaterial color="#00ffb4" transparent opacity={0.9} />
+        <meshBasicMaterial color="#FFD41C" transparent opacity={0.9} />
       </mesh>
     </group>
   );

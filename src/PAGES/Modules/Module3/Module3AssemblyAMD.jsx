@@ -1545,7 +1545,7 @@ function InteractiveCenteredObject({
         <bufferGeometry />
         <lineBasicMaterial
           ref={tetherMaterialRef}
-          color="#00ffb4"
+          color="#FFD41C"
           transparent
           opacity={0.45}
           depthTest={false}
@@ -1562,7 +1562,7 @@ function InteractiveCenteredObject({
         <ringGeometry args={[captureRingRadius * 0.72, captureRingRadius, 64]} />
         <meshBasicMaterial
           ref={captureRingMaterialRef}
-          color="#00ffb4"
+          color="#FFD41C"
           transparent
           opacity={0.18}
           side={THREE.DoubleSide}
@@ -1642,7 +1642,7 @@ function InstallationTargetGuide({ part, seatOffsetLocal = null }) {
       object.raycast = () => null;
       object.renderOrder = 1000;
       const material = new THREE.MeshBasicMaterial({
-        color: "#00ffb4",
+        color: "#FFD41C",
         transparent: true,
         opacity: part.key === "cpu" ? 0.04 : 0.09,
         depthTest: false,
@@ -1739,7 +1739,7 @@ function InstallationTargetGuide({ part, seatOffsetLocal = null }) {
       <mesh ref={markerRef} position={guideData.center.toArray()} renderOrder={1002}>
         <sphereGeometry args={[markerRadius, 24, 16]} />
         <meshBasicMaterial
-          color="#00ffb4"
+          color="#FFD41C"
           transparent
           opacity={0.7}
           wireframe
@@ -1757,8 +1757,8 @@ function InstallationTargetGuide({ part, seatOffsetLocal = null }) {
         occlude={false}
         style={{ pointerEvents: "none" }}
       >
-        <div className="whitespace-nowrap rounded-xl border border-[#00ffb4]/40 bg-[#07111d]/95 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#73ffd4] shadow-[0_12px_35px_rgba(0,0,0,0.5)] backdrop-blur-md">
-          <span className="mr-2 inline-flex rounded-full border border-[#00ffb4]/35 bg-[#00ffb4]/12 px-2 py-0.5 text-[8px]">TARGET</span>
+        <div className="whitespace-nowrap rounded-xl border border-[#FFD41C]/40 bg-[#07111d]/95 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#73ffd4] shadow-[0_12px_35px_rgba(0,0,0,0.5)] backdrop-blur-md">
+          <span className="mr-2 inline-flex rounded-full border border-[#FFD41C]/35 bg-[#FFD41C]/12 px-2 py-0.5 text-[8px]">TARGET</span>
           Install {COMPONENT_LABELS[part.key]} here
         </div>
       </Html>
@@ -1994,7 +1994,7 @@ function MotherboardUnit({
 function Loader() {
   return (
     <Html center>
-      <div className="rounded-xl border border-[#1a2438] bg-[#0b1220]/90 px-4 py-2 text-xs font-semibold text-[#00ffb4]">
+      <div className="rounded-xl border border-[#1a2438] bg-[#0b1220]/90 px-4 py-2 text-xs font-semibold text-[#FFD41C]">
         Loading assembly scene...
       </div>
     </Html>
@@ -2325,7 +2325,7 @@ function ModelViewer({
         }}
         style={{ touchAction: "none" }}
       >
-        <color attach="background" args={["#070c14"]} />
+        <color attach="background" args={[typeof document !== "undefined" && document.documentElement.classList.contains("articton-light") ? "#f8f9ff" : "#070c14"]} />
         <hemisphereLight args={["#ffffff", "#182338", 1.12]} />
         <ambientLight intensity={0.7} />
         <directionalLight
@@ -2387,7 +2387,7 @@ function ModelViewer({
           type="button"
           onClick={() => setOverviewRequest((value) => value + 1)}
           disabled={isDraggingPart}
-          className="rounded-xl border border-[#00ffb4]/30 bg-[#0b1220]/92 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#7dffdc] shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl transition hover:bg-[#00ffb4]/12 disabled:cursor-not-allowed disabled:opacity-45"
+          className="rounded-xl border border-[#FFD41C]/30 bg-[#0b1220]/92 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#7dffdc] shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl transition hover:bg-[#FFD41C]/12 disabled:cursor-not-allowed disabled:opacity-45"
         >
           Reset Camera View
         </button>
@@ -2396,7 +2396,7 @@ function ModelViewer({
           onClick={toggleFullscreen}
           disabled={isDraggingPart}
           aria-pressed={isFullscreen}
-          className="rounded-xl border border-[#00ffb4]/30 bg-[#0b1220]/92 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#7dffdc] shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl transition hover:bg-[#00ffb4]/12 disabled:cursor-not-allowed disabled:opacity-45"
+          className="rounded-xl border border-[#FFD41C]/30 bg-[#0b1220]/92 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#7dffdc] shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl transition hover:bg-[#FFD41C]/12 disabled:cursor-not-allowed disabled:opacity-45"
           title={isFullscreen ? "Exit fullscreen view" : "Open the 3D workspace in fullscreen"}
         >
           {isFullscreen ? "Exit Full Screen" : "Full Screen"}
@@ -2404,16 +2404,16 @@ function ModelViewer({
       </div>
 
       {showGuides && telemetry ? (
-        <div className="pointer-events-none absolute bottom-4 left-4 z-[80] w-[min(320px,calc(100%-32px))] rounded-2xl border border-[#00ffb4]/25 bg-[#0b1220]/94 px-4 py-3 text-[11px] leading-5 text-[#dbe6f5] shadow-[0_12px_35px_rgba(0,0,0,0.4)] backdrop-blur-xl">
+        <div className="pointer-events-none absolute bottom-4 left-4 z-[80] w-[min(320px,calc(100%-32px))] rounded-2xl border border-[#FFD41C]/25 bg-[#0b1220]/94 px-4 py-3 text-[11px] leading-5 text-[#dbe6f5] shadow-[0_12px_35px_rgba(0,0,0,0.4)] backdrop-blur-xl">
           <div className="mb-1 flex items-center justify-between gap-4">
-            <span className="font-bold text-[#00ffb4]">{telemetry.label}</span>
-            <span className="rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.12em] text-[#7dffdc]">
+            <span className="font-bold text-[#FFD41C]">{telemetry.label}</span>
+            <span className="rounded-full border border-[#FFD41C]/25 bg-[#FFD41C]/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.12em] text-[#7dffdc]">
               {telemetry.magnetState}
             </span>
           </div>
           <div className="mb-2 h-1.5 overflow-hidden rounded-full bg-white/10">
             <div
-              className="h-full rounded-full bg-[#00ffb4] transition-[width] duration-150"
+              className="h-full rounded-full bg-[#FFD41C] transition-[width] duration-150"
               style={{ width: `${Math.round(telemetry.progress * 100)}%` }}
             />
           </div>
@@ -2459,7 +2459,7 @@ function HeaderDropdown({
       <details className="group relative z-50">
         <summary className="list-none cursor-pointer rounded-2xl border border-[#1a2438] bg-[#0d1220]/95 px-3 py-2.5 transition hover:bg-[#111b2f]">
           <div className="flex max-w-[230px] items-center justify-end gap-3">
-            <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/10 text-sm font-bold text-[#00ffb4]">
+            <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-[#FFD41C]/25 bg-[#FFD41C]/10 text-sm font-bold text-[#FFD41C]">
               {avatarUrl ? (
                 <img src={avatarUrl} alt="Profile" className="h-full w-full object-cover" />
               ) : (
@@ -2508,8 +2508,8 @@ function HeaderDropdown({
 function ModuleBackground() {
   return (
     <>
-      <div className="pointer-events-none absolute -left-44 -top-44 h-[720px] w-[720px] rounded-full bg-[#00ffb4]/10 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-56 -right-52 h-[820px] w-[820px] rounded-full bg-[#00ffb4]/6 blur-3xl" />
+      <div className="pointer-events-none absolute -left-44 -top-44 h-[720px] w-[720px] rounded-full bg-[#FFD41C]/10 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-56 -right-52 h-[820px] w-[820px] rounded-full bg-[#FFD41C]/6 blur-3xl" />
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#0a0e17] via-[#0a0e17] to-[#0d1220]" />
     </>
   );
@@ -2561,7 +2561,7 @@ function Sidebar({
         </div>
 
         <div
-          className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-3 pr-2 [scrollbar-color:rgba(0,255,180,0.35)_rgba(255,255,255,0.05)] [scrollbar-width:thin]"
+          className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-3 pr-2 [scrollbar-color:rgba(255,212,28,0.35)_rgba(255,255,255,0.05)] [scrollbar-width:thin]"
           style={{ scrollbarGutter: "stable" }}
         >
           {steps.map((item, index) => {
@@ -2579,7 +2579,7 @@ function Sidebar({
                 className={[
                   "flex w-full scroll-m-3 items-center gap-3 rounded-2xl border px-3 py-3 text-left transition",
                   active
-                    ? "border-[#00ffb4]/25 bg-[#00ffb4]/10"
+                    ? "border-[#FFD41C]/25 bg-[#FFD41C]/10"
                     : "border-[#1a2438] bg-white/[0.03]",
                   unlocked
                     ? "hover:bg-white/[0.06]"
@@ -2590,9 +2590,9 @@ function Sidebar({
                   className={[
                     "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold transition",
                     done
-                      ? "bg-[#00ffb4] text-[#0a0e17]"
+                      ? "bg-[#FFD41C] text-[#0a0e17]"
                       : active
-                      ? "border border-[#00ffb4]/35 bg-[#00ffb4]/10 text-[#00ffb4]"
+                      ? "border border-[#FFD41C]/35 bg-[#FFD41C]/10 text-[#FFD41C]"
                       : "border border-[#1a2438] bg-[#0d1220] text-[#7a8ba8]",
                   ].join(" ")}
                 >
@@ -2625,8 +2625,8 @@ function Sidebar({
               type="button"
               onClick={onViewCertificate}
               className={[
-                "flex items-center justify-center rounded-2xl bg-[#00ffb4] font-black text-[#0a0e17]",
-                "shadow-[0_18px_50px_rgba(0,255,180,0.22)] transition hover:scale-[1.03]",
+                "flex items-center justify-center rounded-2xl bg-[#FFD41C] font-black text-[#0a0e17]",
+                "shadow-[0_18px_50px_rgba(255,212,28,0.22)] transition hover:scale-[1.03]",
                 open ? "w-full px-5 py-3 text-sm" : "h-10 w-10 text-sm",
               ].join(" ")}
               title="View Certificate"
@@ -2658,10 +2658,10 @@ function Sidebar({
 function ModuleIntroCard({ platform, moduleType, onStart }) {
   return (
     <div className="absolute inset-0 z-[750] flex items-center justify-center bg-[#050912]/78 p-5 backdrop-blur-md">
-      <div className="relative w-full max-w-2xl overflow-hidden rounded-[30px] border border-[#00ffb4]/30 bg-[#0b1220]/96 p-7 shadow-[0_40px_120px_rgba(0,0,0,0.7)] md:p-9">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(0,255,180,0.13),transparent_42%)]" />
+      <div className="relative w-full max-w-2xl overflow-hidden rounded-[30px] border border-[#FFD41C]/30 bg-[#0b1220]/96 p-7 shadow-[0_40px_120px_rgba(0,0,0,0.7)] md:p-9">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(255,212,28,0.13),transparent_42%)]" />
         <div className="relative">
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/8 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-[#00ffb4]">
+          <div className="inline-flex items-center gap-2 rounded-full border border-[#FFD41C]/25 bg-[#FFD41C]/8 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-[#FFD41C]">
             Module 3 • {platform} Platform
           </div>
           <h2 className="mt-5 text-3xl font-black tracking-tight text-white md:text-4xl">
@@ -2673,19 +2673,19 @@ function ModuleIntroCard({ platform, moduleType, onStart }) {
 
           <div className="mt-6 grid gap-3 sm:grid-cols-3">
             <div className="rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4">
-              <div className="text-xs font-black uppercase tracking-[0.16em] text-[#00ffb4]">1. Identify</div>
+              <div className="text-xs font-black uppercase tracking-[0.16em] text-[#FFD41C]">1. Identify</div>
               <div className="mt-2 text-xs leading-5 text-[#9fb0ca]">
                 Read the step card first, then identify the highlighted component and its destination host: motherboard or flat case.
               </div>
             </div>
             <div className="rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4">
-              <div className="text-xs font-black uppercase tracking-[0.16em] text-[#00ffb4]">2. Move</div>
+              <div className="text-xs font-black uppercase tracking-[0.16em] text-[#FFD41C]">2. Move</div>
               <div className="mt-2 text-xs leading-5 text-[#9fb0ca]">
                 Perform the listed preparation and handling checks, then click-hold to lift and carry the component toward the host field.
               </div>
             </div>
             <div className="rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4">
-              <div className="text-xs font-black uppercase tracking-[0.16em] text-[#00ffb4]">3. Complete</div>
+              <div className="text-xs font-black uppercase tracking-[0.16em] text-[#FFD41C]">3. Complete</div>
               <div className="mt-2 text-xs leading-5 text-[#9fb0ca]">
                 Verify the final seated position against the card’s checklist before continuing to the next instruction guide.
               </div>
@@ -2699,7 +2699,7 @@ function ModuleIntroCard({ platform, moduleType, onStart }) {
             <button
               type="button"
               onClick={onStart}
-              className="rounded-2xl bg-[#00ffb4] px-7 py-3 text-sm font-black text-[#07111d] shadow-[0_16px_45px_rgba(0,255,180,0.25)] transition hover:scale-[1.03]"
+              className="rounded-2xl bg-[#FFD41C] px-7 py-3 text-sm font-black text-[#07111d] shadow-[0_16px_45px_rgba(255,212,28,0.25)] transition hover:scale-[1.03]"
             >
               Start Guided Practice →
             </button>
@@ -2739,13 +2739,13 @@ function StepInstructionCard({
       aria-modal="true"
       aria-labelledby="step-instruction-title"
     >
-      <div className="articton-instruction-card relative w-full max-w-4xl overflow-hidden rounded-[30px] border border-[#00ffb4]/35 bg-[#0b1220]/97 p-6 shadow-[0_40px_120px_rgba(0,0,0,0.76),0_0_70px_rgba(0,255,180,0.10)] md:p-8">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_0%,rgba(0,255,180,0.16),transparent_42%)]" />
-        <div className="pointer-events-none absolute -right-24 -top-24 h-56 w-56 rounded-full border border-[#00ffb4]/15 bg-[#00ffb4]/5 blur-2xl" />
+      <div className="articton-instruction-card relative w-full max-w-4xl overflow-hidden rounded-[30px] border border-[#FFD41C]/35 bg-[#0b1220]/97 p-6 shadow-[0_40px_120px_rgba(0,0,0,0.76),0_0_70px_rgba(255,212,28,0.10)] md:p-8">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_0%,rgba(255,212,28,0.16),transparent_42%)]" />
+        <div className="pointer-events-none absolute -right-24 -top-24 h-56 w-56 rounded-full border border-[#FFD41C]/15 bg-[#FFD41C]/5 blur-2xl" />
 
         <div className="articton-instruction-content relative">
           <div className="articton-instruction-topbar flex flex-wrap items-center justify-between gap-3">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#00ffb4]/30 bg-[#00ffb4]/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.22em] text-[#73ffd4]">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#FFD41C]/30 bg-[#FFD41C]/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.22em] text-[#73ffd4]">
               {isFinalChallenge
                 ? "Final Challenge • Before You Begin"
                 : `Step ${stepNumber} of ${totalSteps} • Before You Begin`}
@@ -2756,11 +2756,11 @@ function StepInstructionCard({
           </div>
 
           <div className="articton-instruction-hero mt-6 flex items-start gap-5">
-            <div className="articton-instruction-step-icon flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-[#00ffb4]/40 bg-[#00ffb4]/12 text-2xl font-black text-[#00ffb4] shadow-[0_0_34px_rgba(0,255,180,0.18)]">
+            <div className="articton-instruction-step-icon flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-[#FFD41C]/40 bg-[#FFD41C]/12 text-2xl font-black text-[#FFD41C] shadow-[0_0_34px_rgba(255,212,28,0.18)]">
               {isFinalChallenge ? "★" : stepNumber}
             </div>
             <div className="min-w-0">
-              <div className="text-[11px] font-black uppercase tracking-[0.24em] text-[#00ffb4]">
+              <div className="text-[11px] font-black uppercase tracking-[0.24em] text-[#FFD41C]">
                 Instruction Guide
               </div>
               <h2
@@ -2777,13 +2777,13 @@ function StepInstructionCard({
 
           <div className="articton-instruction-details mt-7 grid gap-4 lg:grid-cols-[1.35fr_0.85fr]">
             <section className="articton-instruction-procedure rounded-2xl border border-[#1a2438] bg-white/[0.035] p-5">
-              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-[#00ffb4]">
+              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-[#FFD41C]">
                 Correct Procedure
               </div>
               <ol className="mt-4 space-y-3">
                 {safeGuide.procedure.map((item, index) => (
                   <li key={`${stepName}-instruction-${index}`} className="flex gap-3 text-sm leading-6 text-[#d7e1ee]">
-                    <span className="articton-instruction-number flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[#00ffb4]/30 bg-[#00ffb4]/10 text-[10px] font-black text-[#00ffb4]">
+                    <span className="articton-instruction-number flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[#FFD41C]/30 bg-[#FFD41C]/10 text-[10px] font-black text-[#FFD41C]">
                       {index + 1}
                     </span>
                     <span>{item}</span>
@@ -2797,8 +2797,8 @@ function StepInstructionCard({
                 <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#ffd166]">Safety / Handling</div>
                 <p className="mt-2 text-xs leading-6 text-[#d8dfeb]">{safeGuide.safety}</p>
               </div>
-              <div className="articton-instruction-side-card rounded-2xl border border-[#00ffb4]/22 bg-[#00ffb4]/[0.06] p-4">
-                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#00ffb4]">Correct Result</div>
+              <div className="articton-instruction-side-card rounded-2xl border border-[#FFD41C]/22 bg-[#FFD41C]/[0.06] p-4">
+                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#FFD41C]">Correct Result</div>
                 <p className="mt-2 text-xs leading-6 text-[#d8dfeb]">{safeGuide.verify}</p>
               </div>
               <div className="articton-instruction-side-card rounded-2xl border border-[#ff7b72]/22 bg-[#ff7b72]/[0.055] p-4">
@@ -2808,8 +2808,8 @@ function StepInstructionCard({
             </div>
           </div>
 
-          <div className="articton-instruction-simulation mt-5 rounded-2xl border border-[#00ffb4]/18 bg-[#00ffb4]/6 px-4 py-3 text-xs leading-6 text-[#c3d1e4]">
-            <span className="font-black uppercase tracking-[0.14em] text-[#00ffb4]">In the simulation: </span>
+          <div className="articton-instruction-simulation mt-5 rounded-2xl border border-[#FFD41C]/18 bg-[#FFD41C]/6 px-4 py-3 text-xs leading-6 text-[#c3d1e4]">
+            <span className="font-black uppercase tracking-[0.14em] text-[#FFD41C]">In the simulation: </span>
             {safeGuide.simulation}
           </div>
 
@@ -2820,7 +2820,7 @@ function StepInstructionCard({
             <button
               type="button"
               onClick={onBegin}
-              className="articton-instruction-button rounded-2xl bg-[#00ffb4] px-7 py-3 text-sm font-black text-[#07111d] shadow-[0_16px_45px_rgba(0,255,180,0.20)] transition hover:scale-[1.02]"
+              className="articton-instruction-button rounded-2xl bg-[#FFD41C] px-7 py-3 text-sm font-black text-[#07111d] shadow-[0_16px_45px_rgba(255,212,28,0.20)] transition hover:scale-[1.02]"
             >
               {isFinalChallenge ? "Begin Final Challenge" : `Begin ${stepName}`} →
             </button>
@@ -2839,11 +2839,11 @@ function FullAssemblyCompletionCard({ platform, onReview, onCertificate }) {
       aria-modal="true"
       aria-labelledby="full-assembly-completion-title"
     >
-      <div className="relative w-full max-w-2xl overflow-hidden rounded-[30px] border border-[#00ffb4]/35 bg-[#0b1220]/97 p-7 shadow-[0_40px_120px_rgba(0,0,0,0.76),0_0_70px_rgba(0,255,180,0.10)] md:p-9">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_0%,rgba(0,255,180,0.16),transparent_42%)]" />
+      <div className="relative w-full max-w-2xl overflow-hidden rounded-[30px] border border-[#FFD41C]/35 bg-[#0b1220]/97 p-7 shadow-[0_40px_120px_rgba(0,0,0,0.76),0_0_70px_rgba(255,212,28,0.10)] md:p-9">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_0%,rgba(255,212,28,0.16),transparent_42%)]" />
         <div className="articton-instruction-content relative">
           <div className="articton-instruction-topbar flex flex-wrap items-center justify-between gap-3">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#00ffb4]/30 bg-[#00ffb4]/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.22em] text-[#73ffd4]">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#FFD41C]/30 bg-[#FFD41C]/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.22em] text-[#73ffd4]">
               Full Assembly Complete
             </div>
             <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-[#9fb0ca]">
@@ -2852,9 +2852,9 @@ function FullAssemblyCompletionCard({ platform, onReview, onCertificate }) {
           </div>
 
           <div className="articton-instruction-hero mt-6 flex items-start gap-5">
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-[#00ffb4]/40 bg-[#00ffb4]/12 text-3xl font-black text-[#00ffb4] shadow-[0_0_34px_rgba(0,255,180,0.18)]">✓</div>
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-[#FFD41C]/40 bg-[#FFD41C]/12 text-3xl font-black text-[#FFD41C] shadow-[0_0_34px_rgba(255,212,28,0.18)]">✓</div>
             <div className="min-w-0">
-              <div className="text-[11px] font-black uppercase tracking-[0.24em] text-[#00ffb4]">Validated Unguided Run</div>
+              <div className="text-[11px] font-black uppercase tracking-[0.24em] text-[#FFD41C]">Validated Unguided Run</div>
               <h2 id="full-assembly-completion-title" className="articton-instruction-title mt-2 text-2xl font-black leading-tight text-white md:text-4xl">
                 Your PC Is Fully Assembled
               </h2>
@@ -2866,15 +2866,15 @@ function FullAssemblyCompletionCard({ platform, onReview, onCertificate }) {
 
           <div className="mt-7 grid gap-3 sm:grid-cols-3">
             <div className="rounded-2xl border border-[#1a2438] bg-white/[0.035] p-4">
-              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#00ffb4]">Order</div>
+              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#FFD41C]">Order</div>
               <div className="mt-2 text-sm font-bold text-white">Validated</div>
             </div>
             <div className="rounded-2xl border border-[#1a2438] bg-white/[0.035] p-4">
-              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#00ffb4]">Placement</div>
+              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#FFD41C]">Placement</div>
               <div className="mt-2 text-sm font-bold text-white">All parts seated</div>
             </div>
             <div className="rounded-2xl border border-[#1a2438] bg-white/[0.035] p-4">
-              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#00ffb4]">Result</div>
+              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#FFD41C]">Result</div>
               <div className="mt-2 text-sm font-bold text-white">Certificate unlocked</div>
             </div>
           </div>
@@ -2883,7 +2883,7 @@ function FullAssemblyCompletionCard({ platform, onReview, onCertificate }) {
             <button type="button" onClick={onReview} className="rounded-2xl border border-[#1a2438] bg-white/[0.04] px-5 py-3 text-sm font-semibold text-[#dbe6f5] transition hover:bg-white/[0.08]">
               Review Finished PC
             </button>
-            <button type="button" onClick={onCertificate} className="rounded-2xl bg-[#00ffb4] px-6 py-3 text-sm font-black text-[#07111d] shadow-[0_16px_45px_rgba(0,255,180,0.18)] transition hover:scale-[1.02]">
+            <button type="button" onClick={onCertificate} className="rounded-2xl bg-[#FFD41C] px-6 py-3 text-sm font-black text-[#07111d] shadow-[0_16px_45px_rgba(255,212,28,0.18)] transition hover:scale-[1.02]">
               View Certificate →
             </button>
           </div>
@@ -2908,15 +2908,15 @@ function CompletionCertificate({
     <div className="min-h-screen w-full overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased print:bg-white">
       <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden px-5 py-8">
         <ModuleBackground />
-        <div className="relative z-10 w-full max-w-4xl overflow-hidden rounded-[34px] border border-[#00ffb4]/35 bg-[#0d1220]/94 p-7 text-center shadow-[0_40px_120px_rgba(0,0,0,0.65)] backdrop-blur-xl md:p-12 print:border-black print:bg-white print:text-black print:shadow-none">
-          <div className="pointer-events-none absolute inset-4 rounded-[26px] border border-dashed border-[#00ffb4]/30 print:border-black/40" />
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(0,255,180,0.14),transparent_42%)] print:hidden" />
+        <div className="relative z-10 w-full max-w-4xl overflow-hidden rounded-[34px] border border-[#FFD41C]/35 bg-[#0d1220]/94 p-7 text-center shadow-[0_40px_120px_rgba(0,0,0,0.65)] backdrop-blur-xl md:p-12 print:border-black print:bg-white print:text-black print:shadow-none">
+          <div className="pointer-events-none absolute inset-4 rounded-[26px] border border-dashed border-[#FFD41C]/30 print:border-black/40" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,212,28,0.14),transparent_42%)] print:hidden" />
 
           <div className="relative">
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-[#00ffb4]/40 bg-[#00ffb4]/10 text-4xl font-black text-[#00ffb4] shadow-[0_0_40px_rgba(0,255,180,0.18)] print:border-black print:bg-transparent print:text-black">
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-[#FFD41C]/40 bg-[#FFD41C]/10 text-4xl font-black text-[#FFD41C] shadow-[0_0_40px_rgba(255,212,28,0.18)] print:border-black print:bg-transparent print:text-black">
               ✓
             </div>
-            <div className="mt-5 text-[11px] font-black uppercase tracking-[0.34em] text-[#00ffb4] print:text-black">
+            <div className="mt-5 text-[11px] font-black uppercase tracking-[0.34em] text-[#FFD41C] print:text-black">
               Certificate of Completion
             </div>
             <h1 className="mt-3 text-4xl font-black tracking-tight text-white md:text-6xl print:text-black">
@@ -2951,14 +2951,14 @@ function CompletionCertificate({
               <button
                 type="button"
                 onClick={onBack}
-                className="rounded-2xl bg-[#00ffb4] px-6 py-3 text-sm font-black text-[#07111d] transition hover:scale-[1.03]"
+                className="rounded-2xl bg-[#FFD41C] px-6 py-3 text-sm font-black text-[#07111d] transition hover:scale-[1.03]"
               >
                 Back to Modules →
               </button>
               <button
                 type="button"
                 onClick={onSwitchPlatform}
-                className="rounded-2xl border border-[#00ffb4]/35 bg-[#00ffb4]/10 px-6 py-3 text-sm font-black text-[#7dffdc] transition hover:bg-[#00ffb4]/18"
+                className="rounded-2xl border border-[#FFD41C]/35 bg-[#FFD41C]/10 px-6 py-3 text-sm font-black text-[#7dffdc] transition hover:bg-[#FFD41C]/18"
               >
                 Try {alternatePlatform} Version
               </button>
@@ -3392,7 +3392,7 @@ export default function Module3AssemblyAMD({
   }
 
   return (
-      <div className="fixed inset-0 h-screen w-screen overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased">
+      <div className="articton-app-shell articton-module-page fixed inset-0 h-screen w-screen overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased">
       <div className="relative h-full w-full overflow-hidden">
         <ModuleBackground />
         <AchievementToast achievement={achievementToast} onClose={() => setAchievementToast(null)} />
@@ -3427,9 +3427,9 @@ export default function Module3AssemblyAMD({
         ) : null}
 
         <div className="relative flex h-full w-full flex-col overflow-hidden">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(0,255,180,0.08),transparent_35%)]" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_88%_20%,rgba(0,255,180,0.05),transparent_30%)]" />
-          <div className="absolute inset-0 bg-[linear-gradient(rgba(0,255,180,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,180,0.025)_1px,transparent_1px)] bg-[size:54px_54px] opacity-55" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(255,212,28,0.08),transparent_35%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_88%_20%,rgba(255,212,28,0.05),transparent_30%)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(rgba(255,212,28,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(255,212,28,0.025)_1px,transparent_1px)] bg-[size:54px_54px] opacity-55" />
 
           <div className="relative flex h-full w-full flex-col overflow-hidden">
             <div className="flex items-center justify-between px-6 pt-6 text-[12px] text-[#7a8ba8] md:px-10">
@@ -3453,7 +3453,7 @@ export default function Module3AssemblyAMD({
                     <div className="text-base font-bold tracking-wide text-white">
                       Articton
                     </div>
-                    <div className="text-[11px] uppercase tracking-[0.24em] text-[#00ffb4]">
+                    <div className="text-[11px] uppercase tracking-[0.24em] text-[#FFD41C]">
                       AMD Assembly View
                     </div>
                   </div>
@@ -3461,7 +3461,7 @@ export default function Module3AssemblyAMD({
 
                 <div className="flex flex-wrap items-center justify-end gap-3">
                   {validationMessage ? (
-                    <div className="max-w-[540px] rounded-2xl border border-[#00ffb4]/20 bg-[#00ffb4]/8 px-4 py-2 text-xs font-semibold text-[#dffef5]">
+                    <div className="max-w-[540px] rounded-2xl border border-[#FFD41C]/20 bg-[#FFD41C]/8 px-4 py-2 text-xs font-semibold text-[#dffef5]">
                       {validationMessage}
                     </div>
                   ) : null}
@@ -3505,9 +3505,9 @@ export default function Module3AssemblyAMD({
                       key={item.key}
                       className={`h-2.5 w-9 rounded-full transition ${
                         index === step
-                          ? "bg-[#00ffb4]"
+                          ? "bg-[#FFD41C]"
                           : index < step
-                          ? "bg-[#00ffb4]/55"
+                          ? "bg-[#FFD41C]/55"
                           : "bg-white/10"
                       }`}
                     />
@@ -3567,7 +3567,7 @@ export default function Module3AssemblyAMD({
                       <button
                         type="button"
                         onClick={() => setAiOpen(true)}
-                        className="rounded-2xl border border-[#00ffb4]/25 bg-[#0b1220]/90 px-4 py-3 text-sm font-semibold text-[#00ffb4] shadow-[0_10px_40px_rgba(0,255,180,0.15)] backdrop-blur-xl transition hover:scale-[1.03]"
+                        className="rounded-2xl border border-[#FFD41C]/25 bg-[#0b1220]/90 px-4 py-3 text-sm font-semibold text-[#FFD41C] shadow-[0_10px_40px_rgba(255,212,28,0.15)] backdrop-blur-xl transition hover:scale-[1.03]"
                       >
                         AI Assistant
                       </button>
@@ -3597,7 +3597,7 @@ export default function Module3AssemblyAMD({
                               key={index}
                               className={`rounded-2xl px-4 py-3 text-sm leading-6 ${
                                 message.role === "assistant"
-                                  ? "bg-[#00ffb4]/10 text-[#dffef5]"
+                                  ? "bg-[#FFD41C]/10 text-[#dffef5]"
                                   : "bg-white/5 text-white"
                               }`}
                             >
@@ -3621,13 +3621,13 @@ export default function Module3AssemblyAMD({
                                 }
                               }}
                               placeholder="Ask about this step..."
-                              className="flex-1 rounded-xl border border-[#1a2438] bg-[#111827] px-4 py-3 text-sm text-white outline-none transition focus:border-[#00ffb4]/35"
+                              className="flex-1 rounded-xl border border-[#1a2438] bg-[#111827] px-4 py-3 text-sm text-white outline-none transition focus:border-[#FFD41C]/35"
                             />
                             <button
                               type="button"
                               onClick={askAI}
                               disabled={aiLoading}
-                              className="rounded-xl bg-[#00ffb4] px-4 py-3 text-sm font-bold text-[#0a0e17] transition hover:scale-[1.03] disabled:cursor-not-allowed disabled:opacity-60"
+                              className="rounded-xl bg-[#FFD41C] px-4 py-3 text-sm font-bold text-[#0a0e17] transition hover:scale-[1.03] disabled:cursor-not-allowed disabled:opacity-60"
                             >
                               {aiLoading ? "..." : "Send"}
                             </button>

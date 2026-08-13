@@ -1462,7 +1462,7 @@ function InteractiveCenteredObject({
         <bufferGeometry />
         <lineBasicMaterial
           ref={tetherMaterialRef}
-          color="#00ffb4"
+          color="#FFD41C"
           transparent
           opacity={0.45}
           depthTest={false}
@@ -1479,7 +1479,7 @@ function InteractiveCenteredObject({
         <ringGeometry args={[captureRingRadius * 0.72, captureRingRadius, 64]} />
         <meshBasicMaterial
           ref={captureRingMaterialRef}
-          color="#00ffb4"
+          color="#FFD41C"
           transparent
           opacity={0.18}
           side={THREE.DoubleSide}
@@ -1748,7 +1748,7 @@ function MotherboardUnit({
 function Loader() {
   return (
     <Html center>
-      <div className="rounded-xl border border-[#1a2438] bg-[#0b1220]/90 px-4 py-2 text-xs font-semibold text-[#00ffb4]">
+      <div className="rounded-xl border border-[#1a2438] bg-[#0b1220]/90 px-4 py-2 text-xs font-semibold text-[#FFD41C]">
         Loading test scene...
       </div>
     </Html>
@@ -2025,7 +2025,7 @@ function ModelViewer({
         gl={{ antialias: true, powerPreference: "high-performance", alpha: false, stencil: false }}
         style={{ touchAction: "none" }}
       >
-        <color attach="background" args={["#070c14"]} />
+        <color attach="background" args={[typeof document !== "undefined" && document.documentElement.classList.contains("articton-light") ? "#f8f9ff" : "#070c14"]} />
         <hemisphereLight args={["#ffffff", "#182338", 1.12]} />
         <ambientLight intensity={0.7} />
         <directionalLight position={[6, 10, 7]} intensity={1.72} castShadow shadow-mapSize-width={1024} shadow-mapSize-height={1024} />
@@ -2073,7 +2073,7 @@ function ModelViewer({
           type="button"
           onClick={() => setOverviewRequest((value) => value + 1)}
           disabled={isDraggingPart}
-          className="rounded-xl border border-[#00ffb4]/30 bg-[#00ffb4]/12 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#7dffdc] shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl transition hover:bg-[#00ffb4]/20 disabled:cursor-not-allowed disabled:opacity-45"
+          className="rounded-xl border border-[#FFD41C]/30 bg-[#FFD41C]/12 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#7dffdc] shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl transition hover:bg-[#FFD41C]/20 disabled:cursor-not-allowed disabled:opacity-45"
         >
           Reset Camera View
         </button>
@@ -2082,7 +2082,7 @@ function ModelViewer({
           onClick={toggleFullscreen}
           disabled={isDraggingPart}
           aria-pressed={isFullscreen}
-          className="rounded-xl border border-[#00ffb4]/30 bg-[#0b1220]/92 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#7dffdc] shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl transition hover:bg-[#00ffb4]/12 disabled:cursor-not-allowed disabled:opacity-45"
+          className="rounded-xl border border-[#FFD41C]/30 bg-[#0b1220]/92 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#7dffdc] shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl transition hover:bg-[#FFD41C]/12 disabled:cursor-not-allowed disabled:opacity-45"
         >
           {isFullscreen ? "Exit Full Screen" : "Full Screen"}
         </button>
@@ -2105,7 +2105,7 @@ function HeaderDropdown({ onBack, setIsSettingsOpen, profile }) {
   return (
     <div className="flex flex-wrap items-center justify-end gap-3">
       <div className="flex max-w-[230px] items-center gap-3 rounded-2xl border border-[#1a2438] bg-[#0d1220]/95 px-3 py-2.5">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/10 text-sm font-bold uppercase text-[#00ffb4]">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[#FFD41C]/25 bg-[#FFD41C]/10 text-sm font-bold uppercase text-[#FFD41C]">
           {avatarUrl ? (
             <img src={avatarUrl} alt="Profile" className="h-full w-full object-cover" />
           ) : (
@@ -2138,8 +2138,8 @@ function HeaderDropdown({ onBack, setIsSettingsOpen, profile }) {
 function ModuleBackground() {
   return (
     <>
-      <div className="pointer-events-none absolute -left-44 -top-44 h-[720px] w-[720px] rounded-full bg-[#00ffb4]/10 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-56 -right-52 h-[820px] w-[820px] rounded-full bg-[#00ffb4]/6 blur-3xl" />
+      <div className="pointer-events-none absolute -left-44 -top-44 h-[720px] w-[720px] rounded-full bg-[#FFD41C]/10 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-56 -right-52 h-[820px] w-[820px] rounded-full bg-[#FFD41C]/6 blur-3xl" />
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#0a0e17] via-[#0a0e17] to-[#0d1220]" />
     </>
   );
@@ -2166,12 +2166,12 @@ function ChecklistSidebar({ open, onToggle, completedParts, checklistOrder, onRe
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-3 pr-2 [scrollbar-color:rgba(0,255,180,0.35)_rgba(255,255,255,0.05)] [scrollbar-width:thin]">
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-3 pr-2 [scrollbar-color:rgba(255,212,28,0.35)_rgba(255,255,255,0.05)] [scrollbar-width:thin]">
           {(checklistOrder || ASSEMBLY_SEQUENCE).map((key, index) => {
             const done = completedParts.includes(key);
             return (
-              <div key={key} className={["flex w-full items-center gap-3 rounded-2xl border px-3 py-3 text-left transition", done ? "border-[#00ffb4]/25 bg-[#00ffb4]/10" : "border-[#1a2438] bg-white/[0.03]"].join(" ")}>
-                <span className={["flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold transition", done ? "bg-[#00ffb4] text-[#0a0e17]" : "border border-[#1a2438] bg-[#0d1220] text-[#7a8ba8]"].join(" ")}>{index + 1}</span>
+              <div key={key} className={["flex w-full items-center gap-3 rounded-2xl border px-3 py-3 text-left transition", done ? "border-[#FFD41C]/25 bg-[#FFD41C]/10" : "border-[#1a2438] bg-white/[0.03]"].join(" ")}>
+                <span className={["flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold transition", done ? "bg-[#FFD41C] text-[#0a0e17]" : "border border-[#1a2438] bg-[#0d1220] text-[#7a8ba8]"].join(" ")}>{index + 1}</span>
                 {open ? (
                   <div className="min-w-0">
                     <div className="truncate text-sm font-semibold text-white">Step {index + 1}</div>
@@ -2195,8 +2195,8 @@ function ChecklistSidebar({ open, onToggle, completedParts, checklistOrder, onRe
 function TestIntroCard({ onStart }) {
   return (
     <div className="absolute inset-0 z-[750] flex items-center justify-center bg-[#050912]/78 p-5 backdrop-blur-md">
-      <div className="relative w-full max-w-2xl overflow-hidden rounded-[30px] border border-[#00ffb4]/30 bg-[#0b1220]/96 p-7 shadow-[0_40px_120px_rgba(0,0,0,0.7)] md:p-9">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(0,255,180,0.13),transparent_42%)]" />
+      <div className="relative w-full max-w-2xl overflow-hidden rounded-[30px] border border-[#FFD41C]/30 bg-[#0b1220]/96 p-7 shadow-[0_40px_120px_rgba(0,0,0,0.7)] md:p-9">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(255,212,28,0.13),transparent_42%)]" />
         <div className="relative">
           <div className="inline-flex items-center gap-2 rounded-full border border-[#ff9f7d]/30 bg-[#ff9f7d]/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-[#ff9f7d]">
             Practical Test • INTEL Platform
@@ -2211,15 +2211,15 @@ function TestIntroCard({ onStart }) {
 
           <div className="mt-6 grid gap-3 sm:grid-cols-3">
             <div className="rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4">
-              <div className="text-xs font-black uppercase tracking-[0.16em] text-[#00ffb4]">No Guides</div>
+              <div className="text-xs font-black uppercase tracking-[0.16em] text-[#FFD41C]">No Guides</div>
               <div className="mt-2 text-xs leading-5 text-[#9fb0ca]">No install targets or wireframes shown. Rely on what you know.</div>
             </div>
             <div className="rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4">
-              <div className="text-xs font-black uppercase tracking-[0.16em] text-[#00ffb4]">Free Order</div>
+              <div className="text-xs font-black uppercase tracking-[0.16em] text-[#FFD41C]">Free Order</div>
               <div className="mt-2 text-xs leading-5 text-[#9fb0ca]">Populate the motherboard before it goes in the case, then fill the case.</div>
             </div>
             <div className="rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4">
-              <div className="text-xs font-black uppercase tracking-[0.16em] text-[#00ffb4]">Scored</div>
+              <div className="text-xs font-black uppercase tracking-[0.16em] text-[#FFD41C]">Scored</div>
               <div className="mt-2 text-xs leading-5 text-[#9fb0ca]">Confirmed sequence errors and failed placement attempts cost points.</div>
             </div>
           </div>
@@ -2229,7 +2229,7 @@ function TestIntroCard({ onStart }) {
             <button
               type="button"
               onClick={onStart}
-              className="rounded-2xl bg-[#00ffb4] px-7 py-3 text-sm font-black text-[#07111d] shadow-[0_16px_45px_rgba(0,255,180,0.25)] transition hover:scale-[1.03]"
+              className="rounded-2xl bg-[#FFD41C] px-7 py-3 text-sm font-black text-[#07111d] shadow-[0_16px_45px_rgba(255,212,28,0.25)] transition hover:scale-[1.03]"
             >
               Begin Test →
             </button>
@@ -2246,25 +2246,25 @@ function ResultsCard({ result, onRetry, onBackToDashboard }) {
 
   return (
     <div className="absolute inset-0 z-[780] flex items-center justify-center bg-[#050912]/86 p-5 backdrop-blur-md" role="dialog" aria-modal="true">
-      <div className="relative w-full max-w-2xl overflow-hidden rounded-[30px] border border-[#00ffb4]/35 bg-[#0b1220]/97 p-7 shadow-[0_40px_120px_rgba(0,0,0,0.76),0_0_70px_rgba(0,255,180,0.10)] md:p-9">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_0%,rgba(0,255,180,0.16),transparent_42%)]" />
+      <div className="relative w-full max-w-2xl overflow-hidden rounded-[30px] border border-[#FFD41C]/35 bg-[#0b1220]/97 p-7 shadow-[0_40px_120px_rgba(0,0,0,0.76),0_0_70px_rgba(255,212,28,0.10)] md:p-9">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_0%,rgba(255,212,28,0.16),transparent_42%)]" />
 
         <div className="relative">
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#00ffb4]/30 bg-[#00ffb4]/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.22em] text-[#73ffd4]">
+          <div className="inline-flex items-center gap-2 rounded-full border border-[#FFD41C]/30 bg-[#FFD41C]/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.22em] text-[#73ffd4]">
             Test Complete • INTEL Full Assembly
           </div>
 
           <div className="mt-6 flex items-center gap-6">
             <div
               className={[
-                "flex h-24 w-24 shrink-0 items-center justify-center rounded-full border-4 text-4xl font-black shadow-[0_0_34px_rgba(0,255,180,0.18)]",
-                isPass ? "border-[#00ffb4]/50 bg-[#00ffb4]/10 text-[#00ffb4]" : "border-[#ff7d7d]/50 bg-[#ff7d7d]/10 text-[#ff9f9f]",
+                "flex h-24 w-24 shrink-0 items-center justify-center rounded-full border-4 text-4xl font-black shadow-[0_0_34px_rgba(255,212,28,0.18)]",
+                isPass ? "border-[#FFD41C]/50 bg-[#FFD41C]/10 text-[#FFD41C]" : "border-[#ff7d7d]/50 bg-[#ff7d7d]/10 text-[#ff9f9f]",
               ].join(" ")}
             >
               {grade.letter}
             </div>
             <div className="min-w-0">
-              <div className="text-[11px] font-black uppercase tracking-[0.24em] text-[#00ffb4]">{grade.tone}</div>
+              <div className="text-[11px] font-black uppercase tracking-[0.24em] text-[#FFD41C]">{grade.tone}</div>
               <h2 className="mt-2 text-3xl font-black leading-tight text-white">{result.score} / 100</h2>
               <p className="mt-2 text-sm leading-6 text-[#9fb0ca]">
                 {isPass
@@ -2276,11 +2276,11 @@ function ResultsCard({ result, onRetry, onBackToDashboard }) {
 
           <div className="mt-7 grid gap-3 sm:grid-cols-4">
             <div className="rounded-2xl border border-[#1a2438] bg-white/[0.035] p-4">
-              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#00ffb4]">Time</div>
+              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#FFD41C]">Time</div>
               <div className="mt-2 text-sm font-bold text-white">{formatDuration(result.elapsedSeconds)}</div>
             </div>
             <div className="rounded-2xl border border-[#1a2438] bg-white/[0.035] p-4">
-              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#00ffb4]">Parts Installed</div>
+              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#FFD41C]">Parts Installed</div>
               <div className="mt-2 text-sm font-bold text-white">{result.partsCompleted} / {ASSEMBLY_SEQUENCE.length}</div>
             </div>
             <div className="rounded-2xl border border-[#1a2438] bg-white/[0.035] p-4">
@@ -2294,7 +2294,7 @@ function ResultsCard({ result, onRetry, onBackToDashboard }) {
             </div>
           </div>
 
-          <div className="mt-7 rounded-2xl border border-[#00ffb4]/18 bg-[#00ffb4]/6 px-4 py-3 text-xs leading-6 text-[#b7c6dd]">
+          <div className="mt-7 rounded-2xl border border-[#FFD41C]/18 bg-[#FFD41C]/6 px-4 py-3 text-xs leading-6 text-[#b7c6dd]">
             Score starts at 100. Each confirmed sequence error costs {PENALTY_WRONG_ORDER_CLICK} points, each
             meaningful failed placement costs {PENALTY_FUMBLE} points, and time beyond {Math.round(TIME_PAR_SECONDS / 60)}{" "}
             minutes costs {PENALTY_PER_OVER_PAR_MINUTE} points per extra minute. Click-release actions without a real drag are ignored. 75+ is a pass.
@@ -2311,7 +2311,7 @@ function ResultsCard({ result, onRetry, onBackToDashboard }) {
             <button
               type="button"
               onClick={onRetry}
-              className="rounded-2xl bg-[#00ffb4] px-6 py-3 text-sm font-black text-[#07111d] shadow-[0_16px_45px_rgba(0,255,180,0.18)] transition hover:scale-[1.02]"
+              className="rounded-2xl bg-[#FFD41C] px-6 py-3 text-sm font-black text-[#07111d] shadow-[0_16px_45px_rgba(255,212,28,0.18)] transition hover:scale-[1.02]"
             >
               Retry Test →
             </button>
@@ -2580,7 +2580,7 @@ export default function INTELFullAssemblyPracticalTest({ onFinish, onBack }) {
   };
 
   return (
-    <div className="absolute inset-0 h-full w-full overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased">
+    <div className="articton-app-shell articton-practice-page absolute inset-0 h-full w-full overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased">
       <div className="relative h-full w-full overflow-hidden">
         <ModuleBackground />
         <AchievementToast achievement={achievementToast} onClose={() => setAchievementToast(null)} />
@@ -2589,9 +2589,9 @@ export default function INTELFullAssemblyPracticalTest({ onFinish, onBack }) {
         {result ? <ResultsCard result={result} onRetry={resetTest} onBackToDashboard={handleBackToDashboard} /> : null}
 
         <div className="relative flex h-full w-full flex-col overflow-hidden">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(0,255,180,0.08),transparent_35%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(255,212,28,0.08),transparent_35%)]" />
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_88%_20%,rgba(255,159,125,0.05),transparent_30%)]" />
-          <div className="absolute inset-0 bg-[linear-gradient(rgba(0,255,180,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,180,0.025)_1px,transparent_1px)] bg-[size:54px_54px] opacity-55" />
+          <div className="absolute inset-0 bg-[linear-gradient(rgba(255,212,28,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(255,212,28,0.025)_1px,transparent_1px)] bg-[size:54px_54px] opacity-55" />
 
           <div className="relative flex h-full w-full flex-col overflow-hidden">
             <div className="flex items-center justify-between px-6 pt-6 text-[12px] text-[#7a8ba8] md:px-10">
@@ -2613,7 +2613,7 @@ export default function INTELFullAssemblyPracticalTest({ onFinish, onBack }) {
 
                 <div className="flex flex-wrap items-center justify-end gap-3">
                   {validationMessage ? (
-                    <div className="max-w-[540px] rounded-2xl border border-[#00ffb4]/20 bg-[#00ffb4]/8 px-4 py-2 text-xs font-semibold text-[#dffef5]">
+                    <div className="max-w-[540px] rounded-2xl border border-[#FFD41C]/20 bg-[#FFD41C]/8 px-4 py-2 text-xs font-semibold text-[#dffef5]">
                       {validationMessage}
                     </div>
                   ) : null}
@@ -2642,7 +2642,7 @@ export default function INTELFullAssemblyPracticalTest({ onFinish, onBack }) {
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-4 text-[11px] font-bold">
-                  <span className="text-[#00ffb4]">{completedParts.length} / {ASSEMBLY_SEQUENCE.length} installed</span>
+                  <span className="text-[#FFD41C]">{completedParts.length} / {ASSEMBLY_SEQUENCE.length} installed</span>
                   <span className="text-[#ff9f7d]">
                     {wrongOrderCount} sequence {wrongOrderCount === 1 ? "error" : "errors"}{liveScoring.orderPenaltyPoints > 0 ? ` (-${liveScoring.orderPenaltyPoints} pts)` : ""}
                   </span>

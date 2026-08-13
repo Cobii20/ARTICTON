@@ -21,8 +21,8 @@ const THEME = {
   surface2: "#111d33",
   text: "#e8ecf4",
   muted: "#7a8ba8",
-  accent: "#00ffb4",
-  accentSoft: "rgba(0,255,180,0.12)",
+  accent: "#FFD41C",
+  accentSoft: "rgba(255,212,28,0.12)",
   border: "#1a2438",
 };
 
@@ -251,11 +251,11 @@ function ComponentPartsPanel({ current }) {
   const parts = COMPONENT_PARTS[key] || [];
 
   return (
-    <div className="mt-5">
+    <div className="articton-module1-details mt-5">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="rounded-full border border-[#00ffb4]/30 bg-[#00ffb4]/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-[#baffee]"
+        className="articton-module1-details-toggle rounded-full border border-[#FFD41C]/30 bg-[#FFD41C]/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-[#baffee]"
       >
         {open ? "Hide details" : "Click for more details"}
       </button>
@@ -269,8 +269,8 @@ function ComponentPartsPanel({ current }) {
             className="mt-4 space-y-3 overflow-hidden"
           >
             {parts.map((item) => (
-              <div key={item.part} className="rounded-xl border border-[#00ffb4]/15 bg-black/20 p-3">
-                <div className="text-[12px] font-black text-[#00ffb4]">{item.part}</div>
+              <div key={item.part} className="articton-module1-detail-card rounded-xl border border-[#FFD41C]/15 bg-black/20 p-3">
+                <div className="text-[12px] font-black text-[#FFD41C]">{item.part}</div>
                 <div className="mt-1 text-[11px] leading-5 text-[#dbe6f5]">
                   {item.definition}
                 </div>
@@ -303,7 +303,7 @@ function IntroDeck({ slides, onDone }) {
 
   return (
     <div className="pointer-events-none absolute inset-0 z-50">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,rgba(0,255,180,0.08),rgba(0,0,0,0.58)_58%,rgba(0,0,0,0.75))]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,rgba(255,212,28,0.08),rgba(0,0,0,0.58)_58%,rgba(0,0,0,0.75))]" />
 
       <div className="relative flex h-full w-full items-end justify-center p-4 pb-8 sm:items-center sm:p-6">
         <AnimatePresence mode="wait">
@@ -313,11 +313,11 @@ function IntroDeck({ slides, onDone }) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.99 }}
             transition={{ duration: 0.22 }}
-            className="pointer-events-auto w-[760px] max-w-[calc(100vw-32px)] overflow-hidden rounded-[18px] border border-[#00ffb4]/30 bg-[#06131b]/72 shadow-[0_0_45px_rgba(0,255,180,0.16),0_32px_100px_rgba(0,0,0,0.55)] backdrop-blur-xl"
+            className="pointer-events-auto w-[760px] max-w-[calc(100vw-32px)] overflow-hidden rounded-[18px] border border-[#FFD41C]/30 bg-[#06131b]/72 shadow-[0_0_45px_rgba(255,212,28,0.16),0_32px_100px_rgba(0,0,0,0.55)] backdrop-blur-xl"
           >
-            <div className="flex items-center justify-between gap-4 border-b border-[#00ffb4]/20 bg-[#00ffb4]/5 px-5 py-4 sm:px-7">
+            <div className="flex items-center justify-between gap-4 border-b border-[#FFD41C]/20 bg-[#FFD41C]/5 px-5 py-4 sm:px-7">
               <div className="min-w-0">
-                <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#00ffb4]">
+                <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#FFD41C]">
                   Hologram Briefing
                 </div>
                 <div className="truncate text-[20px] font-extrabold text-[#e8ecf4] sm:text-[26px]">
@@ -325,7 +325,7 @@ function IntroDeck({ slides, onDone }) {
                 </div>
               </div>
 
-              <div className="rounded-full border border-[#00ffb4]/20 bg-[#00ffb4]/10 px-3 py-1 text-[12px] font-bold text-[#baffee]">
+              <div className="rounded-full border border-[#FFD41C]/20 bg-[#FFD41C]/10 px-3 py-1 text-[12px] font-bold text-[#baffee]">
                 {Math.min(index + 1, safeSlides.length)}/{safeSlides.length}
               </div>
             </div>
@@ -339,7 +339,7 @@ function IntroDeck({ slides, onDone }) {
                 <ul className="mt-6 space-y-3 text-[#c8d4e6]">
                   {slide.points.map((p, i) => (
                     <li key={i} className="flex gap-3 text-[17px] leading-relaxed">
-                      <span className="mt-[10px] h-2 w-2 flex-none rounded-full bg-[#00ffb4]/70" />
+                      <span className="mt-[10px] h-2 w-2 flex-none rounded-full bg-[#FFD41C]/70" />
                       <span>{p}</span>
                     </li>
                   ))}
@@ -356,7 +356,7 @@ function IntroDeck({ slides, onDone }) {
                       if (isLast) onDone();
                       else setIndex((i) => Math.min(i + 1, safeSlides.length - 1));
                     }}
-                    className="h-12 rounded-2xl bg-[#00ffb4] px-7 text-[16px] font-semibold text-[#0a0e17] transition hover:scale-[1.02]"
+                    className="h-12 rounded-2xl bg-[#FFD41C] px-7 text-[16px] font-semibold text-[#0a0e17] transition hover:scale-[1.02]"
                   >
                     {isLast ? "Start 3D →" : "Next →"}
                   </button>
@@ -421,7 +421,7 @@ function HotspotPin({
       <mesh visible={pinOpacity > 0.02}>
         <sphereGeometry args={[glow, 24, 24]} />
         <meshBasicMaterial
-          color={active ? "#00ffb4" : "white"}
+          color={active ? "#FFD41C" : "white"}
           transparent
           opacity={active ? 0.22 * pinOpacity : 0.08 * pinOpacity}
         />
@@ -437,7 +437,7 @@ function HotspotPin({
           className={[
             "relative flex items-center justify-center rounded-full border backdrop-blur-md shadow-[0_16px_45px_rgba(0,0,0,0.55)] transition select-none",
             active
-              ? "border-[#00ffb4]/30 bg-[#00ffb4]/95 text-[#0a0e17]"
+              ? "border-[#FFD41C]/30 bg-[#FFD41C]/95 text-[#0a0e17]"
               : "border-white/20 bg-white/75 text-black hover:bg-white/90",
           ].join(" ")}
           style={{
@@ -568,12 +568,12 @@ function HotspotHologram({ hotspot, onClose }) {
         initial={{ opacity: 0, y: 10, scale: 0.94 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 8, scale: 0.96 }}
-        className="w-[300px] max-w-[72vw] overflow-hidden rounded-[14px] border border-[#00ffb4]/35 bg-[#06131b]/78 text-left shadow-[0_0_35px_rgba(0,255,180,0.20),0_20px_70px_rgba(0,0,0,0.62)] backdrop-blur-xl"
+        className="w-[300px] max-w-[72vw] overflow-hidden rounded-[14px] border border-[#FFD41C]/35 bg-[#06131b]/78 text-left shadow-[0_0_35px_rgba(255,212,28,0.20),0_20px_70px_rgba(0,0,0,0.62)] backdrop-blur-xl"
       >
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(0,255,180,0.06)_1px,transparent_1px)] bg-[size:100%_16px]" />
-        <div className="relative flex items-start justify-between gap-3 border-b border-[#00ffb4]/20 px-4 py-3">
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,212,28,0.06)_1px,transparent_1px)] bg-[size:100%_16px]" />
+        <div className="relative flex items-start justify-between gap-3 border-b border-[#FFD41C]/20 px-4 py-3">
           <div className="min-w-0">
-            <div className="text-[10px] font-black uppercase tracking-[0.22em] text-[#00ffb4]">
+            <div className="text-[10px] font-black uppercase tracking-[0.22em] text-[#FFD41C]">
               Hotspot {hotspot.number}
             </div>
             <div className="mt-1 text-[14px] font-black leading-5 text-white">
@@ -584,7 +584,7 @@ function HotspotHologram({ hotspot, onClose }) {
           <button
             type="button"
             onClick={onClose}
-            className="flex h-7 w-7 flex-none items-center justify-center rounded-full border border-[#00ffb4]/20 bg-white/[0.04] text-[12px] text-white/80 transition hover:bg-white/[0.1]"
+            className="flex h-7 w-7 flex-none items-center justify-center rounded-full border border-[#FFD41C]/20 bg-white/[0.04] text-[12px] text-white/80 transition hover:bg-white/[0.1]"
             aria-label="Close hotspot"
           >
             x
@@ -616,7 +616,7 @@ function LabEnvironment() {
     <group>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.74, 0]}>
         <circleGeometry args={[2.75, 96]} />
-        <meshBasicMaterial color="#00ffb4" transparent opacity={0.045} />
+        <meshBasicMaterial color="#FFD41C" transparent opacity={0.045} />
       </mesh>
 
       <mesh
@@ -625,11 +625,11 @@ function LabEnvironment() {
         position={[0, -0.72, 0]}
       >
         <ringGeometry args={[1.35, 1.38, 96]} />
-        <meshBasicMaterial color="#00ffb4" transparent opacity={0.34} />
+        <meshBasicMaterial color="#FFD41C" transparent opacity={0.34} />
       </mesh>
 
       <gridHelper
-        args={[7, 36, "#00ffb4", "#1d4450"]}
+        args={[7, 36, "#FFD41C", "#1d4450"]}
         position={[0, -0.78, 0]}
       />
 
@@ -660,13 +660,13 @@ function FixedLabInfoPanel({
     "Explore the component, rotate the model, zoom in, and select the glowing markers to inspect its parts.";
 
   const panelContent = (
-    <div className="relative overflow-hidden rounded-[18px] border border-[#00ffb4]/25 bg-[#06131b]/88 p-5 shadow-[0_0_35px_rgba(0,255,180,0.13),0_24px_70px_rgba(0,0,0,0.42)] backdrop-blur-xl">
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(0,255,180,0.045)_1px,transparent_1px)] bg-[size:100%_18px]" />
+    <div className="articton-module1-info-card relative overflow-hidden rounded-[18px] border border-[#FFD41C]/25 bg-[#06131b]/88 p-5 shadow-[0_0_35px_rgba(255,212,28,0.13),0_24px_70px_rgba(0,0,0,0.42)] backdrop-blur-xl">
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,212,28,0.045)_1px,transparent_1px)] bg-[size:100%_18px]" />
 
       <div className="relative">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div className="text-[10px] font-black uppercase tracking-[0.26em] text-[#00ffb4]">
+            <div className="text-[10px] font-black uppercase tracking-[0.26em] text-[#FFD41C]">
               Articton Lab Environment
             </div>
 
@@ -675,7 +675,7 @@ function FixedLabInfoPanel({
             </div>
           </div>
 
-          <div className="rounded-full border border-[#00ffb4]/20 bg-[#00ffb4]/8 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#baffee]">
+          <div className="rounded-full border border-[#FFD41C]/20 bg-[#FFD41C]/8 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#baffee]">
             {selectedPlatform ? selectedPlatform.toUpperCase() : "PC"}
           </div>
         </div>
@@ -688,7 +688,7 @@ function FixedLabInfoPanel({
           {componentDescription}
         </p>
 
-        <div className="mt-4 rounded-xl border border-[#00ffb4]/14 bg-black/16 px-3 py-2 text-[11px] text-[#8fa3bf]">
+        <div className="articton-module1-info-status mt-4 rounded-xl border border-[#FFD41C]/14 bg-black/16 px-3 py-2 text-[11px] text-[#8fa3bf]">
           {showIntro
             ? "Hologram briefing active"
             : afkAutoRotate
@@ -696,7 +696,7 @@ function FixedLabInfoPanel({
             : "Manual rotation active"}
         </div>
 
-        <div className="my-5 h-px bg-[#00ffb4]/16" />
+        <div className="my-5 h-px bg-[#FFD41C]/16" />
 
         <AnimatePresence mode="wait">
           {activeHotspot ? (
@@ -707,7 +707,7 @@ function FixedLabInfoPanel({
               exit={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.18 }}
             >
-              <div className="text-[10px] font-black uppercase tracking-[0.22em] text-[#00ffb4]">
+              <div className="text-[10px] font-black uppercase tracking-[0.22em] text-[#FFD41C]">
                 Hotspot {activeHotspot.number}
               </div>
 
@@ -736,7 +736,7 @@ function FixedLabInfoPanel({
   );
 
   return (
-    <div className="pointer-events-auto absolute left-3 top-3 z-[130] max-h-[calc(100%-1.5rem)] w-[340px] max-w-[calc(100%-1.5rem)] overflow-y-auto pr-1 md:left-6 md:top-6 md:max-h-[calc(100%-3rem)]">
+    <div className="articton-module1-info-panel pointer-events-auto absolute left-3 top-3 z-[130] max-h-[calc(100%-1.5rem)] w-[340px] max-w-[calc(100%-1.5rem)] overflow-y-auto pr-1 md:left-6 md:top-6 md:max-h-[calc(100%-3rem)]">
       {panelContent}
     </div>
   );
@@ -832,9 +832,9 @@ function WelcomeHologram({ onStart, onOpenTutorial }) {
         initial={{ opacity: 0, y: 18, scale: 0.94 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.45 }}
-        className="w-[min(720px,82vw)] rounded-[18px] border border-[#00ffb4]/35 bg-[#06131b]/72 px-6 py-6 text-center shadow-[0_0_55px_rgba(0,255,180,0.18),0_32px_110px_rgba(0,0,0,0.62)] backdrop-blur-xl"
+        className="w-[min(720px,82vw)] rounded-[18px] border border-[#FFD41C]/35 bg-[#06131b]/72 px-6 py-6 text-center shadow-[0_0_55px_rgba(255,212,28,0.18),0_32px_110px_rgba(0,0,0,0.62)] backdrop-blur-xl"
       >
-        <div className="text-[11px] font-black uppercase tracking-[0.32em] text-[#00ffb4]">
+        <div className="text-[11px] font-black uppercase tracking-[0.32em] text-[#FFD41C]">
           Welcome to Articton
         </div>
         <div className="mt-3 text-[34px] font-black leading-none text-white sm:text-[54px]">
@@ -848,14 +848,14 @@ function WelcomeHologram({ onStart, onOpenTutorial }) {
           <button
             type="button"
             onClick={onStart}
-            className="h-12 rounded-full bg-[#00ffb4] px-6 text-[14px] font-black text-[#06131b] shadow-[0_0_30px_rgba(0,255,180,0.28)] transition hover:scale-[1.03]"
+            className="h-12 rounded-full bg-[#FFD41C] px-6 text-[14px] font-black text-[#06131b] shadow-[0_0_30px_rgba(255,212,28,0.28)] transition hover:scale-[1.03]"
           >
             Start Exploration
           </button>
           <button
             type="button"
             onClick={onOpenTutorial}
-            className="h-12 rounded-full border border-[#00ffb4]/25 bg-white/[0.04] px-6 text-[14px] font-bold text-[#dbe6f5] transition hover:bg-white/[0.09]"
+            className="h-12 rounded-full border border-[#FFD41C]/25 bg-white/[0.04] px-6 text-[14px] font-bold text-[#dbe6f5] transition hover:bg-white/[0.09]"
           >
             How to Navigate
           </button>
@@ -876,11 +876,11 @@ function NavigationTutorialHologram({ page, onPrev, onNext }) {
         initial={{ opacity: 0, y: 14, scale: 0.96 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: -10, scale: 0.98 }}
-        className="relative w-[min(640px,82vw)] overflow-hidden rounded-[18px] border border-[#00ffb4]/32 bg-[#06131b]/74 px-6 py-5 shadow-[0_0_48px_rgba(0,255,180,0.17),0_30px_100px_rgba(0,0,0,0.60)] backdrop-blur-xl"
+        className="relative w-[min(640px,82vw)] overflow-hidden rounded-[18px] border border-[#FFD41C]/32 bg-[#06131b]/74 px-6 py-5 shadow-[0_0_48px_rgba(255,212,28,0.17),0_30px_100px_rgba(0,0,0,0.60)] backdrop-blur-xl"
       >
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(0,255,180,0.055)_1px,transparent_1px)] bg-[size:100%_18px]" />
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,212,28,0.055)_1px,transparent_1px)] bg-[size:100%_18px]" />
         <div className="relative">
-          <div className="text-[11px] font-black uppercase tracking-[0.26em] text-[#00ffb4]">
+          <div className="text-[11px] font-black uppercase tracking-[0.26em] text-[#FFD41C]">
             Navigation Tutorial
           </div>
          <div className="mt-2 text-[28px] font-black text-white">
@@ -891,9 +891,9 @@ function NavigationTutorialHologram({ page, onPrev, onNext }) {
             : "Rotate Tutorial"}
         </div>
 
-          <div className="relative my-6 h-36 rounded-[16px] border border-[#00ffb4]/20 bg-black/22">
+          <div className="relative my-6 h-36 rounded-[16px] border border-[#FFD41C]/20 bg-black/22">
             <motion.div
-              className="absolute left-1/2 top-1/2 h-20 w-32 -translate-x-1/2 -translate-y-1/2 rounded-[18px] border border-[#00ffb4]/30 bg-[#00ffb4]/10 shadow-[0_0_40px_rgba(0,255,180,0.18)]"
+              className="absolute left-1/2 top-1/2 h-20 w-32 -translate-x-1/2 -translate-y-1/2 rounded-[18px] border border-[#FFD41C]/30 bg-[#FFD41C]/10 shadow-[0_0_40px_rgba(255,212,28,0.18)]"
               animate={
                 isDragSnap
                   ? { x: [-40, 40, -40] }
@@ -942,7 +942,7 @@ function NavigationTutorialHologram({ page, onPrev, onNext }) {
               type="button"
               onClick={onPrev}
               disabled={page === 0}
-              className="h-11 rounded-full border border-[#00ffb4]/20 bg-white/[0.04] px-5 text-[13px] font-bold text-[#dbe6f5] transition hover:bg-white/[0.09] disabled:opacity-40"
+              className="h-11 rounded-full border border-[#FFD41C]/20 bg-white/[0.04] px-5 text-[13px] font-bold text-[#dbe6f5] transition hover:bg-white/[0.09] disabled:opacity-40"
             >
               Back
             </button>
@@ -954,7 +954,7 @@ function NavigationTutorialHologram({ page, onPrev, onNext }) {
             <button
               type="button"
               onClick={onNext}
-              className="h-11 rounded-full bg-[#00ffb4] px-6 text-[13px] font-black text-[#06131b] shadow-[0_0_28px_rgba(0,255,180,0.22)] transition hover:scale-[1.03]"
+              className="h-11 rounded-full bg-[#FFD41C] px-6 text-[13px] font-black text-[#06131b] shadow-[0_0_28px_rgba(255,212,28,0.22)] transition hover:scale-[1.03]"
             >
              {isDragSnap
             ? "Choose Platform"
@@ -975,9 +975,9 @@ function PlatformChoiceHologram({ selectedPlatform, onSelectPlatform }) {
       <motion.div
         initial={{ opacity: 0, y: 18, scale: 0.95 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        className="w-[min(760px,86vw)] rounded-[18px] border border-[#00ffb4]/35 bg-[#06131b]/74 px-6 py-6 text-center shadow-[0_0_55px_rgba(0,255,180,0.18),0_32px_110px_rgba(0,0,0,0.62)] backdrop-blur-xl"
+        className="w-[min(760px,86vw)] rounded-[18px] border border-[#FFD41C]/35 bg-[#06131b]/74 px-6 py-6 text-center shadow-[0_0_55px_rgba(255,212,28,0.18),0_32px_110px_rgba(0,0,0,0.62)] backdrop-blur-xl"
       >
-        <div className="text-[11px] font-black uppercase tracking-[0.26em] text-[#00ffb4]">
+        <div className="text-[11px] font-black uppercase tracking-[0.26em] text-[#FFD41C]">
           Processor Platform
         </div>
         <div className="mt-2 text-[30px] font-black leading-tight text-white">
@@ -1010,13 +1010,13 @@ function PlatformChoiceHologram({ selectedPlatform, onSelectPlatform }) {
                 className={[
                   "rounded-[16px] border px-5 py-5 text-left transition hover:scale-[1.02]",
                   active
-                    ? "border-[#00ffb4]/55 bg-[#00ffb4]/16 shadow-[0_0_34px_rgba(0,255,180,0.18)]"
+                    ? "border-[#FFD41C]/55 bg-[#FFD41C]/16 shadow-[0_0_34px_rgba(255,212,28,0.18)]"
                     : "border-white/12 bg-white/[0.04] hover:bg-white/[0.08]",
                 ].join(" ")}
               >
                 <div className="text-[28px] font-black text-white">{platform.name}</div>
                 <div className="mt-3 text-[12px] leading-5 text-[#b7c6dd]">{platform.detail}</div>
-                <div className="mt-5 text-[11px] font-black uppercase tracking-[0.18em] text-[#00ffb4]">
+                <div className="mt-5 text-[11px] font-black uppercase tracking-[0.18em] text-[#FFD41C]">
                   Select {platform.name}
                 </div>
               </button>
@@ -1090,7 +1090,7 @@ function HeaderDropdown({ userName, avatarUrl = "", onBack, onLogout, setIsSetti
       <details className="group relative z-50">
         <summary className="list-none cursor-pointer rounded-2xl border border-[#1a2438] bg-[#0d1220]/95 px-4 py-2.5 transition hover:bg-[#111b2f]">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/10 text-sm font-bold text-[#00ffb4]">
+            <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-[#FFD41C]/25 bg-[#FFD41C]/10 text-sm font-bold text-[#FFD41C]">
               {avatarUrl ? (
                 <img src={avatarUrl} alt="Profile" className="h-full w-full object-cover" />
               ) : (
@@ -1631,19 +1631,19 @@ export default function Module1Page({ onBack, onLogout }) {
 
   if (showCertificate) {
     return (
-      <div className="min-h-screen w-full overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased">
+      <div className="articton-app-shell articton-module-page min-h-screen w-full overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased">
         <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden px-6">
           <ModulePageBackground />
 
-          <div className="relative z-10 w-full max-w-3xl rounded-[34px] border border-[#00ffb4]/35 bg-[#0d1220]/90 p-8 text-center shadow-[0_40px_120px_rgba(0,0,0,0.65)] backdrop-blur-xl md:p-12">
-            <div className="pointer-events-none absolute inset-4 rounded-[26px] border border-dashed border-[#00ffb4]/30" />
+          <div className="relative z-10 w-full max-w-3xl rounded-[34px] border border-[#FFD41C]/35 bg-[#0d1220]/90 p-8 text-center shadow-[0_40px_120px_rgba(0,0,0,0.65)] backdrop-blur-xl md:p-12">
+            <div className="pointer-events-none absolute inset-4 rounded-[26px] border border-dashed border-[#FFD41C]/30" />
 
             <div className="relative">
-              <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full border border-[#00ffb4]/40 bg-[#00ffb4]/10 text-4xl font-black text-[#00ffb4] shadow-[0_0_40px_rgba(0,255,180,0.18)]">
+              <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full border border-[#FFD41C]/40 bg-[#FFD41C]/10 text-4xl font-black text-[#FFD41C] shadow-[0_0_40px_rgba(255,212,28,0.18)]">
                 ✓
               </div>
 
-              <div className="mb-3 text-[12px] font-bold uppercase tracking-[0.32em] text-[#00ffb4]">
+              <div className="mb-3 text-[12px] font-bold uppercase tracking-[0.32em] text-[#FFD41C]">
                 Certificate of Completion
               </div>
 
@@ -1664,7 +1664,7 @@ export default function Module1Page({ onBack, onLogout }) {
                 <button
                   type="button"
                   onClick={handleBackToDashboard}
-                  className="rounded-2xl bg-[#00ffb4] px-7 py-3 text-sm font-black text-[#0a0e17] shadow-[0_18px_50px_rgba(0,255,180,0.22)] transition hover:scale-[1.03]"
+                  className="rounded-2xl bg-[#FFD41C] px-7 py-3 text-sm font-black text-[#0a0e17] shadow-[0_18px_50px_rgba(255,212,28,0.22)] transition hover:scale-[1.03]"
                 >
                   Back to Dashboard →
                 </button>
@@ -1672,7 +1672,7 @@ export default function Module1Page({ onBack, onLogout }) {
                 <button
                   type="button"
                   onClick={handleSwitchPlatform}
-                  className="rounded-2xl border border-[#00ffb4]/40 bg-[#0d1220] px-7 py-3 text-sm font-bold text-[#dbe6f5] shadow-[0_12px_32px_rgba(0,255,180,0.12)] transition hover:bg-white/5"
+                  className="rounded-2xl border border-[#FFD41C]/40 bg-[#0d1220] px-7 py-3 text-sm font-bold text-[#dbe6f5] shadow-[0_12px_32px_rgba(255,212,28,0.12)] transition hover:bg-white/5"
                 >
                   Switch to {selectedPlatform === "amd" ? "Intel" : "AMD"}
                 </button>
@@ -1685,15 +1685,15 @@ export default function Module1Page({ onBack, onLogout }) {
   }
 
   return (
-    <div className="min-h-screen w-full overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased">
+    <div className="articton-app-shell articton-module-page min-h-screen w-full overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased">
       <div className="relative h-screen w-full overflow-hidden">
         <ModulePageBackground />
 
         <div className="relative h-full w-full overflow-hidden p-0 md:p-3">
           <div className="relative h-full w-full overflow-hidden border border-[#1a2438] bg-[linear-gradient(135deg,#0a0e17,#0d1220,#101a2d)] shadow-[0_70px_180px_rgba(0,0,0,0.70)] md:rounded-[30px]">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(0,255,180,0.08),transparent_35%)]" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_88%_20%,rgba(0,255,180,0.05),transparent_30%)]" />
-            <div className="absolute inset-0 bg-[linear-gradient(rgba(0,255,180,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,180,0.025)_1px,transparent_1px)] bg-[size:54px_54px] opacity-55" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(255,212,28,0.08),transparent_35%)]" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_88%_20%,rgba(255,212,28,0.05),transparent_30%)]" />
+            <div className="absolute inset-0 bg-[linear-gradient(rgba(255,212,28,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(255,212,28,0.025)_1px,transparent_1px)] bg-[size:54px_54px] opacity-55" />
             <div className="absolute inset-0 bg-black/10 ring-1 ring-white/5" />
 
             <div className="relative flex h-full w-full flex-col overflow-hidden">
@@ -1736,7 +1736,7 @@ export default function Module1Page({ onBack, onLogout }) {
                         Articton
                       </div>
 
-                      <div className="text-[11px] uppercase tracking-[0.24em] text-[#00ffb4]">
+                      <div className="text-[11px] uppercase tracking-[0.24em] text-[#FFD41C]">
                         3D Learning View
                       </div>
                     </div>
@@ -1760,10 +1760,10 @@ export default function Module1Page({ onBack, onLogout }) {
               </div>
 
               <div className="min-h-0 flex-1 px-3 py-3 md:px-6 md:py-5">
-                <div className="relative h-full overflow-hidden rounded-[22px] border border-[#00ffb4]/18 bg-[#031018] shadow-[0_30px_100px_rgba(0,0,0,0.52)]">
+                <div className="relative h-full overflow-hidden rounded-[22px] border border-[#FFD41C]/18 bg-[#031018] shadow-[0_30px_100px_rgba(0,0,0,0.52)]">
                   <div className="relative h-full min-h-0 min-w-0 overflow-hidden">
-                    <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_44%,rgba(0,255,180,0.12),transparent_36%),radial-gradient(circle_at_82%_18%,rgba(95,149,152,0.14),transparent_28%)]" />
-                    <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(0,255,180,0.032)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,180,0.032)_1px,transparent_1px)] bg-[size:48px_48px] opacity-75" />
+                    <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_44%,rgba(255,212,28,0.12),transparent_36%),radial-gradient(circle_at_82%_18%,rgba(95,149,152,0.14),transparent_28%)]" />
+                    <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,212,28,0.032)_1px,transparent_1px),linear-gradient(90deg,rgba(255,212,28,0.032)_1px,transparent_1px)] bg-[size:48px_48px] opacity-75" />
                     <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_150px_rgba(0,0,0,0.68)]" />
 
                     {isComponentStage && !showIntro ? (
@@ -1791,11 +1791,11 @@ export default function Module1Page({ onBack, onLogout }) {
                       camera={sceneCamera}
                       dpr={[1, 1.8]}
                     >
-                      <color attach="background" args={["#06131b"]} />
+                      <color attach="background" args={[typeof document !== "undefined" && document.documentElement.classList.contains("articton-light") ? "#f8f9ff" : "#06131b"]} />
                       <ambientLight intensity={0.78} />
                       <directionalLight position={[6, 8, 6]} intensity={1.25} />
                       <directionalLight position={[-6, -2, -6]} intensity={0.45} />
-                      <pointLight position={[0, 1.2, 2.2]} intensity={0.75} color="#00ffb4" />
+                      <pointLight position={[0, 1.2, 2.2]} intensity={0.75} color="#FFD41C" />
 
                       <Suspense fallback={null}>
                         <LabEnvironment />
@@ -1938,7 +1938,7 @@ function PartsDock({
         </div>
       ) : null}
 
-      <div className="pointer-events-auto flex max-w-full items-center gap-2 overflow-x-auto rounded-full border border-[#00ffb4]/24 bg-[#06131b]/72 p-2 shadow-[0_0_35px_rgba(0,255,180,0.13),0_18px_70px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+      <div className="articton-module1-bottom-nav pointer-events-auto flex max-w-full items-center gap-2 overflow-x-auto rounded-full border border-[#FFD41C]/24 bg-[#06131b]/72 p-2 shadow-[0_0_35px_rgba(255,212,28,0.13),0_18px_70px_rgba(0,0,0,0.45)] backdrop-blur-xl">
         {modules.map((m, index) => {
           const done = !!completedParts[m.key];
           const active = currentKey === m.key;
@@ -1949,16 +1949,16 @@ function PartsDock({
               type="button"
               onClick={() => onSelect(index)}
               className={[
-                "flex h-11 items-center gap-2 whitespace-nowrap rounded-full border px-3 text-[12px] font-bold transition",
+                "articton-module1-nav-button flex h-11 items-center gap-2 whitespace-nowrap rounded-full border px-3 text-[12px] font-bold transition",
                 active
-                  ? "border-[#00ffb4]/45 bg-[#00ffb4]/16 text-white shadow-[0_0_22px_rgba(0,255,180,0.13)]"
+                  ? "is-active border-[#FFD41C]/45 bg-[#FFD41C]/16 text-white shadow-[0_0_22px_rgba(255,212,28,0.13)]"
                   : "border-white/10 bg-white/[0.035] text-[#b7c6dd] hover:bg-white/[0.08]",
               ].join(" ")}
             >
               <span
                 className={[
-                  "flex h-6 w-6 items-center justify-center rounded-full text-[11px]",
-                  done ? "bg-[#00ffb4] text-[#06131b]" : "border border-white/15 text-[#9fb0ca]",
+                  "articton-module1-nav-index flex h-6 w-6 items-center justify-center rounded-full text-[11px]",
+                  done ? "bg-[#FFD41C] text-[#06131b]" : "border border-white/15 text-[#9fb0ca]",
                 ].join(" ")}
               >
                 {done ? "OK" : index + 1}
@@ -1972,7 +1972,7 @@ function PartsDock({
           <button
             type="button"
             onClick={onViewCertificate}
-            className="h-11 whitespace-nowrap rounded-full bg-[#00ffb4] px-4 text-[12px] font-black text-[#06131b] shadow-[0_0_28px_rgba(0,255,180,0.22)] transition hover:scale-[1.02]"
+            className="h-11 whitespace-nowrap rounded-full bg-[#FFD41C] px-4 text-[12px] font-black text-[#06131b] shadow-[0_0_28px_rgba(255,212,28,0.22)] transition hover:scale-[1.02]"
           >
             Certificate
           </button>
@@ -1999,16 +1999,16 @@ function SceneControls({
         <button
           type="button"
           onClick={onWelcome}
-          className="rounded-full border border-[#00ffb4]/22 bg-[#06131b]/70 px-4 py-2 text-[11px] font-black uppercase tracking-[0.14em] text-[#dbe6f5] shadow-[0_18px_60px_rgba(0,0,0,0.30)] backdrop-blur-xl transition hover:bg-white/[0.08]"
+          className="rounded-full border border-[#FFD41C]/22 bg-[#06131b]/70 px-4 py-2 text-[11px] font-black uppercase tracking-[0.14em] text-[#dbe6f5] shadow-[0_18px_60px_rgba(0,0,0,0.30)] backdrop-blur-xl transition hover:bg-white/[0.08]"
         >
           Welcome
         </button>
 
-        <div className="pointer-events-none rounded-full border border-[#00ffb4]/18 bg-[#06131b]/60 px-3 py-2 text-[11px] text-[#9fb0ca] backdrop-blur-xl">
+        <div className="pointer-events-none rounded-full border border-[#FFD41C]/18 bg-[#06131b]/60 px-3 py-2 text-[11px] text-[#9fb0ca] backdrop-blur-xl">
           {`${Object.values(completedParts).filter(Boolean).length}/${totalModules} parts complete`}
         </div>
 
-        <div className="pointer-events-none hidden rounded-full border border-[#00ffb4]/18 bg-[#06131b]/60 px-3 py-2 text-[11px] text-[#9fb0ca] backdrop-blur-xl md:block">
+        <div className="pointer-events-none hidden rounded-full border border-[#FFD41C]/18 bg-[#06131b]/60 px-3 py-2 text-[11px] text-[#9fb0ca] backdrop-blur-xl md:block">
           {debug
             ? lastCoords
               ? `Debug on / [${lastCoords.join(", ")}]`
@@ -2024,7 +2024,7 @@ function SceneControls({
           type="button"
           onClick={onPrev}
           aria-label="Previous module"
-          className="absolute left-4 top-1/2 z-[115] flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-[#00ffb4]/25 bg-[#06131b]/74 text-lg font-black text-[#dbe6f5] shadow-[0_18px_60px_rgba(0,0,0,0.36)] backdrop-blur-xl transition hover:bg-white/[0.08] md:left-6"
+          className="absolute left-4 top-1/2 z-[115] flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-[#FFD41C]/25 bg-[#06131b]/74 text-lg font-black text-[#dbe6f5] shadow-[0_18px_60px_rgba(0,0,0,0.36)] backdrop-blur-xl transition hover:bg-white/[0.08] md:left-6"
         >
           &lt;
         </button>
@@ -2035,7 +2035,7 @@ function SceneControls({
           type="button"
           onClick={onNext}
           aria-label="Next module"
-          className="absolute right-4 top-1/2 z-[115] flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-[#00ffb4]/25 bg-[#06131b]/74 text-lg font-black text-[#dbe6f5] shadow-[0_18px_60px_rgba(0,0,0,0.36)] backdrop-blur-xl transition hover:bg-white/[0.08] md:right-6"
+          className="absolute right-4 top-1/2 z-[115] flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-[#FFD41C]/25 bg-[#06131b]/74 text-lg font-black text-[#dbe6f5] shadow-[0_18px_60px_rgba(0,0,0,0.36)] backdrop-blur-xl transition hover:bg-white/[0.08] md:right-6"
         >
           &gt;
         </button>
@@ -2093,7 +2093,7 @@ function PartsSidebar({
                 className={[
                   "flex w-full items-center gap-3 rounded-2xl border px-3 py-3 text-left transition",
                   active
-                    ? "border-[#00ffb4]/25 bg-[#00ffb4]/10"
+                    ? "border-[#FFD41C]/25 bg-[#FFD41C]/10"
                     : "border-[#1a2438] bg-white/[0.03] hover:bg-white/[0.06]",
                 ].join(" ")}
               >
@@ -2102,12 +2102,12 @@ function PartsSidebar({
                     "flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold transition",
                     open
                       ? done
-                        ? "bg-[#00ffb4] text-[#0a0e17]"
+                        ? "bg-[#FFD41C] text-[#0a0e17]"
                         : "border border-[#1a2438] bg-[#0d1220] text-[#7a8ba8]"
                       : done
-                      ? "text-[#00ffb4]"
+                      ? "text-[#FFD41C]"
                       : active
-                      ? "text-[#00ffb4]"
+                      ? "text-[#FFD41C]"
                       : "text-[#7a8ba8]",
                   ].join(" ")}
                 >
@@ -2140,7 +2140,7 @@ function PartsSidebar({
               <button
                 type="button"
                 onClick={onViewCertificate}
-                className="mt-3 w-full rounded-2xl bg-[#00ffb4] px-4 py-3 text-sm font-semibold text-[#0a0e17] shadow-[0_12px_40px_rgba(0,255,180,0.22)] transition hover:scale-[1.01]"
+                className="mt-3 w-full rounded-2xl bg-[#FFD41C] px-4 py-3 text-sm font-semibold text-[#0a0e17] shadow-[0_12px_40px_rgba(255,212,28,0.22)] transition hover:scale-[1.01]"
               >
                 View Certificate ✓
               </button>
@@ -2148,7 +2148,7 @@ function PartsSidebar({
               <button
                 type="button"
                 onClick={onViewCertificate}
-                className="mt-3 flex h-12 w-full items-center justify-center rounded-2xl bg-[#00ffb4] text-[#0a0e17] shadow-[0_12px_40px_rgba(0,255,180,0.22)] transition hover:scale-[1.01]"
+                className="mt-3 flex h-12 w-full items-center justify-center rounded-2xl bg-[#FFD41C] text-[#0a0e17] shadow-[0_12px_40px_rgba(255,212,28,0.22)] transition hover:scale-[1.01]"
                 aria-label="View certificate"
               >
                 ✓
@@ -2163,8 +2163,8 @@ function PartsSidebar({
 function ModulePageBackground() {
   return (
     <>
-      <div className="pointer-events-none absolute -left-44 -top-44 h-[720px] w-[720px] rounded-full bg-[#00ffb4]/10 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-56 -right-52 h-[820px] w-[820px] rounded-full bg-[#00ffb4]/6 blur-3xl" />
+      <div className="pointer-events-none absolute -left-44 -top-44 h-[720px] w-[720px] rounded-full bg-[#FFD41C]/10 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-56 -right-52 h-[820px] w-[820px] rounded-full bg-[#FFD41C]/6 blur-3xl" />
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#0a0e17] via-[#0a0e17] to-[#0d1220]" />
     </>
   );

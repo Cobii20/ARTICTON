@@ -133,7 +133,7 @@ const PSU_INSERT_TRANSITION_SPEED = 0.24;
 
 const MB_COLOR = "#4aa3ff";
 const CPU_COLOR = "#b56dff";
-const RAM_COLOR = "#00ffb4";
+const RAM_COLOR = "#FFD41C";
 const SSD_COLOR = "#ffcc00";
 const HDD_COLOR = "#ff8a3d";
 const PSU_COLOR = "#ff4d6d";
@@ -208,7 +208,7 @@ function Scene({
 
   return (
     <>
-      <color attach="background" args={["#05080D"]} />
+      <color attach="background" args={[typeof document !== "undefined" && document.documentElement.classList.contains("articton-light") ? "#f8f9ff" : "#05080D"]} />
 
       <ambientLight intensity={0.55} />
 

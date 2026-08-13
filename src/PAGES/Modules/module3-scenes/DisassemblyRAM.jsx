@@ -111,7 +111,7 @@ function Scene({ placementApi, onComplete }) {
 
   return (
     <>
-      <color attach="background" args={["#05080D"]} />
+      <color attach="background" args={[typeof document !== "undefined" && document.documentElement.classList.contains("articton-light") ? "#f8f9ff" : "#05080D"]} />
       <ambientLight intensity={0.5} />
       <directionalLight
         position={[6, 10, 6]}
@@ -182,7 +182,7 @@ function PlacementGuideBoard({ snapped }) {
           rotation={[-Math.PI / 2, 0, 0]}
         >
           <planeGeometry args={[CELL_SIZE * 0.92, CELL_SIZE * 0.92]} />
-          <meshBasicMaterial color="#00ffb4" transparent opacity={0.18} />
+          <meshBasicMaterial color="#FFD41C" transparent opacity={0.18} />
         </mesh>
       )}
 
@@ -192,7 +192,7 @@ function PlacementGuideBoard({ snapped }) {
           rotation={[-Math.PI / 2, 0, 0]}
         >
           <ringGeometry args={[0.45, 0.82, 48]} />
-          <meshBasicMaterial color="#00ffb4" transparent opacity={0.9} />
+          <meshBasicMaterial color="#FFD41C" transparent opacity={0.9} />
         </mesh>
       )}
 

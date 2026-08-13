@@ -37,13 +37,13 @@ function LoadingFallback() {
 
   return (
     <>
-      <color attach="background" args={["#05080D"]} />
+      <color attach="background" args={[typeof document !== "undefined" && document.documentElement.classList.contains("articton-light") ? "#f8f9ff" : "#05080D"]} />
       <ambientLight intensity={0.6} />
       <Html center style={{ pointerEvents: "none" }}>
         <div
           style={{
             minWidth: 220,
-            border: "1px solid rgba(0,255,180,.25)",
+            border: "1px solid rgba(255,212,28,.25)",
             borderRadius: 16,
             background: "rgba(10,14,22,.88)",
             boxShadow: "0 18px 55px rgba(0,0,0,.35)",
@@ -122,7 +122,7 @@ function DefaultModel({ url }) {
 function DefaultScene() {
   return (
     <>
-      <color attach="background" args={["#05080D"]} />
+      <color attach="background" args={[typeof document !== "undefined" && document.documentElement.classList.contains("articton-light") ? "#f8f9ff" : "#05080D"]} />
       <ambientLight intensity={0.65} />
       <directionalLight
         position={[6, 10, 6]}

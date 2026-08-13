@@ -1,10 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { ChevronDown, LogOut, Settings as SettingsIcon } from "lucide-react";
 import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "../firebase";
 import { fetchMobileScoreDocs, mergeMobileScoresIntoProfile } from "../utils/mobileScores";
 import ModuleContentWorkspace from "../Components/ModuleContentWorkspace";
 import AccountProfileModal from "../Components/AccountProfileModal";
+import SettingsModal from "../Components/Settings";
+import { getUserSettings } from "../utils/userSettings";
 
 const PASSING_PERCENT = 60;
 const MODULE_ACTIVITY_GROUPS = [
@@ -249,7 +252,7 @@ function StatusPill({ status, passed }) {
       className={[
         "rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em]",
         passed
-          ? "bg-[#00ffb4]/15 text-[#b7fff0] border border-[#00ffb4]/20"
+          ? "bg-[#FFD41C]/15 text-[#b7fff0] border border-[#FFD41C]/20"
           : "bg-white/5 text-[#9fb0c9] border border-white/10",
       ].join(" ")}
     >
@@ -267,7 +270,14 @@ export default function FacultyPage({ onLogout }) {
   const [user, setUser] = useState(null);
   const [facultyProfile, setFacultyProfile] = useState(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [settings, setSettings] = useState(getUserSettings);
   const [activeTab, setActiveTab] = useState("progress");
+
+  const handleSettingChange = (key, value) => {
+    setSettings((previous) => ({ ...previous, [key]: value }));
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -370,11 +380,11 @@ export default function FacultyPage({ onLogout }) {
   }, [students]);
 
   return (
-    <div className="min-h-screen bg-[#0a0e17] text-[#e8ecf4]">
-      <div className="relative h-full w-full overflow-hidden p-6 lg:p-8">
+    <div className="articton-app-shell articton-faculty-page min-h-screen bg-[#0a0e17] text-[#e8ecf4]">
+      <div className="relative h-full w-full overflow-auto p-6 lg:p-8 pb-12">
         <div className="mb-8 flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
           <div>
-            <div className="text-sm uppercase tracking-[0.25em] text-[#00ffb4]/70">
+            <div className="text-sm uppercase tracking-[0.25em] text-[#FFD41C]/70">
               Faculty Dashboard
             </div>
             <h1 className="mt-4 text-4xl font-black tracking-tight">
@@ -395,7 +405,7 @@ export default function FacultyPage({ onLogout }) {
                 className={[
                   "rounded-xl px-4 py-2 text-sm font-semibold transition",
                   activeTab === "progress"
-                    ? "bg-[#00ffb4] text-[#0a0e17]"
+                    ? "bg-[#FFD41C] text-[#0a0e17]"
                     : "text-[#9fb0c9] hover:text-white",
                 ].join(" ")}
               >
@@ -407,38 +417,69 @@ export default function FacultyPage({ onLogout }) {
                 className={[
                   "rounded-xl px-4 py-2 text-sm font-semibold transition",
                   activeTab === "content"
-                    ? "bg-[#00ffb4] text-[#0a0e17]"
+                    ? "bg-[#FFD41C] text-[#0a0e17]"
                     : "text-[#9fb0c9] hover:text-white",
                 ].join(" ")}
               >
                 Module Content
               </button>
             </div>
-            <button
-              type="button"
-              onClick={() => setIsProfileOpen(true)}
-              className="flex items-center gap-3 rounded-2xl border border-[#1a2438] bg-[#0d1220] px-4 py-3 text-sm text-[#dbe6f5] transition hover:bg-white/[0.04]"
-            >
-              <span className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-xl border border-[#00ffb4]/25 bg-[#00ffb4]/10 text-sm font-bold uppercase text-[#00ffb4]">
-                {facultyProfile?.avatarUrl ? (
-                  <img src={facultyProfile.avatarUrl} alt="Faculty profile" className="h-full w-full object-cover" />
-                ) : (
-                  (facultyProfile?.firstName || user?.email || "F").charAt(0).toUpperCase()
-                )}
-              </span>
-              <span className="max-w-[220px] truncate">
-                {facultyProfile?.firstName || facultyProfile?.lastName
-                  ? `${facultyProfile?.firstName || ""} ${facultyProfile?.lastName || ""}`.trim()
-                  : user?.email || "Faculty"}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={onLogout}
-              className="rounded-2xl bg-[#00ffb4] px-5 py-3 text-sm font-semibold text-[#0a0e17] transition hover:scale-[1.01]"
-            >
-              Logout
-            </button>
+            <div className="relative z-[1010]">
+              <button
+                type="button"
+                onClick={() => setDropdownOpen((v) => !v)}
+                className="flex items-center gap-3 rounded-2xl border border-[#1a2438] bg-[#0d1220] px-4 py-3 text-sm text-[#dbe6f5] transition hover:bg-white/[0.04]"
+              >
+                <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-xl border border-[#FFD41C]/25 bg-[#FFD41C]/10 text-sm font-bold uppercase text-[#FFD41C]">
+                  {facultyProfile?.avatarUrl ? (
+                    <img src={facultyProfile.avatarUrl} alt="Faculty profile" className="h-full w-full object-cover" />
+                  ) : (
+                    (facultyProfile?.firstName || user?.email || "F").charAt(0).toUpperCase()
+                  )}
+                </div>
+                <span className="max-w-[220px] truncate">
+                  {facultyProfile?.firstName || facultyProfile?.lastName
+                    ? `${facultyProfile?.firstName || ""} ${facultyProfile?.lastName || ""}`.trim()
+                    : user?.email || "Faculty"}
+                </span>
+                <ChevronDown className={["h-4 w-4 transition", dropdownOpen ? "rotate-180" : ""].join(" ")} />
+              </button>
+
+              {dropdownOpen && (
+                <div className="absolute right-0 mt-2 w-48 overflow-hidden rounded-2xl border border-[#1a2438] bg-[#0b1220] shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
+                  <button
+                    className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-[#dbe6f5] transition hover:bg-white/[0.05]"
+                    onClick={() => {
+                      setDropdownOpen(false);
+                      setIsProfileOpen(true);
+                    }}
+                  >
+                    <SettingsIcon className="h-4 w-4 text-[#7a8ba8]" />
+                    Profile
+                  </button>
+                  <button
+                    className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-[#dbe6f5] transition hover:bg-white/[0.05]"
+                    onClick={() => {
+                      setDropdownOpen(false);
+                      setIsSettingsOpen(true);
+                    }}
+                  >
+                    <SettingsIcon className="h-4 w-4 text-[#7a8ba8]" />
+                    Settings
+                  </button>
+                  <button
+                    className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-red-200 transition hover:bg-red-500/10"
+                    onClick={() => {
+                      setDropdownOpen(false);
+                      onLogout();
+                    }}
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Logout
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -468,7 +509,7 @@ export default function FacultyPage({ onLogout }) {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search students..."
-                    className="w-full rounded-2xl border border-[#1a2438] bg-[#0b1220] px-4 py-3 text-sm text-white outline-none focus:border-[#00ffb4]/40 focus:ring-2 focus:ring-[#00ffb4]/15"
+                    className="w-full rounded-2xl border border-[#1a2438] bg-[#0b1220] px-4 py-3 text-sm text-white outline-none focus:border-[#FFD41C]/40 focus:ring-2 focus:ring-[#FFD41C]/15"
                   />
                 </div>
               </div>
@@ -496,7 +537,7 @@ export default function FacultyPage({ onLogout }) {
                       key={student.id}
                       className={`grid grid-cols-[1.4fr_1.4fr_0.9fr_0.9fr_130px] gap-4 px-5 py-4 transition ${
                         selectedStudent?.id === student.id
-                          ? "bg-[#00ffb4]/10"
+                          ? "bg-[#FFD41C]/10"
                           : "hover:bg-white/5"
                       }`}
                     >
@@ -531,7 +572,7 @@ export default function FacultyPage({ onLogout }) {
                         <button
                           type="button"
                           onClick={() => setSelectedStudentId(student.id)}
-                          className="rounded-2xl bg-[#00ffb4] px-4 py-2 text-sm font-semibold text-[#0a0e17] transition hover:bg-[#00e699]"
+                          className="rounded-2xl bg-[#FFD41C] px-4 py-2 text-sm font-semibold text-[#0a0e17] transition hover:bg-[#e6bd00]"
                         >
                           View
                         </button>
@@ -545,8 +586,8 @@ export default function FacultyPage({ onLogout }) {
 
           <div className="space-y-4">
             <div className="relative overflow-hidden rounded-[28px] border border-[#1a2438] bg-[#0d1220] p-6 shadow-[0_25px_80px_rgba(0,0,0,0.25)]">
-              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_8%_0%,rgba(0,255,180,0.11),transparent_34%)]" />
-              <div className="pointer-events-none absolute right-0 top-0 h-40 w-40 rounded-full bg-[#00ffb4]/5 blur-3xl" />
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_8%_0%,rgba(255,212,28,0.11),transparent_34%)]" />
+              <div className="pointer-events-none absolute right-0 top-0 h-40 w-40 rounded-full bg-[#FFD41C]/5 blur-3xl" />
 
               <div className="relative">
                 {selectedStudent ? (
@@ -555,7 +596,7 @@ export default function FacultyPage({ onLogout }) {
                       <StudentAvatar student={selectedStudent} size="xl" />
 
                       <div className="min-w-0">
-                        <div className="text-sm uppercase tracking-[0.28em] text-[#00ffb4]/70">
+                        <div className="text-sm uppercase tracking-[0.28em] text-[#FFD41C]/70">
                           Student profile
                         </div>
 
@@ -583,13 +624,13 @@ export default function FacultyPage({ onLogout }) {
                       </div>
                     </div>
 
-                    <div className="self-start rounded-2xl border border-[#00ffb4]/20 bg-[#00ffb4]/10 px-4 py-2 text-sm capitalize text-[#b7fff0] sm:self-center">
+                    <div className="self-start rounded-2xl border border-[#FFD41C]/20 bg-[#FFD41C]/10 px-4 py-2 text-sm capitalize text-[#b7fff0] sm:self-center">
                       {selectedStudent.role}
                     </div>
                   </div>
                 ) : (
                   <div>
-                    <div className="text-sm uppercase tracking-[0.28em] text-[#00ffb4]/70">
+                    <div className="text-sm uppercase tracking-[0.28em] text-[#FFD41C]/70">
                       Student profile
                     </div>
                     <div className="mt-3 text-2xl font-bold text-white">
@@ -651,6 +692,13 @@ export default function FacultyPage({ onLogout }) {
           profile={facultyProfile}
           onProfileUpdated={setFacultyProfile}
         />
+        <SettingsModal
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+          settings={settings}
+          onChange={handleSettingChange}
+          onEditProfile={() => setIsProfileOpen(true)}
+        />
       </div>
     </div>
   );
@@ -675,7 +723,7 @@ function StudentAvatar({ student, size = "md" }) {
 
   const dimension =
     size === "xl"
-      ? "h-24 w-24 text-3xl ring-4 ring-[#00ffb4]/10"
+      ? "h-24 w-24 text-3xl ring-4 ring-[#FFD41C]/10"
       : size === "lg"
       ? "h-16 w-16 text-xl"
       : "h-11 w-11 text-sm";
@@ -688,7 +736,7 @@ function StudentAvatar({ student, size = "md" }) {
 
   return (
     <div
-      className={`${dimension} flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-[#00ffb4]/30 bg-[#00ffb4]/10 font-bold text-[#00ffb4] shadow-[0_12px_34px_rgba(0,0,0,0.28)]`}
+      className={`${dimension} flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-[#FFD41C]/30 bg-[#FFD41C]/10 font-bold text-[#FFD41C] shadow-[0_12px_34px_rgba(0,0,0,0.28)]`}
     >
       {showImage ? (
         <img

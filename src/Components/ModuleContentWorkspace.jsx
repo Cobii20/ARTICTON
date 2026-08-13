@@ -258,7 +258,7 @@ export default function ModuleContentWorkspace({ mode = "faculty", user }) {
       <div className={`${panelClass} p-5`}>
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div>
-            <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[#00ffb4]/70">
+            <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[#FFD41C]/70">
               Mobile Module Content
             </div>
             <h2 className="mt-2 text-2xl font-black text-white">
@@ -274,7 +274,7 @@ export default function ModuleContentWorkspace({ mode = "faculty", user }) {
               <select
                 value={selectedModuleId}
                 onChange={(event) => setSelectedModuleId(event.target.value)}
-                className="w-full appearance-none rounded-2xl border border-[#1a2438] bg-[#0b1220] px-4 py-3 pr-11 text-sm text-white outline-none focus:border-[#00ffb4]/40"
+                className="w-full appearance-none rounded-2xl border border-[#1a2438] bg-[#0b1220] px-4 py-3 pr-11 text-sm text-white outline-none focus:border-[#FFD41C]/40"
               >
                 {EDITABLE_MODULES.map((module) => (
                   <option key={module.id} value={module.id} className="bg-[#0b1220] text-white">
@@ -287,7 +287,7 @@ export default function ModuleContentWorkspace({ mode = "faculty", user }) {
             <button
               type="button"
               onClick={() => Promise.all([loadCards(), loadRequests()])}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#00ffb4]/30 bg-[#00ffb4]/10 px-4 py-3 text-sm font-semibold text-[#00ffb4] transition hover:bg-[#00ffb4]/16"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#FFD41C]/30 bg-[#FFD41C]/10 px-4 py-3 text-sm font-semibold text-[#FFD41C] transition hover:bg-[#FFD41C]/16"
             >
               <RefreshCw className="h-4 w-4" />
               Refresh
@@ -296,7 +296,7 @@ export default function ModuleContentWorkspace({ mode = "faculty", user }) {
         </div>
 
         {message ? (
-          <div className="mt-4 rounded-2xl border border-[#00ffb4]/20 bg-[#00ffb4]/10 px-4 py-3 text-sm text-[#b7fff0]">
+          <div className="mt-4 rounded-2xl border border-[#FFD41C]/20 bg-[#FFD41C]/10 px-4 py-3 text-sm text-[#b7fff0]">
             {message}
           </div>
         ) : null}
@@ -318,7 +318,7 @@ export default function ModuleContentWorkspace({ mode = "faculty", user }) {
               <button
                 type="button"
                 onClick={addCard}
-                className="inline-flex items-center gap-2 rounded-2xl bg-[#00ffb4] px-4 py-3 text-sm font-bold text-[#0a0e17]"
+                className="inline-flex items-center gap-2 rounded-2xl bg-[#FFD41C] px-4 py-3 text-sm font-bold text-[#0a0e17]"
               >
                 <Plus className="h-4 w-4" />
                 Add
@@ -329,7 +329,7 @@ export default function ModuleContentWorkspace({ mode = "faculty", user }) {
               value={summary}
               onChange={(event) => setSummary(event.target.value)}
               placeholder="Change summary for admin"
-              className="mt-5 min-h-24 w-full rounded-2xl border border-[#1a2438] bg-[#0b1220] px-4 py-3 text-sm text-white outline-none focus:border-[#00ffb4]/40 focus:ring-2 focus:ring-[#00ffb4]/15"
+              className="mt-5 min-h-24 w-full rounded-2xl border border-[#1a2438] bg-[#0b1220] px-4 py-3 text-sm text-white outline-none focus:border-[#FFD41C]/40 focus:ring-2 focus:ring-[#FFD41C]/15"
             />
 
             <div className="mt-5 space-y-4">
@@ -362,7 +362,7 @@ export default function ModuleContentWorkspace({ mode = "faculty", user }) {
               type="button"
               onClick={submitRequest}
               disabled={busy === "submit" || loadingCards}
-              className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#00ffb4] px-5 py-4 text-sm font-black text-[#0a0e17] transition hover:scale-[1.005] disabled:opacity-60"
+              className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#FFD41C] px-5 py-4 text-sm font-black text-[#0a0e17] transition hover:scale-[1.005] disabled:opacity-60"
             >
               <Send className="h-4 w-4" />
               {busy === "submit" ? "Submitting..." : "Submit for Admin Approval"}
@@ -406,7 +406,7 @@ function Toast({ toast, onClose }) {
           className={[
             "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border",
             isSuccess
-              ? "border-[#00ffb4]/25 bg-[#00ffb4]/10 text-[#00ffb4]"
+              ? "border-[#FFD41C]/25 bg-[#FFD41C]/10 text-[#FFD41C]"
               : "border-red-400/25 bg-red-500/10 text-red-200",
           ].join(" ")}
         >
@@ -435,7 +435,7 @@ function EditableCard({ card, index, canMoveUp, canMoveDown, onChange, onMove, o
   return (
     <div className="rounded-2xl border border-[#1a2438] bg-[#0b1220] p-4">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <span className="rounded-full border border-[#00ffb4]/20 bg-[#00ffb4]/10 px-3 py-1 text-xs font-bold text-[#00ffb4]">
+        <span className="rounded-full border border-[#FFD41C]/20 bg-[#FFD41C]/10 px-3 py-1 text-xs font-bold text-[#FFD41C]">
           Card {index + 1}
         </span>
         <div className="flex gap-2">
@@ -455,21 +455,21 @@ function EditableCard({ card, index, canMoveUp, canMoveDown, onChange, onMove, o
         value={card.title}
         onChange={(event) => onChange(index, "title", event.target.value)}
         placeholder="Card title"
-        className="w-full rounded-2xl border border-[#1a2438] bg-white/[0.03] px-4 py-3 text-sm text-white outline-none focus:border-[#00ffb4]/40"
+        className="w-full rounded-2xl border border-[#1a2438] bg-white/[0.03] px-4 py-3 text-sm text-white outline-none focus:border-[#FFD41C]/40"
       />
 
       <textarea
         value={card.details}
         onChange={(event) => onChange(index, "details", event.target.value)}
         placeholder="Details"
-        className="mt-3 min-h-28 w-full rounded-2xl border border-[#1a2438] bg-white/[0.03] px-4 py-3 text-sm leading-6 text-white outline-none focus:border-[#00ffb4]/40"
+        className="mt-3 min-h-28 w-full rounded-2xl border border-[#1a2438] bg-white/[0.03] px-4 py-3 text-sm leading-6 text-white outline-none focus:border-[#FFD41C]/40"
       />
 
       <div className="relative mt-3">
         <select
           value={card.mediaType}
           onChange={(event) => onChange(index, "mediaType", event.target.value)}
-          className="w-full appearance-none rounded-2xl border border-[#1a2438] bg-[#0b1220] px-4 py-3 pr-11 text-sm text-white outline-none focus:border-[#00ffb4]/40"
+          className="w-full appearance-none rounded-2xl border border-[#1a2438] bg-[#0b1220] px-4 py-3 pr-11 text-sm text-white outline-none focus:border-[#FFD41C]/40"
         >
           {MODULE_MEDIA_TYPES.map((type) => (
             <option key={type} value={type} className="bg-[#0b1220] text-white">
@@ -484,7 +484,7 @@ function EditableCard({ card, index, canMoveUp, canMoveDown, onChange, onMove, o
         value={card.mediaUrl}
         onChange={(event) => onChange(index, "mediaUrl", event.target.value)}
         placeholder="Image, GIF, video, or embed URL"
-        className="mt-3 w-full rounded-2xl border border-[#1a2438] bg-white/[0.03] px-4 py-3 text-sm text-white outline-none focus:border-[#00ffb4]/40"
+        className="mt-3 w-full rounded-2xl border border-[#1a2438] bg-white/[0.03] px-4 py-3 text-sm text-white outline-none focus:border-[#FFD41C]/40"
       />
     </div>
   );
@@ -494,7 +494,7 @@ function RequestList({ title, requests, loading, mode, busy = "", onReview }) {
   return (
     <div className={`${panelClass} p-5`}>
       <div className="flex items-center gap-3">
-        <FileText className="h-5 w-5 text-[#00ffb4]" />
+        <FileText className="h-5 w-5 text-[#FFD41C]" />
         <h3 className="text-lg font-bold text-white">{title}</h3>
       </div>
 
@@ -513,7 +513,7 @@ function RequestList({ title, requests, loading, mode, busy = "", onReview }) {
                     {request.requestedByEmail || request.requestedBy || "Unknown"} · {formatDate(request.createdAt)}
                   </div>
                 </div>
-                <span className="rounded-full border border-[#00ffb4]/20 bg-[#00ffb4]/10 px-3 py-1 text-xs font-bold uppercase text-[#00ffb4]">
+                <span className="rounded-full border border-[#FFD41C]/20 bg-[#FFD41C]/10 px-3 py-1 text-xs font-bold uppercase text-[#FFD41C]">
                   {request.status}
                 </span>
               </div>
@@ -541,7 +541,7 @@ function RequestList({ title, requests, loading, mode, busy = "", onReview }) {
                     type="button"
                     onClick={() => onReview?.(request, "approve")}
                     disabled={busy === `approve:${request.id}`}
-                    className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#00ffb4] px-4 py-3 text-sm font-black text-[#0a0e17] disabled:opacity-60"
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#FFD41C] px-4 py-3 text-sm font-black text-[#0a0e17] disabled:opacity-60"
                   >
                     <Check className="h-4 w-4" />
                     {busy === `approve:${request.id}` ? "Approving..." : "Approve"}
@@ -564,7 +564,7 @@ function ApprovedPreview({ module, cards, loading }) {
   return (
     <div className={`${panelClass} p-5`}>
       <div className="flex items-center gap-3">
-        <ImageIcon className="h-5 w-5 text-[#00ffb4]" />
+        <ImageIcon className="h-5 w-5 text-[#FFD41C]" />
         <h3 className="text-lg font-bold text-white">Published preview</h3>
       </div>
       <p className="mt-2 text-sm text-[#7a8ba8]">{module.title}</p>
@@ -619,7 +619,7 @@ function CardPreview({ card, compact = false }) {
               href={card.mediaUrl.startsWith("http") ? card.mediaUrl : undefined}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex max-w-full items-center gap-2 rounded-xl border border-[#00ffb4]/20 bg-[#00ffb4]/10 px-3 py-2 text-xs text-[#b7fff0]"
+              className="inline-flex max-w-full items-center gap-2 rounded-xl border border-[#FFD41C]/20 bg-[#FFD41C]/10 px-3 py-2 text-xs text-[#b7fff0]"
             >
               {card.mediaType === "asset" ? <LinkIcon className="h-4 w-4" /> : <ExternalLink className="h-4 w-4" />}
               <span className="truncate">{card.mediaUrl}</span>

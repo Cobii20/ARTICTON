@@ -54,7 +54,7 @@ const PARTS = [
     id: "ram",
     label: "RAM",
     url: RAM_URL,
-    color: "#00ffb4",
+    color: "#FFD41C",
     installedPosition: new THREE.Vector3(-6.44, -0.59, 3.79),
     installedRotation: new THREE.Euler(0, 0, -Math.PI / 2),
     floorPosition: new THREE.Vector3(13.73, -24.61, 9.06),
@@ -226,7 +226,7 @@ function Scene({ placementApi, onComplete }) {
 
   return (
     <>
-      <color attach="background" args={["#05080D"]} />
+      <color attach="background" args={[typeof document !== "undefined" && document.documentElement.classList.contains("articton-light") ? "#f8f9ff" : "#05080D"]} />
       <ambientLight intensity={0.5} />
       <directionalLight
         position={[6, 10, 6]}
