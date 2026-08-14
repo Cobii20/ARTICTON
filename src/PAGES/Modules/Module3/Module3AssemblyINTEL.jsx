@@ -18,9 +18,18 @@ import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { AchievementToast, unlockAchievement } from "../../../utils/achievements.jsx";
 import { formatTutorReply } from "../../../utils/tutorReply.js";
 import { getUserSettings } from "../../../utils/userSettings";
+import { PDF_BASED_ASSEMBLY_GUIDES } from "../../../utils/pdfBasedInstructionGuides";
+import { useCompactWorkspace } from "../../../hooks/useCompactWorkspace";
+import {
+  GUIDED_ASSEMBLY_CAMERA_PRESET,
+  GUIDED_ASSEMBLY_ORBIT_PROPS,
+  collectFocusObjects,
+  frameSceneCamera,
+  getAssemblyCameraFocus,
+} from "../../../utils/threeCameraControls";
 
 /* ------------------------------------------------------------------ */
-/* Module 3 validated assembly configuration (INTEL platform)           */
+/* Module 3 validated assembly configuration (AMD platform)           */
 /* ------------------------------------------------------------------ */
 
 /*
@@ -63,16 +72,16 @@ const steps = [
 ];
 
 const PART_MODELS = [
-  { key: "table", path: "/models/INTELtable.glb" },
-  { key: "case", path: "/models/NEWcaseINTEL.glb" },
-  { key: "motherboard", path: "/models/NEWmotherboardINTEL.glb" },
-  { key: "cpu", path: "/models/NEWcpuINTEL.glb" },
-  { key: "ram1", path: "/models/NEWramINTEL.glb" },
-  { key: "ram2", path: "/models/NEWram2INTEL.glb" },
-  { key: "ssd", path: "/models/NEWssdINTEL.glb" },
-  { key: "hdd", path: "/models/NEWhddINTEL.glb" },
-  { key: "psu", path: "/models/NEWpsuINTEL.glb" },
-  { key: "gpu", path: "/models/NEWgpuINTEL.glb" },
+  { key: "table", path: "/models/AMDtable.glb" },
+  { key: "case", path: "/models/NEWcaseAMD.glb" },
+  { key: "motherboard", path: "/models/NEWmotherboardAMD.glb" },
+  { key: "cpu", path: "/models/NEWcpuAMD.glb" },
+  { key: "ram1", path: "/models/NEWramAMD.glb" },
+  { key: "ram2", path: "/models/NEWram2AMD.glb" },
+  { key: "ssd", path: "/models/NEWssdAMD.glb" },
+  { key: "hdd", path: "/models/NEWhddAMD.glb" },
+  { key: "psu", path: "/models/NEWpsuAMD.glb" },
+  { key: "gpu", path: "/models/NEWgpuAMD.glb" },
 ];
 
 const GUIDED_STEPS = steps.filter((item) => item.key !== "final");
@@ -93,145 +102,18 @@ const COMPONENT_LABELS = {
   gpu: "GPU (Graphics Processing Unit)",
 };
 
-const STEP_INSTRUCTION_GUIDES = Object.freeze({
-  cpu: {
-    title: "Prepare to Install the CPU",
-    summary: "The CPU is installed first while the motherboard is fully supported on the table. Correct orientation matters more than pressure—the processor should seat without force.",
-    procedure: [
-      "Place the motherboard flat on the table, release the socket lever, and open the load plate completely.",
-      "Match the processor's corner triangle and side notches with the socket; lower it vertically by its edges without touching socket pins.",
-      "Confirm the CPU is level in the keyed recess, close the load plate, and lock the retention lever under its hook.",
-      "Keep thermal paste off the contact pads; cooler installation and fan connection are verified before normal operation."
-    ],
-    safety: "Intel LGA socket pins are exposed in the motherboard socket and bend easily. Never touch them or drag the CPU across them.",
-    verify: "The CPU is level, fully inside the keyed socket, and the retention mechanism closes normally without unusual resistance.",
-    avoid: "Pressing the CPU down, touching socket pins or contact pads, or closing the load plate over a misaligned processor.",
-    simulation: "Drag the CPU into the motherboard's invisible field and release before contact. The animation lowers it vertically and applies the corrected socket seating depth."
-  },
-  ramFirst: {
-    title: "Prepare to Install the First RAM Module",
-    summary: "Install either available RAM module first. The notch in the module must match the keyed DIMM slot before downward pressure is applied.",
-    procedure: [
-      "Open the DIMM retaining latch or latches completely and identify the highlighted first memory slot.",
-      "Hold the RAM by its top corners, align the off-center notch with the slot key, and keep the module perfectly vertical.",
-      "Press evenly at both ends until the module bottoms out and the retention latch or latches click into place.",
-      "Visually compare both ends to confirm the module is level and equally deep in the slot."
-    ],
-    safety: "Use the module edges only and support the motherboard beneath the slot. Do not touch the gold contacts.",
-    verify: "The notch is aligned, both ends are fully seated, and the retention latch or latches are closed.",
-    avoid: "Reversing the module, pressing one end at a time, or continuing when the notch does not match.",
-    simulation: "Either RAM module is accepted first. Enter the motherboard field and let the animated vertical seating motion finish the insertion."
-  },
-  ramSecond: {
-    title: "Prepare to Install the Second RAM Module",
-    summary: "Complete the memory pair using the remaining module and the highlighted paired slot. Matching placement supports the intended dual-channel configuration.",
-    procedure: [
-      "Open the retention latch or latches on the remaining highlighted DIMM slot.",
-      "Check the keyed notch again; do not assume the second module is already oriented correctly.",
-      "Lower the module vertically and press both ends evenly until the latches close.",
-      "Compare both RAM modules: they should be parallel, level, and fully seated at the same depth."
-    ],
-    safety: "Keep pressure centered over the slot and support the board. Stop immediately if the module rocks or meets uneven resistance.",
-    verify: "Both RAM modules are locked, parallel, and flush in their intended slots.",
-    avoid: "Installing the second module in an arbitrary slot or mistaking partial latch movement for full seating.",
-    simulation: "Install the RAM module that remains. The next component stays locked until both memory modules are seated."
-  },
-  ssd: {
-    title: "Prepare to Install the M.2 SSD",
-    summary: "The M.2 SSD is installed on the table before the motherboard enters the case. Its edge connector enters at an angle, then the free end is secured flat.",
-    procedure: [
-      "Confirm the correct M.2 socket and standoff position for the drive length.",
-      "Hold the SSD by its edges and insert the gold connector at roughly a 20–30° angle until it is fully engaged.",
-      "Lower the free end gently onto the standoff and secure it with the screw or tool-less latch.",
-      "Tighten only until secure; the SSD must remain flat without bowing."
-    ],
-    safety: "Keep fingers off the gold contacts and controller components. Use the correct short M.2 screw and avoid overtightening.",
-    verify: "The connector is fully inserted, the drive lies flat, and the retaining point holds it without bending.",
-    avoid: "Pushing the drive straight down into the socket, using the wrong standoff, or overtightening the tiny screw.",
-    simulation: "Move the SSD into the motherboard field. The magnetic route aligns the insertion angle, lowers it, and seats it without passing through the board."
-  },
-  motherboard: {
-    title: "Prepare to Install the Populated Motherboard",
-    summary: "Install the motherboard with the CPU, both RAM modules, and SSD already mounted. The case remains flat and open-side-up so the board can be lowered safely.",
-    procedure: [
-      "Verify the case has only the required standoffs and that the rear I/O opening or shield is ready; remove any extra standoff that could short the board.",
-      "Support the board at two strong edges, align the rear I/O ports first, and keep mounted components clear of the case walls.",
-      "Lower the board vertically onto the standoffs and confirm every screw hole aligns before inserting hardware.",
-      "Start all motherboard screws by hand, then tighten gradually in a cross pattern without overtightening."
-    ],
-    safety: "Never rest the board on an unmatched standoff. Do not carry it by the CPU cooler, RAM, socket, or connectors.",
-    verify: "Rear I/O is aligned, every mounting hole sits over a standoff, the board is level, and no cable is trapped beneath it.",
-    avoid: "Forcing the rear ports into place, using an extra standoff, or tightening one screw fully before the others are started.",
-    simulation: "Bring the populated motherboard into the case field. It will lift clear, travel above the chassis, lower vertically, and seat without clipping through case walls."
-  },
-  psu: {
-    title: "Prepare to Install the PSU",
-    summary: "Install the power supply after the populated motherboard. Correct fan orientation and controlled cable routing support cooling and later connections.",
-    procedure: [
-      "Identify the case's ventilated PSU intake and orient the PSU fan toward that vent unless the case design specifies otherwise.",
-      "Support the PSU with both hands, slide it straight into its bay, and align the rear mounting holes.",
-      "Install the rear screws in a cross pattern while continuing to support the unit.",
-      "Route the 24-pin, CPU EPS, PCIe, and SATA power leads through the intended cable-management openings without connecting them under tension."
-    ],
-    safety: "The PSU is heavy. Keep fingers clear of pinch points and never open the PSU enclosure.",
-    verify: "The fan faces a usable vent, the unit sits flush, all rear screws are secure, and cables have a clear route.",
-    avoid: "Blocking the PSU intake, trapping cables under the unit, or allowing the PSU to hang from one screw.",
-    simulation: "Move the PSU into the case field. The safe-path animation lifts, clears the chassis edge, lowers into the bay, and preserves the correct orientation."
-  },
-  hdd: {
-    title: "Prepare to Install the HDD",
-    summary: "Secure the hard drive mechanically before attaching cables. Its connectors should face the cable-routing side so SATA plugs are not bent or stressed.",
-    procedure: [
-      "Place the HDD in its tray or cage with the connector side oriented toward the cable-management area.",
-      "Align the mounting holes, rails, or tool-less pins and secure the drive evenly on both sides.",
-      "Connect SATA data and SATA power by their keyed shapes; each plug should enter straight without force.",
-      "Leave a gentle cable bend and confirm the connectors are not carrying the drive's weight."
-    ],
-    safety: "Support the HDD throughout installation and protect its circuit board from tools, impacts, and static discharge.",
-    verify: "The drive cannot slide or rattle, both connectors are fully seated, and cable bends are relaxed.",
-    avoid: "Forcing a reversed SATA plug, leaving the drive unsecured, or sharply bending a cable at the connector.",
-    simulation: "Guide the HDD into the case field. The animation carries it over obstructions and lowers it into the drive bay."
-  },
-  gpu: {
-    title: "Prepare to Install the GPU",
-    summary: "The graphics card is installed last so it does not block motherboard, PSU, or storage access. The slot, rear bracket, and power connections must all be secured.",
-    procedure: [
-      "Remove the correct rear expansion-slot covers and open the PCIe x16 retention latch.",
-      "Hold the GPU by its edges or backplate, align the gold connector with the slot, and align the metal bracket with the case opening.",
-      "Press straight and evenly until the card is fully seated and the slot latch clicks closed.",
-      "Secure the bracket screws, then connect every required PCIe power plug until each latch engages."
-    ],
-    safety: "Support the GPU's weight during insertion. Keep fingers away from contacts and fans, and never use the bracket screws to pull the card into the slot.",
-    verify: "The slot latch is closed, the bracket sits flush, screws are secure, and all required power connectors are latched.",
-    avoid: "Tilting the GPU into the slot, missing the rear bracket opening, or forgetting supplemental power.",
-    simulation: "Enter the case magnetic field and release early. The GPU follows a collision-safe lift-over-lower route before the completed case animates upright."
-  },
-  final: {
-    title: "Final Unguided Assembly Challenge",
-    summary: "Repeat the full build without target highlights. The magnetic assistance and order restrictions remain, but component identification and safety checks are now your responsibility.",
-    procedure: [
-      "Install the CPU, then install both RAM modules—either module may be first—followed by the M.2 SSD.",
-      "Install the populated motherboard into the flat, open-side-up case before adding the PSU.",
-      "Install the PSU, then the HDD, and install the GPU last.",
-      "After each component, verify orientation, retention, clearance, and cable or screw requirements before continuing."
-    ],
-    safety: "A correct sequence does not replace inspection. Stop whenever alignment, connector state, or clearance is uncertain.",
-    verify: "CPU, both RAM modules, SSD, motherboard, PSU, HDD, and GPU are fully seated; the completed chassis then transitions upright.",
-    avoid: "Relying on force, skipping a retention check, or installing case components before the populated motherboard.",
-    simulation: "Complete CPU → both RAM modules (either first) → SSD → motherboard → PSU → HDD → GPU. No target highlights are shown."
-  }
-});
+const STEP_INSTRUCTION_GUIDES = PDF_BASED_ASSEMBLY_GUIDES.amd;
 
 /* Module 2 table seats become the loose starting positions for assembly. */
 const TABLE_STARTS = Object.freeze({
-  cpu: { position: [-12.615, -9.935, 19.679], snapDistance: 0.75, magnetDistance: 4.5 },
-  ram1: { position: [-14.962, -10.105, 22.539], snapDistance: 0.85, magnetDistance: 5 },
-  ram2: { position: [-15.606, -10.102, 21.06], snapDistance: 0.85, magnetDistance: 5 },
-  ssd: { position: [-5.398, -7.823, 28.806], snapDistance: 1, magnetDistance: 6 },
-  motherboard: { position: [-11.627, -7.507, 13.488], snapDistance: 2, magnetDistance: 11 },
-  psu: { position: [-5.545, -0.965, 19.931], snapDistance: 1.6, magnetDistance: 9, preserveTableRotation: true },
-  hdd: { position: [-10.726, -3.46, 24.501], snapDistance: 1.25, magnetDistance: 7 },
-  gpu: { position: [-11.387, -6.232, 24.891], snapDistance: 1.5, magnetDistance: 9 },
+  cpu: { position: [-24.32, -27.331, 85.547], snapDistance: 0.75, magnetDistance: 4.5 },
+  ram1: { position: [-53.836, -27.553, 80.307], snapDistance: 0.85, magnetDistance: 5 },
+  ram2: { position: [-55.587, -27.596, 75.629], snapDistance: 0.85, magnetDistance: 5 },
+  ssd: { position: [-28.53, -13.076, 98.981], snapDistance: 1, magnetDistance: 6 },
+  motherboard: { position: [-41.07, -21.537, 54.246], snapDistance: 2, magnetDistance: 11 },
+  psu: { position: [-28.697, -2.967, 75.561], snapDistance: 1.6, magnetDistance: 9, preserveTableRotation: true },
+  hdd: { position: [-38.289, -9.671, 90.063], snapDistance: 1.25, magnetDistance: 7 },
+  gpu: { position: [-41.711, -17.422, 88.557], snapDistance: 1.5, magnetDistance: 9 },
 });
 
 const DEFAULT_SNAP_DISTANCE = 1;
@@ -261,8 +143,8 @@ const CASE_STAND_CARD_DELAY_MS = CASE_STAND_TRANSITION_DURATION_MS + 300;
 const ASSEMBLY_UX_VERSION = "Guided Safe-Path Magnet v5 + Upright Finish";
 
 const LEGACY_STORAGE_KEYS = [
-  "module3CompletedStepsINTEL",
-  "module3AssembledPartsINTEL",
+  "module3CompletedStepsAMD",
+  "module3AssembledPartsAMD",
 ];
 
 function getCompletedPartCount(stepConfig, completedParts) {
@@ -1525,6 +1407,7 @@ function InteractiveCenteredObject({
       <group
         ref={groupRef}
         position={startPosition}
+        userData={{ artictonFocusKey: partKey }}
         onPointerDown={handlePointerDown}
         onPointerOver={handlePointerOver}
         onPointerOut={handlePointerOut}
@@ -1545,7 +1428,7 @@ function InteractiveCenteredObject({
         <bufferGeometry />
         <lineBasicMaterial
           ref={tetherMaterialRef}
-          color="#FFD41C"
+          color="#00ffb4"
           transparent
           opacity={0.45}
           depthTest={false}
@@ -1562,7 +1445,7 @@ function InteractiveCenteredObject({
         <ringGeometry args={[captureRingRadius * 0.72, captureRingRadius, 64]} />
         <meshBasicMaterial
           ref={captureRingMaterialRef}
-          color="#FFD41C"
+          color="#00ffb4"
           transparent
           opacity={0.18}
           side={THREE.DoubleSide}
@@ -1642,7 +1525,7 @@ function InstallationTargetGuide({ part, seatOffsetLocal = null }) {
       object.raycast = () => null;
       object.renderOrder = 1000;
       const material = new THREE.MeshBasicMaterial({
-        color: "#FFD41C",
+        color: "#00ffb4",
         transparent: true,
         opacity: part.key === "cpu" ? 0.04 : 0.09,
         depthTest: false,
@@ -1739,7 +1622,7 @@ function InstallationTargetGuide({ part, seatOffsetLocal = null }) {
       <mesh ref={markerRef} position={guideData.center.toArray()} renderOrder={1002}>
         <sphereGeometry args={[markerRadius, 24, 16]} />
         <meshBasicMaterial
-          color="#FFD41C"
+          color="#00ffb4"
           transparent
           opacity={0.7}
           wireframe
@@ -1757,8 +1640,8 @@ function InstallationTargetGuide({ part, seatOffsetLocal = null }) {
         occlude={false}
         style={{ pointerEvents: "none" }}
       >
-        <div className="whitespace-nowrap rounded-xl border border-[#FFD41C]/40 bg-[#07111d]/95 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#73ffd4] shadow-[0_12px_35px_rgba(0,0,0,0.5)] backdrop-blur-md">
-          <span className="mr-2 inline-flex rounded-full border border-[#FFD41C]/35 bg-[#FFD41C]/12 px-2 py-0.5 text-[8px]">TARGET</span>
+        <div className="whitespace-nowrap rounded-xl border border-[#00ffb4]/40 bg-[#07111d]/95 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#73ffd4] shadow-[0_12px_35px_rgba(0,0,0,0.5)] backdrop-blur-md">
+          <span className="mr-2 inline-flex rounded-full border border-[#00ffb4]/35 bg-[#00ffb4]/12 px-2 py-0.5 text-[8px]">TARGET</span>
           Install {COMPONENT_LABELS[part.key]} here
         </div>
       </Html>
@@ -1881,7 +1764,11 @@ function CaseWorkspace({
   });
 
   return (
-    <group ref={groundedGroupRef} position={[0, groundOffsetY, 0]}>
+    <group
+      ref={groundedGroupRef}
+      position={[0, groundOffsetY, 0]}
+      userData={{ artictonFocusKey: "case" }}
+    >
       <group position={bounds.center.toArray()}>
         <group ref={caseRotationRef} quaternion={layFlatQuaternion.toArray()}>
           <group ref={contentFrameRef} position={inverseCenter.toArray()}>
@@ -1994,7 +1881,7 @@ function MotherboardUnit({
 function Loader() {
   return (
     <Html center>
-      <div className="rounded-xl border border-[#1a2438] bg-[#0b1220]/90 px-4 py-2 text-xs font-semibold text-[#FFD41C]">
+      <div className="rounded-xl border border-[#1a2438] bg-[#0b1220]/90 px-4 py-2 text-xs font-semibold text-[#00ffb4]">
         Loading assembly scene...
       </div>
     </Html>
@@ -2136,17 +2023,45 @@ function AssemblyScene({
   );
 }
 
-function FullTableBirdEyeCamera({ sceneRootRef, controlsRef, overviewRequest }) {
+function FullTableBirdEyeCamera({
+  sceneRootRef,
+  controlsRef,
+  overviewRequest,
+  activePartKeys = [],
+}) {
   const { camera, size } = useThree();
   const initializedRef = useRef(false);
   const handledRequestRef = useRef(-1);
+  const handledFocusKeyRef = useRef("");
+  const lastFramedSizeRef = useRef({ width: 0, height: 0 });
+  const activePartKeysKey = activePartKeys.join("|");
 
   useEffect(() => {
     const isInitial = !initializedRef.current;
     const isRequested = overviewRequest !== handledRequestRef.current;
-    if (!isInitial && !isRequested) return undefined;
+    const isNewFocus = activePartKeysKey !== handledFocusKeyRef.current;
+    const previousSize = lastFramedSizeRef.current;
+    const previousAspect = previousSize.height
+      ? previousSize.width / previousSize.height
+      : 0;
+    const nextAspect = size.height ? size.width / size.height : 0;
+    const widthShift = Math.abs(size.width - previousSize.width);
+    const heightShift = Math.abs(size.height - previousSize.height);
+    const aspectShift = Math.abs(nextAspect - previousAspect);
+    const shouldReframeForResize =
+      initializedRef.current &&
+      previousSize.width > 0 &&
+      previousSize.height > 0 &&
+      (widthShift > Math.max(48, previousSize.width * 0.08) ||
+        heightShift > Math.max(40, previousSize.height * 0.08) ||
+        aspectShift > 0.08);
+
+    if (!isInitial && !isRequested && !isNewFocus && !shouldReframeForResize) {
+      return undefined;
+    }
 
     let frameId = 0;
+    let settleTimer = 0;
     let attempts = 0;
 
     const frameWholeWorkspace = () => {
@@ -2166,49 +2081,62 @@ function FullTableBirdEyeCamera({ sceneRootRef, controlsRef, overviewRequest }) 
         return;
       }
 
-      const center = box.getCenter(new THREE.Vector3());
-      const sceneSize = box.getSize(new THREE.Vector3());
-      const aspect = Math.max(size.width / Math.max(size.height, 1), 0.5);
-      const verticalFov = THREE.MathUtils.degToRad(camera.fov);
-      const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * aspect);
-      const verticalDistance =
-        (sceneSize.y * 0.72) / Math.max(Math.tan(verticalFov / 2), 0.2);
-      const horizontalDistance =
-        (sceneSize.x * 0.72) / Math.max(Math.tan(horizontalFov / 2), 0.2);
-      const depthDistance = sceneSize.z * 0.9;
-      const distance = Math.max(
-        verticalDistance,
-        horizontalDistance,
-        depthDistance,
-        12
+      const focus = getAssemblyCameraFocus(
+        activePartKeysKey ? activePartKeysKey.split("|") : []
       );
+      const focusObjects = collectFocusObjects(root, focus.keys);
+      if (focus.keys?.length && !focusObjects.length) {
+        attempts += 1;
+        if (attempts < 90) frameId = requestAnimationFrame(frameWholeWorkspace);
+        return;
+      }
+      const framed = frameSceneCamera({
+        camera,
+        controls,
+        root,
+        objects: focusObjects.length ? focusObjects : undefined,
+        size: { width: size.width, height: size.height },
+        preset: focus.preset || GUIDED_ASSEMBLY_CAMERA_PRESET,
+        minDistance: focus.minDistance ?? 12,
+      });
 
-      // Elevated diagonal direction preserves a useful bird's-eye view while
-      // keeping every loose component, the motherboard, case, and full table
-      // inside the viewport on both wide and smaller screens.
-      const direction = new THREE.Vector3(0.42, 1.28, 0.88).normalize();
-      const target = center.clone();
-      target.y += sceneSize.y * 0.02;
-
-      camera.position.copy(target).addScaledVector(direction, distance * 1.52);
-      camera.near = Math.max(0.01, distance / 600);
-      camera.far = Math.max(1600, distance * 24);
-      camera.updateProjectionMatrix();
-
-      controls.target.copy(target);
-      camera.lookAt(target);
-      controls.update();
-      initializedRef.current = true;
-      handledRequestRef.current = overviewRequest;
+      if (framed) {
+        initializedRef.current = true;
+        handledRequestRef.current = overviewRequest;
+        handledFocusKeyRef.current = activePartKeysKey;
+        lastFramedSizeRef.current = {
+          width: size.width,
+          height: size.height,
+        };
+      }
     };
 
-    frameId = requestAnimationFrame(frameWholeWorkspace);
-    return () => cancelAnimationFrame(frameId);
-  }, [camera, controlsRef, overviewRequest, sceneRootRef, size.height, size.width]);
+    const queueFrame = () => {
+      frameId = requestAnimationFrame(frameWholeWorkspace);
+    };
+
+    if (shouldReframeForResize && !isRequested && !isNewFocus) {
+      settleTimer = window.setTimeout(queueFrame, 120);
+    } else {
+      queueFrame();
+    }
+
+    return () => {
+      if (settleTimer) window.clearTimeout(settleTimer);
+      cancelAnimationFrame(frameId);
+    };
+  }, [
+    activePartKeysKey,
+    camera,
+    controlsRef,
+    overviewRequest,
+    sceneRootRef,
+    size.height,
+    size.width,
+  ]);
 
   return null;
 }
-
 
 
 function ModelViewer({
@@ -2230,9 +2158,8 @@ function ModelViewer({
   const activePartKeysKey = activePartKeys.join("|");
 
   useEffect(() => {
-    // Changing stages must not zoom into one item. Keep the whole workspace
-    // stable so every currently valid component remains visible.
     setTelemetry(null);
+    setOverviewRequest((value) => value + 1);
   }, [activePartKeysKey]);
 
   const refreshOverviewAfterResize = useCallback(() => {
@@ -2312,7 +2239,7 @@ function ModelViewer({
       style={isFullscreen ? { width: "100vw", height: "100vh" } : undefined}
     >
       <Canvas
-        camera={{ position: [35, 72, 52], fov: 46, near: 0.01, far: 1400 }}
+        camera={{ position: [35, 72, 52], fov: 42, near: 0.01, far: 1800 }}
         dpr={[1, 1.45]}
         shadows
         performance={{ min: 0.55 }}
@@ -2325,7 +2252,7 @@ function ModelViewer({
         }}
         style={{ touchAction: "none" }}
       >
-        <color attach="background" args={[typeof document !== "undefined" && document.documentElement.classList.contains("articton-light") ? "#f8f9ff" : "#070c14"]} />
+        <color attach="background" args={["#070c14"]} />
         <hemisphereLight args={["#ffffff", "#182338", 1.12]} />
         <ambientLight intensity={0.7} />
         <directionalLight
@@ -2358,22 +2285,14 @@ function ModelViewer({
           sceneRootRef={sceneRootRef}
           controlsRef={controlsRef}
           overviewRequest={overviewRequest}
+          activePartKeys={activePartKeys}
         />
 
         <OrbitControls
           ref={controlsRef}
           makeDefault
           enabled={!isDraggingPart}
-          enablePan={false}
-          enableZoom
-          zoomSpeed={0.48}
-          zoomToCursor
-          enableDamping
-          dampingFactor={0.12}
-          minPolarAngle={0.08}
-          maxPolarAngle={Math.PI * 0.46}
-          minDistance={10}
-          maxDistance={190}
+          {...GUIDED_ASSEMBLY_ORBIT_PROPS}
           mouseButtons={{
             LEFT: null,
             MIDDLE: THREE.MOUSE.DOLLY,
@@ -2382,38 +2301,42 @@ function ModelViewer({
         />
       </Canvas>
 
-      <div className="absolute left-4 top-4 z-[80] flex max-w-[calc(100%-180px)] flex-wrap gap-2">
+      <div className="articton-viewer-actions absolute left-4 top-4 z-[80] flex max-w-[calc(100%-180px)] flex-wrap gap-2">
         <button
           type="button"
           onClick={() => setOverviewRequest((value) => value + 1)}
           disabled={isDraggingPart}
-          className="rounded-xl border border-[#FFD41C]/30 bg-[#0b1220]/92 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#7dffdc] shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl transition hover:bg-[#FFD41C]/12 disabled:cursor-not-allowed disabled:opacity-45"
+          className="rounded-xl border border-[#00ffb4]/30 bg-[#0b1220]/92 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#7dffdc] shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl transition hover:bg-[#00ffb4]/12 disabled:cursor-not-allowed disabled:opacity-45"
         >
-          Reset Camera View
+          <span className="hidden sm:inline">Reset Camera View</span>
+          <span className="sm:hidden">Work View</span>
         </button>
         <button
           type="button"
           onClick={toggleFullscreen}
           disabled={isDraggingPart}
           aria-pressed={isFullscreen}
-          className="rounded-xl border border-[#FFD41C]/30 bg-[#0b1220]/92 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#7dffdc] shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl transition hover:bg-[#FFD41C]/12 disabled:cursor-not-allowed disabled:opacity-45"
+          className="rounded-xl border border-[#00ffb4]/30 bg-[#0b1220]/92 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#7dffdc] shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl transition hover:bg-[#00ffb4]/12 disabled:cursor-not-allowed disabled:opacity-45"
           title={isFullscreen ? "Exit fullscreen view" : "Open the 3D workspace in fullscreen"}
         >
-          {isFullscreen ? "Exit Full Screen" : "Full Screen"}
+          <span className="hidden sm:inline">
+            {isFullscreen ? "Exit Full Screen" : "Full Screen"}
+          </span>
+          <span className="sm:hidden">{isFullscreen ? "Exit" : "Full"}</span>
         </button>
       </div>
 
       {showGuides && telemetry ? (
-        <div className="pointer-events-none absolute bottom-4 left-4 z-[80] w-[min(320px,calc(100%-32px))] rounded-2xl border border-[#FFD41C]/25 bg-[#0b1220]/94 px-4 py-3 text-[11px] leading-5 text-[#dbe6f5] shadow-[0_12px_35px_rgba(0,0,0,0.4)] backdrop-blur-xl">
+        <div className="pointer-events-none absolute bottom-4 right-4 z-[80] w-[min(320px,calc(100%-32px))] rounded-2xl border border-[#00ffb4]/25 bg-[#0b1220]/94 px-4 py-3 text-[11px] leading-5 text-[#dbe6f5] shadow-[0_12px_35px_rgba(0,0,0,0.4)] backdrop-blur-xl">
           <div className="mb-1 flex items-center justify-between gap-4">
-            <span className="font-bold text-[#FFD41C]">{telemetry.label}</span>
-            <span className="rounded-full border border-[#FFD41C]/25 bg-[#FFD41C]/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.12em] text-[#7dffdc]">
+            <span className="font-bold text-[#00ffb4]">{telemetry.label}</span>
+            <span className="rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.12em] text-[#7dffdc]">
               {telemetry.magnetState}
             </span>
           </div>
           <div className="mb-2 h-1.5 overflow-hidden rounded-full bg-white/10">
             <div
-              className="h-full rounded-full bg-[#FFD41C] transition-[width] duration-150"
+              className="h-full rounded-full bg-[#00ffb4] transition-[width] duration-150"
               style={{ width: `${Math.round(telemetry.progress * 100)}%` }}
             />
           </div>
@@ -2447,19 +2370,19 @@ function HeaderDropdown({
   };
 
   return (
-    <div className="relative flex flex-wrap items-center justify-end gap-3">
+    <div className="articton-user-controls relative flex flex-wrap items-center justify-end gap-3">
       <button
         type="button"
         onClick={handleBack}
-        className="relative z-[70] rounded-2xl border border-[#1a2438] bg-white/[0.03] px-4 py-2.5 text-[13px] font-semibold text-[#dbe6f5] transition hover:bg-white/[0.06]"
+        className="articton-back-button relative z-[70] rounded-2xl border border-[#1a2438] bg-white/[0.03] px-4 py-2.5 text-[13px] font-semibold text-[#dbe6f5] transition hover:bg-white/[0.06]"
       >
         Go back to Dashboard
       </button>
 
-      <details className="group relative z-50">
-        <summary className="list-none cursor-pointer rounded-2xl border border-[#1a2438] bg-[#0d1220]/95 px-3 py-2.5 transition hover:bg-[#111b2f]">
+      <details className="articton-profile-menu group relative z-50">
+        <summary className="articton-profile-summary list-none cursor-pointer rounded-2xl border border-[#1a2438] bg-[#0d1220]/95 px-3 py-2.5 transition hover:bg-[#111b2f]">
           <div className="flex max-w-[230px] items-center justify-end gap-3">
-            <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-[#FFD41C]/25 bg-[#FFD41C]/10 text-sm font-bold text-[#FFD41C]">
+            <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/10 text-sm font-bold text-[#00ffb4]">
               {avatarUrl ? (
                 <img src={avatarUrl} alt="Profile" className="h-full w-full object-cover" />
               ) : (
@@ -2508,8 +2431,8 @@ function HeaderDropdown({
 function ModuleBackground() {
   return (
     <>
-      <div className="pointer-events-none absolute -left-44 -top-44 h-[720px] w-[720px] rounded-full bg-[#FFD41C]/10 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-56 -right-52 h-[820px] w-[820px] rounded-full bg-[#FFD41C]/6 blur-3xl" />
+      <div className="pointer-events-none absolute -left-44 -top-44 h-[720px] w-[720px] rounded-full bg-[#00ffb4]/10 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-56 -right-52 h-[820px] w-[820px] rounded-full bg-[#00ffb4]/6 blur-3xl" />
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#0a0e17] via-[#0a0e17] to-[#0d1220]" />
     </>
   );
@@ -2538,17 +2461,19 @@ function Sidebar({
 
   return (
     <div
-      className={[
-        "absolute left-0 top-0 z-[200] h-full transition-all duration-300",
-        open ? "w-[clamp(220px,22vw,280px)]" : "w-[64px]",
-      ].join(" ")}
+      className="articton-sidebar absolute left-0 top-0 z-[200] h-full transition-all duration-300"
+      style={{
+        width: open
+          ? "var(--articton-sidebar-open)"
+          : "var(--articton-sidebar-closed)",
+      }}
     >
       <div className="flex h-full min-h-0 flex-col border-r border-[#1a2438] bg-[#0b1220]/92 backdrop-blur-xl shadow-[0_18px_60px_rgba(0,0,0,0.28)]">
-        <div className="flex shrink-0 items-center justify-between border-b border-[#1a2438] px-4 py-4">
+        <div className="articton-sidebar-header flex shrink-0 items-center justify-between border-b border-[#1a2438] px-4 py-4">
           {open ? (
             <div>
               <div className="text-sm font-bold text-white">Assembly Steps</div>
-              <div className="text-[11px] text-[#7a8ba8]">INTEL Platform</div>
+              <div className="text-[11px] text-[#7a8ba8]">AMD Platform</div>
             </div>
           ) : null}
           <button
@@ -2561,7 +2486,7 @@ function Sidebar({
         </div>
 
         <div
-          className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-3 pr-2 [scrollbar-color:rgba(255,212,28,0.35)_rgba(255,255,255,0.05)] [scrollbar-width:thin]"
+          className="articton-sidebar-list min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-3 pr-2 [scrollbar-color:rgba(0,255,180,0.35)_rgba(255,255,255,0.05)] [scrollbar-width:thin]"
           style={{ scrollbarGutter: "stable" }}
         >
           {steps.map((item, index) => {
@@ -2577,9 +2502,9 @@ function Sidebar({
                 onClick={() => onSelect(index)}
                 aria-disabled={!unlocked}
                 className={[
-                  "flex w-full scroll-m-3 items-center gap-3 rounded-2xl border px-3 py-3 text-left transition",
+                  "articton-sidebar-item flex w-full scroll-m-3 items-center gap-3 rounded-2xl border px-3 py-3 text-left transition",
                   active
-                    ? "border-[#FFD41C]/25 bg-[#FFD41C]/10"
+                    ? "border-[#00ffb4]/25 bg-[#00ffb4]/10"
                     : "border-[#1a2438] bg-white/[0.03]",
                   unlocked
                     ? "hover:bg-white/[0.06]"
@@ -2590,9 +2515,9 @@ function Sidebar({
                   className={[
                     "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold transition",
                     done
-                      ? "bg-[#FFD41C] text-[#0a0e17]"
+                      ? "bg-[#00ffb4] text-[#0a0e17]"
                       : active
-                      ? "border border-[#FFD41C]/35 bg-[#FFD41C]/10 text-[#FFD41C]"
+                      ? "border border-[#00ffb4]/35 bg-[#00ffb4]/10 text-[#00ffb4]"
                       : "border border-[#1a2438] bg-[#0d1220] text-[#7a8ba8]",
                   ].join(" ")}
                 >
@@ -2620,13 +2545,13 @@ function Sidebar({
         </div>
 
         {currentStep === steps.length - 1 && currentStepCompleted ? (
-          <div className="shrink-0 border-t border-[#1a2438] p-3">
+          <div className="articton-sidebar-footer shrink-0 border-t border-[#1a2438] p-3">
             <button
               type="button"
               onClick={onViewCertificate}
               className={[
-                "flex items-center justify-center rounded-2xl bg-[#FFD41C] font-black text-[#0a0e17]",
-                "shadow-[0_18px_50px_rgba(255,212,28,0.22)] transition hover:scale-[1.03]",
+                "flex items-center justify-center rounded-2xl bg-[#00ffb4] font-black text-[#0a0e17]",
+                "shadow-[0_18px_50px_rgba(0,255,180,0.22)] transition hover:scale-[1.03]",
                 open ? "w-full px-5 py-3 text-sm" : "h-10 w-10 text-sm",
               ].join(" ")}
               title="View Certificate"
@@ -2636,7 +2561,7 @@ function Sidebar({
           </div>
         ) : null}
 
-        <div className="shrink-0 border-t border-[#1a2438] p-3">
+        <div className="articton-sidebar-footer shrink-0 border-t border-[#1a2438] p-3">
           <button
             type="button"
             onClick={onResetScene}
@@ -2658,10 +2583,10 @@ function Sidebar({
 function ModuleIntroCard({ platform, moduleType, onStart }) {
   return (
     <div className="absolute inset-0 z-[750] flex items-center justify-center bg-[#050912]/78 p-5 backdrop-blur-md">
-      <div className="relative w-full max-w-2xl overflow-hidden rounded-[30px] border border-[#FFD41C]/30 bg-[#0b1220]/96 p-7 shadow-[0_40px_120px_rgba(0,0,0,0.7)] md:p-9">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(255,212,28,0.13),transparent_42%)]" />
+      <div className="relative w-full max-w-2xl overflow-hidden rounded-[30px] border border-[#00ffb4]/30 bg-[#0b1220]/96 p-7 shadow-[0_40px_120px_rgba(0,0,0,0.7)] md:p-9">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(0,255,180,0.13),transparent_42%)]" />
         <div className="relative">
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#FFD41C]/25 bg-[#FFD41C]/8 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-[#FFD41C]">
+          <div className="inline-flex items-center gap-2 rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/8 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-[#00ffb4]">
             Module 3 • {platform} Platform
           </div>
           <h2 className="mt-5 text-3xl font-black tracking-tight text-white md:text-4xl">
@@ -2673,19 +2598,19 @@ function ModuleIntroCard({ platform, moduleType, onStart }) {
 
           <div className="mt-6 grid gap-3 sm:grid-cols-3">
             <div className="rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4">
-              <div className="text-xs font-black uppercase tracking-[0.16em] text-[#FFD41C]">1. Identify</div>
+              <div className="text-xs font-black uppercase tracking-[0.16em] text-[#00ffb4]">1. Identify</div>
               <div className="mt-2 text-xs leading-5 text-[#9fb0ca]">
                 Read the step card first, then identify the highlighted component and its destination host: motherboard or flat case.
               </div>
             </div>
             <div className="rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4">
-              <div className="text-xs font-black uppercase tracking-[0.16em] text-[#FFD41C]">2. Move</div>
+              <div className="text-xs font-black uppercase tracking-[0.16em] text-[#00ffb4]">2. Move</div>
               <div className="mt-2 text-xs leading-5 text-[#9fb0ca]">
                 Perform the listed preparation and handling checks, then click-hold to lift and carry the component toward the host field.
               </div>
             </div>
             <div className="rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4">
-              <div className="text-xs font-black uppercase tracking-[0.16em] text-[#FFD41C]">3. Complete</div>
+              <div className="text-xs font-black uppercase tracking-[0.16em] text-[#00ffb4]">3. Complete</div>
               <div className="mt-2 text-xs leading-5 text-[#9fb0ca]">
                 Verify the final seated position against the card’s checklist before continuing to the next instruction guide.
               </div>
@@ -2699,7 +2624,7 @@ function ModuleIntroCard({ platform, moduleType, onStart }) {
             <button
               type="button"
               onClick={onStart}
-              className="rounded-2xl bg-[#FFD41C] px-7 py-3 text-sm font-black text-[#07111d] shadow-[0_16px_45px_rgba(255,212,28,0.25)] transition hover:scale-[1.03]"
+              className="rounded-2xl bg-[#00ffb4] px-7 py-3 text-sm font-black text-[#07111d] shadow-[0_16px_45px_rgba(0,255,180,0.25)] transition hover:scale-[1.03]"
             >
               Start Guided Practice →
             </button>
@@ -2739,13 +2664,13 @@ function StepInstructionCard({
       aria-modal="true"
       aria-labelledby="step-instruction-title"
     >
-      <div className="articton-instruction-card relative w-full max-w-4xl overflow-hidden rounded-[30px] border border-[#FFD41C]/35 bg-[#0b1220]/97 p-6 shadow-[0_40px_120px_rgba(0,0,0,0.76),0_0_70px_rgba(255,212,28,0.10)] md:p-8">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_0%,rgba(255,212,28,0.16),transparent_42%)]" />
-        <div className="pointer-events-none absolute -right-24 -top-24 h-56 w-56 rounded-full border border-[#FFD41C]/15 bg-[#FFD41C]/5 blur-2xl" />
+      <div className="articton-instruction-card relative w-full max-w-4xl overflow-hidden rounded-[30px] border border-[#00ffb4]/35 bg-[#0b1220]/97 p-6 shadow-[0_40px_120px_rgba(0,0,0,0.76),0_0_70px_rgba(0,255,180,0.10)] md:p-8">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_0%,rgba(0,255,180,0.16),transparent_42%)]" />
+        <div className="pointer-events-none absolute -right-24 -top-24 h-56 w-56 rounded-full border border-[#00ffb4]/15 bg-[#00ffb4]/5 blur-2xl" />
 
         <div className="articton-instruction-content relative">
           <div className="articton-instruction-topbar flex flex-wrap items-center justify-between gap-3">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#FFD41C]/30 bg-[#FFD41C]/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.22em] text-[#73ffd4]">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#00ffb4]/30 bg-[#00ffb4]/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.22em] text-[#73ffd4]">
               {isFinalChallenge
                 ? "Final Challenge • Before You Begin"
                 : `Step ${stepNumber} of ${totalSteps} • Before You Begin`}
@@ -2756,11 +2681,11 @@ function StepInstructionCard({
           </div>
 
           <div className="articton-instruction-hero mt-6 flex items-start gap-5">
-            <div className="articton-instruction-step-icon flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-[#FFD41C]/40 bg-[#FFD41C]/12 text-2xl font-black text-[#FFD41C] shadow-[0_0_34px_rgba(255,212,28,0.18)]">
+            <div className="articton-instruction-step-icon flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-[#00ffb4]/40 bg-[#00ffb4]/12 text-2xl font-black text-[#00ffb4] shadow-[0_0_34px_rgba(0,255,180,0.18)]">
               {isFinalChallenge ? "★" : stepNumber}
             </div>
             <div className="min-w-0">
-              <div className="text-[11px] font-black uppercase tracking-[0.24em] text-[#FFD41C]">
+              <div className="text-[11px] font-black uppercase tracking-[0.24em] text-[#00ffb4]">
                 Instruction Guide
               </div>
               <h2
@@ -2777,13 +2702,13 @@ function StepInstructionCard({
 
           <div className="articton-instruction-details mt-7 grid gap-4 lg:grid-cols-[1.35fr_0.85fr]">
             <section className="articton-instruction-procedure rounded-2xl border border-[#1a2438] bg-white/[0.035] p-5">
-              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-[#FFD41C]">
+              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-[#00ffb4]">
                 Correct Procedure
               </div>
               <ol className="mt-4 space-y-3">
                 {safeGuide.procedure.map((item, index) => (
                   <li key={`${stepName}-instruction-${index}`} className="flex gap-3 text-sm leading-6 text-[#d7e1ee]">
-                    <span className="articton-instruction-number flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[#FFD41C]/30 bg-[#FFD41C]/10 text-[10px] font-black text-[#FFD41C]">
+                    <span className="articton-instruction-number flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[#00ffb4]/30 bg-[#00ffb4]/10 text-[10px] font-black text-[#00ffb4]">
                       {index + 1}
                     </span>
                     <span>{item}</span>
@@ -2797,8 +2722,8 @@ function StepInstructionCard({
                 <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#ffd166]">Safety / Handling</div>
                 <p className="mt-2 text-xs leading-6 text-[#d8dfeb]">{safeGuide.safety}</p>
               </div>
-              <div className="articton-instruction-side-card rounded-2xl border border-[#FFD41C]/22 bg-[#FFD41C]/[0.06] p-4">
-                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#FFD41C]">Correct Result</div>
+              <div className="articton-instruction-side-card rounded-2xl border border-[#00ffb4]/22 bg-[#00ffb4]/[0.06] p-4">
+                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#00ffb4]">Correct Result</div>
                 <p className="mt-2 text-xs leading-6 text-[#d8dfeb]">{safeGuide.verify}</p>
               </div>
               <div className="articton-instruction-side-card rounded-2xl border border-[#ff7b72]/22 bg-[#ff7b72]/[0.055] p-4">
@@ -2808,8 +2733,8 @@ function StepInstructionCard({
             </div>
           </div>
 
-          <div className="articton-instruction-simulation mt-5 rounded-2xl border border-[#FFD41C]/18 bg-[#FFD41C]/6 px-4 py-3 text-xs leading-6 text-[#c3d1e4]">
-            <span className="font-black uppercase tracking-[0.14em] text-[#FFD41C]">In the simulation: </span>
+          <div className="articton-instruction-simulation mt-5 rounded-2xl border border-[#00ffb4]/18 bg-[#00ffb4]/6 px-4 py-3 text-xs leading-6 text-[#c3d1e4]">
+            <span className="font-black uppercase tracking-[0.14em] text-[#00ffb4]">In the simulation: </span>
             {safeGuide.simulation}
           </div>
 
@@ -2820,7 +2745,7 @@ function StepInstructionCard({
             <button
               type="button"
               onClick={onBegin}
-              className="articton-instruction-button rounded-2xl bg-[#FFD41C] px-7 py-3 text-sm font-black text-[#07111d] shadow-[0_16px_45px_rgba(255,212,28,0.20)] transition hover:scale-[1.02]"
+              className="articton-instruction-button rounded-2xl bg-[#00ffb4] px-7 py-3 text-sm font-black text-[#07111d] shadow-[0_16px_45px_rgba(0,255,180,0.20)] transition hover:scale-[1.02]"
             >
               {isFinalChallenge ? "Begin Final Challenge" : `Begin ${stepName}`} →
             </button>
@@ -2839,11 +2764,11 @@ function FullAssemblyCompletionCard({ platform, onReview, onCertificate }) {
       aria-modal="true"
       aria-labelledby="full-assembly-completion-title"
     >
-      <div className="relative w-full max-w-2xl overflow-hidden rounded-[30px] border border-[#FFD41C]/35 bg-[#0b1220]/97 p-7 shadow-[0_40px_120px_rgba(0,0,0,0.76),0_0_70px_rgba(255,212,28,0.10)] md:p-9">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_0%,rgba(255,212,28,0.16),transparent_42%)]" />
+      <div className="relative w-full max-w-2xl overflow-hidden rounded-[30px] border border-[#00ffb4]/35 bg-[#0b1220]/97 p-7 shadow-[0_40px_120px_rgba(0,0,0,0.76),0_0_70px_rgba(0,255,180,0.10)] md:p-9">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_0%,rgba(0,255,180,0.16),transparent_42%)]" />
         <div className="articton-instruction-content relative">
           <div className="articton-instruction-topbar flex flex-wrap items-center justify-between gap-3">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#FFD41C]/30 bg-[#FFD41C]/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.22em] text-[#73ffd4]">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#00ffb4]/30 bg-[#00ffb4]/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.22em] text-[#73ffd4]">
               Full Assembly Complete
             </div>
             <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-[#9fb0ca]">
@@ -2852,9 +2777,9 @@ function FullAssemblyCompletionCard({ platform, onReview, onCertificate }) {
           </div>
 
           <div className="articton-instruction-hero mt-6 flex items-start gap-5">
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-[#FFD41C]/40 bg-[#FFD41C]/12 text-3xl font-black text-[#FFD41C] shadow-[0_0_34px_rgba(255,212,28,0.18)]">✓</div>
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-[#00ffb4]/40 bg-[#00ffb4]/12 text-3xl font-black text-[#00ffb4] shadow-[0_0_34px_rgba(0,255,180,0.18)]">✓</div>
             <div className="min-w-0">
-              <div className="text-[11px] font-black uppercase tracking-[0.24em] text-[#FFD41C]">Validated Unguided Run</div>
+              <div className="text-[11px] font-black uppercase tracking-[0.24em] text-[#00ffb4]">Validated Unguided Run</div>
               <h2 id="full-assembly-completion-title" className="articton-instruction-title mt-2 text-2xl font-black leading-tight text-white md:text-4xl">
                 Your PC Is Fully Assembled
               </h2>
@@ -2866,15 +2791,15 @@ function FullAssemblyCompletionCard({ platform, onReview, onCertificate }) {
 
           <div className="mt-7 grid gap-3 sm:grid-cols-3">
             <div className="rounded-2xl border border-[#1a2438] bg-white/[0.035] p-4">
-              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#FFD41C]">Order</div>
+              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#00ffb4]">Order</div>
               <div className="mt-2 text-sm font-bold text-white">Validated</div>
             </div>
             <div className="rounded-2xl border border-[#1a2438] bg-white/[0.035] p-4">
-              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#FFD41C]">Placement</div>
+              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#00ffb4]">Placement</div>
               <div className="mt-2 text-sm font-bold text-white">All parts seated</div>
             </div>
             <div className="rounded-2xl border border-[#1a2438] bg-white/[0.035] p-4">
-              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#FFD41C]">Result</div>
+              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#00ffb4]">Result</div>
               <div className="mt-2 text-sm font-bold text-white">Certificate unlocked</div>
             </div>
           </div>
@@ -2883,7 +2808,7 @@ function FullAssemblyCompletionCard({ platform, onReview, onCertificate }) {
             <button type="button" onClick={onReview} className="rounded-2xl border border-[#1a2438] bg-white/[0.04] px-5 py-3 text-sm font-semibold text-[#dbe6f5] transition hover:bg-white/[0.08]">
               Review Finished PC
             </button>
-            <button type="button" onClick={onCertificate} className="rounded-2xl bg-[#FFD41C] px-6 py-3 text-sm font-black text-[#07111d] shadow-[0_16px_45px_rgba(255,212,28,0.18)] transition hover:scale-[1.02]">
+            <button type="button" onClick={onCertificate} className="rounded-2xl bg-[#00ffb4] px-6 py-3 text-sm font-black text-[#07111d] shadow-[0_16px_45px_rgba(0,255,180,0.18)] transition hover:scale-[1.02]">
               View Certificate →
             </button>
           </div>
@@ -2908,15 +2833,15 @@ function CompletionCertificate({
     <div className="min-h-screen w-full overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased print:bg-white">
       <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden px-5 py-8">
         <ModuleBackground />
-        <div className="relative z-10 w-full max-w-4xl overflow-hidden rounded-[34px] border border-[#FFD41C]/35 bg-[#0d1220]/94 p-7 text-center shadow-[0_40px_120px_rgba(0,0,0,0.65)] backdrop-blur-xl md:p-12 print:border-black print:bg-white print:text-black print:shadow-none">
-          <div className="pointer-events-none absolute inset-4 rounded-[26px] border border-dashed border-[#FFD41C]/30 print:border-black/40" />
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,212,28,0.14),transparent_42%)] print:hidden" />
+        <div className="relative z-10 w-full max-w-4xl overflow-hidden rounded-[34px] border border-[#00ffb4]/35 bg-[#0d1220]/94 p-7 text-center shadow-[0_40px_120px_rgba(0,0,0,0.65)] backdrop-blur-xl md:p-12 print:border-black print:bg-white print:text-black print:shadow-none">
+          <div className="pointer-events-none absolute inset-4 rounded-[26px] border border-dashed border-[#00ffb4]/30 print:border-black/40" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(0,255,180,0.14),transparent_42%)] print:hidden" />
 
           <div className="relative">
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-[#FFD41C]/40 bg-[#FFD41C]/10 text-4xl font-black text-[#FFD41C] shadow-[0_0_40px_rgba(255,212,28,0.18)] print:border-black print:bg-transparent print:text-black">
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-[#00ffb4]/40 bg-[#00ffb4]/10 text-4xl font-black text-[#00ffb4] shadow-[0_0_40px_rgba(0,255,180,0.18)] print:border-black print:bg-transparent print:text-black">
               ✓
             </div>
-            <div className="mt-5 text-[11px] font-black uppercase tracking-[0.34em] text-[#FFD41C] print:text-black">
+            <div className="mt-5 text-[11px] font-black uppercase tracking-[0.34em] text-[#00ffb4] print:text-black">
               Certificate of Completion
             </div>
             <h1 className="mt-3 text-4xl font-black tracking-tight text-white md:text-6xl print:text-black">
@@ -2951,14 +2876,14 @@ function CompletionCertificate({
               <button
                 type="button"
                 onClick={onBack}
-                className="rounded-2xl bg-[#FFD41C] px-6 py-3 text-sm font-black text-[#07111d] transition hover:scale-[1.03]"
+                className="rounded-2xl bg-[#00ffb4] px-6 py-3 text-sm font-black text-[#07111d] transition hover:scale-[1.03]"
               >
                 Back to Modules →
               </button>
               <button
                 type="button"
                 onClick={onSwitchPlatform}
-                className="rounded-2xl border border-[#FFD41C]/35 bg-[#FFD41C]/10 px-6 py-3 text-sm font-black text-[#7dffdc] transition hover:bg-[#FFD41C]/18"
+                className="rounded-2xl border border-[#00ffb4]/35 bg-[#00ffb4]/10 px-6 py-3 text-sm font-black text-[#7dffdc] transition hover:bg-[#00ffb4]/18"
               >
                 Try {alternatePlatform} Version
               </button>
@@ -2981,7 +2906,7 @@ function CompletionCertificate({
 /* Main Module 3 component                                             */
 /* ------------------------------------------------------------------ */
 
-export default function Module3AssemblyINTEL({
+export default function Module3AssemblyAMD({
   onFinish,
   onBack,
   onLogout,
@@ -2994,6 +2919,11 @@ export default function Module3AssemblyINTEL({
   const [firebaseUser, setFirebaseUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const compactWorkspace = useCompactWorkspace();
+  const effectiveSidebarOpen = sidebarOpen && !compactWorkspace;
+  const viewerLeftOffset = effectiveSidebarOpen
+    ? "var(--articton-sidebar-open)"
+    : "var(--articton-sidebar-closed)";
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showCertificate, setShowCertificate] = useState(false);
   const [showIntro, setShowIntro] = useState(true);
@@ -3008,7 +2938,7 @@ export default function Module3AssemblyINTEL({
   const [aiMessages, setAiMessages] = useState([
     {
       role: "assistant",
-      content: "Hello! I am your Module 3 PC Assembly assistant (INTEL).",
+      content: "Hello! I am your Module 3 PC Assembly assistant (AMD).",
     },
   ]);
   const [aiInput, setAiInput] = useState("");
@@ -3104,7 +3034,7 @@ export default function Module3AssemblyINTEL({
         const snapshot = await getDoc(userReference);
         if (snapshot.exists()) setProfile(snapshot.data());
       } catch (error) {
-        console.error("Error fetching Module 3 (INTEL) profile:", error);
+        console.error("Error fetching Module 3 (AMD) profile:", error);
       }
     });
 
@@ -3132,7 +3062,7 @@ export default function Module3AssemblyINTEL({
         userReference,
         {
           moduleProgress: {
-            module3INTEL: {
+            module3AMD: {
               currentStep: steps.length - 1,
               completed: true,
               percent: 100,
@@ -3144,12 +3074,12 @@ export default function Module3AssemblyINTEL({
         { merge: true }
       );
       const achievement = await unlockAchievement(firebaseUser.uid, "module3", {
-        platform: "Intel",
+        platform: "AMD",
       });
       setAchievementToast(achievement);
       window.setTimeout(() => setAchievementToast(null), 4200);
     } catch (error) {
-      console.error("Error saving final Module 3 (INTEL) completion:", error);
+      console.error("Error saving final Module 3 (AMD) completion:", error);
     }
   }, [firebaseUser]);
 
@@ -3333,7 +3263,7 @@ export default function Module3AssemblyINTEL({
         context: {
           mode: "assembly",
           moduleNumber: 3,
-          platform: "intel",
+          platform: "amd",
           currentStep: currentStep?.name,
           activeComponent: activePartLabel,
           completedParts: modelViewerCompletedParts,
@@ -3377,7 +3307,7 @@ export default function Module3AssemblyINTEL({
   if (showCertificate) {
     return (
       <CompletionCertificate
-        platform="INTEL"
+        platform="AMD"
         moduleNumber="3"
         moduleType="Assembly"
         description="You completed the validated assembly order: CPU, both RAM modules in either order, SSD, motherboard, PSU, HDD, and GPU — including a full unguided repeat pass with collision-free animated magnetic seating and an upright case transition."
@@ -3392,14 +3322,14 @@ export default function Module3AssemblyINTEL({
   }
 
   return (
-      <div className="articton-app-shell articton-module-page fixed inset-0 h-screen w-screen overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased">
-      <div className="relative h-full w-full overflow-hidden">
+      <div className="articton-workspace-page fixed inset-0 h-screen w-screen overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased">
+      <div className="articton-workspace-frame relative h-full w-full overflow-hidden">
         <ModuleBackground />
         <AchievementToast achievement={achievementToast} onClose={() => setAchievementToast(null)} />
 
         {showIntro ? (
           <ModuleIntroCard
-            platform="INTEL"
+            platform="AMD"
             moduleType="Assembly"
             onStart={handleStartGuidedPractice}
           />
@@ -3407,7 +3337,7 @@ export default function Module3AssemblyINTEL({
 
         {instructionStepIndex !== null ? (
           <StepInstructionCard
-            platform="INTEL"
+            platform="AMD"
             moduleType="Assembly"
             stepNumber={Math.min(instructionStepIndex + 1, GUIDED_STEPS.length)}
             totalSteps={GUIDED_STEPS.length}
@@ -3420,48 +3350,48 @@ export default function Module3AssemblyINTEL({
 
         {showFinalCompletionCard ? (
           <FullAssemblyCompletionCard
-            platform="INTEL"
+            platform="AMD"
             onReview={() => setShowFinalCompletionCard(false)}
             onCertificate={() => setShowCertificate(true)}
           />
         ) : null}
 
         <div className="relative flex h-full w-full flex-col overflow-hidden">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(255,212,28,0.08),transparent_35%)]" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_88%_20%,rgba(255,212,28,0.05),transparent_30%)]" />
-          <div className="absolute inset-0 bg-[linear-gradient(rgba(255,212,28,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(255,212,28,0.025)_1px,transparent_1px)] bg-[size:54px_54px] opacity-55" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(0,255,180,0.08),transparent_35%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_88%_20%,rgba(0,255,180,0.05),transparent_30%)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(rgba(0,255,180,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,180,0.025)_1px,transparent_1px)] bg-[size:54px_54px] opacity-55" />
 
           <div className="relative flex h-full w-full flex-col overflow-hidden">
-            <div className="flex items-center justify-between px-6 pt-6 text-[12px] text-[#7a8ba8] md:px-10">
+            <div className="articton-topline flex items-center justify-between px-6 pt-6 text-[12px] text-[#7a8ba8] md:px-10">
               <div>
-                Module 3 — <span className="text-[#dbe6f5]">Assembly (INTEL)</span>
+                Module 3 — <span className="text-[#dbe6f5]">Assembly (AMD)</span>
               </div>
               <div className="rounded-lg border border-[#1a2438] bg-white/[0.03] px-2 py-1 text-[11px]">
                 Step {step + 1} of {steps.length}
               </div>
             </div>
 
-            <div className="relative z-[120] mt-3 px-6 md:px-10">
-              <div className="flex w-full flex-wrap items-center justify-between gap-4 rounded-[22px] border border-[#1a2438] bg-[#0b1220]/86 px-6 py-4 shadow-[0_18px_60px_rgba(0,0,0,0.30)] backdrop-blur-xl">
-                <div className="flex flex-wrap items-center justify-end gap-3">
+            <div className="articton-toolbar relative z-[120] mt-3 px-6 md:px-10">
+              <div className="articton-toolbar-inner flex w-full flex-wrap items-center justify-between gap-4 rounded-[22px] border border-[#1a2438] bg-[#0b1220]/86 px-6 py-4 shadow-[0_18px_60px_rgba(0,0,0,0.30)] backdrop-blur-xl">
+                <div className="articton-brand flex flex-wrap items-center justify-end gap-3">
                   <img
                     src="/PNG/Articton.png"
                     alt="Articton Logo"
-                    className="ml-4 h-10 w-10 scale-300 object-contain"
+                    className="articton-brand-logo ml-4 h-10 w-10 scale-300 object-contain"
                   />
                   <div>
-                    <div className="text-base font-bold tracking-wide text-white">
+                    <div className="articton-brand-title text-base font-bold tracking-wide text-white">
                       Articton
                     </div>
-                    <div className="text-[11px] uppercase tracking-[0.24em] text-[#FFD41C]">
-                      INTEL Assembly View
+                    <div className="articton-brand-subtitle text-[11px] uppercase tracking-[0.24em] text-[#00ffb4]">
+                      AMD Assembly View
                     </div>
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center justify-end gap-3">
+                <div className="articton-header-actions flex flex-wrap items-center justify-end gap-3">
                   {validationMessage ? (
-                    <div className="max-w-[540px] rounded-2xl border border-[#FFD41C]/20 bg-[#FFD41C]/8 px-4 py-2 text-xs font-semibold text-[#dffef5]">
+                    <div className="articton-validation max-w-[540px] rounded-2xl border border-[#00ffb4]/20 bg-[#00ffb4]/8 px-4 py-2 text-xs font-semibold text-[#dffef5]">
                       {validationMessage}
                     </div>
                   ) : null}
@@ -3485,13 +3415,13 @@ export default function Module3AssemblyINTEL({
               />
             </div>
 
-            <div className="px-6 pt-4 md:px-10">
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-[18px] border border-[#1a2438] bg-[#0b1220]/72 px-5 py-3 shadow-[0_12px_40px_rgba(0,0,0,0.25)]">
+            <div className="articton-step-strip px-6 pt-4 md:px-10">
+              <div className="articton-step-strip-inner flex flex-wrap items-center justify-between gap-3 rounded-[18px] border border-[#1a2438] bg-[#0b1220]/72 px-5 py-3 shadow-[0_12px_40px_rgba(0,0,0,0.25)]">
                 <div>
-                  <div className="text-sm font-semibold text-white">
+                  <div className="articton-step-title text-sm font-semibold text-white">
                     {isFinalRound ? "Full Assembly Run" : currentStep?.name}
                   </div>
-                  <div className="text-[11px] uppercase tracking-[0.14em] text-[#7a8ba8]">
+                  <div className="articton-step-description text-[11px] uppercase tracking-[0.14em] text-[#7a8ba8]">
                     {isFinalRound
                       ? `Unguided pass • install ${activePartLabel || "complete"} • ${finalRoundCompletedParts.length}/${ASSEMBLY_SEQUENCE.length} done`
                       : activePartLabel
@@ -3499,15 +3429,15 @@ export default function Module3AssemblyINTEL({
                       : "Assembly complete • review the PC or open the certificate"}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="articton-step-progress flex items-center gap-2">
                   {steps.map((item, index) => (
                     <div
                       key={item.key}
-                      className={`h-2.5 w-9 rounded-full transition ${
+                      className={`articton-step-progress-pill h-2.5 w-9 rounded-full transition ${
                         index === step
-                          ? "bg-[#FFD41C]"
+                          ? "bg-[#00ffb4]"
                           : index < step
-                          ? "bg-[#FFD41C]/55"
+                          ? "bg-[#00ffb4]/55"
                           : "bg-white/10"
                       }`}
                     />
@@ -3516,10 +3446,10 @@ export default function Module3AssemblyINTEL({
               </div>
             </div>
 
-            <div className="min-h-0 flex-1 px-4 py-4 md:px-8 md:py-5">
-              <div className="relative h-full overflow-hidden rounded-[24px] border border-[#1a2438] bg-[#0d1220]/78 shadow-[0_28px_90px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+            <div className="articton-stage min-h-0 flex-1 px-4 py-4 md:px-8 md:py-5">
+              <div className="articton-stage-frame relative h-full overflow-hidden rounded-[24px] border border-[#1a2438] bg-[#0d1220]/78 shadow-[0_28px_90px_rgba(0,0,0,0.45)] backdrop-blur-xl">
                 <Sidebar
-                  open={sidebarOpen}
+                  open={effectiveSidebarOpen}
                   onToggle={() => setSidebarOpen((value) => !value)}
                   currentStep={step}
                   completedSteps={effectiveCompletedSteps}
@@ -3534,8 +3464,8 @@ export default function Module3AssemblyINTEL({
                 <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_120px_rgba(0,0,0,0.55)]" />
 
                 <div
-                  className="absolute bottom-3 right-3 top-3 z-[40] overflow-hidden rounded-[18px] border border-[#1a2438] bg-black/20 transition-all duration-300 md:bottom-4 md:right-4 md:top-4"
-                  style={{ left: sidebarOpen ? "clamp(220px, 22vw, 280px)" : 64 }}
+                  className="articton-viewer-shell absolute bottom-3 left-[var(--assembly-viewer-left)] right-3 top-3 z-[40] overflow-hidden rounded-[18px] border border-[#1a2438] bg-black/20 transition-all duration-300 md:bottom-4 md:right-4 md:top-4"
+                  style={{ "--assembly-viewer-left": viewerLeftOffset }}
                 >
                   <ModelViewer
                     key={sceneRevision}
@@ -3550,7 +3480,7 @@ export default function Module3AssemblyINTEL({
 
                   <ProcedureAssistantBubble
                     mode="assembly"
-                    platform="INTEL"
+                    platform="AMD"
                     currentStep={currentStep?.name}
                     activeComponent={activePartLabel}
                     open={aiOpen}
@@ -3567,7 +3497,7 @@ export default function Module3AssemblyINTEL({
                       <button
                         type="button"
                         onClick={() => setAiOpen(true)}
-                        className="rounded-2xl border border-[#FFD41C]/25 bg-[#0b1220]/90 px-4 py-3 text-sm font-semibold text-[#FFD41C] shadow-[0_10px_40px_rgba(255,212,28,0.15)] backdrop-blur-xl transition hover:scale-[1.03]"
+                        className="rounded-2xl border border-[#00ffb4]/25 bg-[#0b1220]/90 px-4 py-3 text-sm font-semibold text-[#00ffb4] shadow-[0_10px_40px_rgba(0,255,180,0.15)] backdrop-blur-xl transition hover:scale-[1.03]"
                       >
                         AI Assistant
                       </button>
@@ -3579,7 +3509,7 @@ export default function Module3AssemblyINTEL({
                               Assembly AI
                             </div>
                             <div className="text-[11px] text-[#7a8ba8]">
-                              INTEL step-aware assistant
+                              AMD step-aware assistant
                             </div>
                           </div>
                           <button
@@ -3597,7 +3527,7 @@ export default function Module3AssemblyINTEL({
                               key={index}
                               className={`rounded-2xl px-4 py-3 text-sm leading-6 ${
                                 message.role === "assistant"
-                                  ? "bg-[#FFD41C]/10 text-[#dffef5]"
+                                  ? "bg-[#00ffb4]/10 text-[#dffef5]"
                                   : "bg-white/5 text-white"
                               }`}
                             >
@@ -3621,13 +3551,13 @@ export default function Module3AssemblyINTEL({
                                 }
                               }}
                               placeholder="Ask about this step..."
-                              className="flex-1 rounded-xl border border-[#1a2438] bg-[#111827] px-4 py-3 text-sm text-white outline-none transition focus:border-[#FFD41C]/35"
+                              className="flex-1 rounded-xl border border-[#1a2438] bg-[#111827] px-4 py-3 text-sm text-white outline-none transition focus:border-[#00ffb4]/35"
                             />
                             <button
                               type="button"
                               onClick={askAI}
                               disabled={aiLoading}
-                              className="rounded-xl bg-[#FFD41C] px-4 py-3 text-sm font-bold text-[#0a0e17] transition hover:scale-[1.03] disabled:cursor-not-allowed disabled:opacity-60"
+                              className="rounded-xl bg-[#00ffb4] px-4 py-3 text-sm font-bold text-[#0a0e17] transition hover:scale-[1.03] disabled:cursor-not-allowed disabled:opacity-60"
                             >
                               {aiLoading ? "..." : "Send"}
                             </button>
@@ -3640,7 +3570,7 @@ export default function Module3AssemblyINTEL({
               </div>
             </div>
 
-            <div className="flex items-center justify-center gap-4 border-t border-[#1a2438] px-6 pb-6 pt-4">
+            <div className="articton-footer flex items-center justify-center gap-4 border-t border-[#1a2438] px-6 pb-6 pt-4">
               <div className="text-center text-xs text-[#7a8ba8]">
                 Left-drag moves components • enter the invisible host field for animated seating • right-drag rotates • wheel zooms • Esc releases • R resets camera
               </div>
@@ -3656,7 +3586,3 @@ export default function Module3AssemblyINTEL({
 
 /* Preload the table, case, and every assembly component. */
 PART_MODELS.forEach((part) => useGLTF.preload(encodeURI(part.path)));
-
-
-
-

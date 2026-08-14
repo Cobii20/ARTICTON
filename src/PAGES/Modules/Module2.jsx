@@ -7,6 +7,7 @@ import PSUtoCaseScene from "./module2-scenes/PSUtoCase";
 import FullAssemblyScene from "./module2-scenes/FullAssembly";
 import React, { useEffect, useState } from "react";
 import Settings from "../../Components/Settings";
+import PlatformChoicePanel from "../../Components/PlatformChoicePanel";
 import { getUserSettings } from "../../utils/userSettings";
 import { auth, db, functions } from "../../firebase.js";
 import { onAuthStateChanged } from "firebase/auth";
@@ -44,7 +45,7 @@ function HeaderDropdown({
       <details className="group relative z-50">
         <summary className="list-none cursor-pointer rounded-2xl border border-[#1a2438] bg-[#0d1220]/95 px-4 py-2.5 transition hover:bg-[#111b2f]">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-[#FFD41C]/25 bg-[#FFD41C]/10 text-sm font-bold text-[#FFD41C]">
+            <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/10 text-sm font-bold text-[#00ffb4]">
               {avatarUrl ? (
                 <img src={avatarUrl} alt="Profile" className="h-full w-full object-cover" />
               ) : (
@@ -100,9 +101,9 @@ function HeaderDropdown({
 function Module2Background() {
   return (
     <>
-      <div className="pointer-events-none absolute -left-44 -top-44 h-[720px] w-[720px] rounded-full bg-[#FFD41C]/10 blur-3xl" />
+      <div className="pointer-events-none absolute -left-44 -top-44 h-[720px] w-[720px] rounded-full bg-[#00ffb4]/10 blur-3xl" />
 
-      <div className="pointer-events-none absolute -bottom-56 -right-52 h-[820px] w-[820px] rounded-full bg-[#FFD41C]/6 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-56 -right-52 h-[820px] w-[820px] rounded-full bg-[#00ffb4]/6 blur-3xl" />
 
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#0a0e17] via-[#0a0e17] to-[#0d1220]" />
     </>
@@ -124,15 +125,19 @@ function Module2PlatformChoice({ user, onBack, onLogout, onSelectPlatform, setIs
   ];
 
   return (
-    <div className="articton-app-shell articton-module-selector-page min-h-screen w-full overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased">
+    <div className="min-h-screen w-full overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased">
       <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden p-4 md:p-8">
         <Module2Background />
 
-        <div className="articton-platform-shell relative z-10 flex min-h-[min(760px,calc(100vh-32px))] w-full max-w-6xl flex-col overflow-hidden rounded-[30px] border border-[#1a2438] bg-[linear-gradient(135deg,#0a0e17,#0d1220,#101a2d)] shadow-[0_70px_180px_rgba(0,0,0,0.70)]">
-          <div className="articton-platform-glow pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(255,212,28,0.08),transparent_35%)]" />
-          <div className="articton-platform-grid pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,212,28,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,212,28,0.04)_1px,transparent_1px)] bg-[size:54px_54px] opacity-55" />
+        <div className="relative z-10 flex flex-col overflow-hidden rounded-[30px] border border-[#1a2438] bg-[linear-gradient(135deg,#0a0e17,#0d1220,#101a2d)] shadow-[0_70px_180px_rgba(0,0,0,0.70)]"
+          style={{
+            width: "min(92vw, clamp(980px, 62vw, 1280px))",
+            minHeight: "clamp(560px, 66vh, 720px)",
+          }}>
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(0,255,180,0.08),transparent_35%)]" />
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(0,255,180,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,180,0.04)_1px,transparent_1px)] bg-[size:54px_54px] opacity-55" />
 
-          <div className="relative z-10 flex items-center justify-between gap-4 px-6 pt-6 md:px-8">
+          <div className="relative z-10 flex items-center justify-between gap-4 px-6 pt-5 md:px-8 md:pt-6">
             <div className="flex items-center gap-3">
               <img
                 src="/PNG/Articton.png"
@@ -145,46 +150,29 @@ function Module2PlatformChoice({ user, onBack, onLogout, onSelectPlatform, setIs
                   Articton
                 </div>
 
-                <div className="text-[11px] uppercase tracking-[0.24em] text-[#FFD41C]">
+                <div className="text-[11px] uppercase tracking-[0.24em] text-[#00ffb4]">
                   Module 2
                 </div>
               </div>
             </div>
+
+            <HeaderDropdown
+              userName={user.name}
+              userEmail={user.email}
+              avatarUrl={user.avatarUrl}
+              onBack={onBack}
+              onLogout={onLogout}
+              setIsSettingsOpen={setIsSettingsOpen}
+            />
           </div>
 
-          <div className="relative z-10 flex flex-1 items-center justify-center px-6 py-10">
-            <div className="articton-platform-card w-[min(880px,90vw)] rounded-[24px] border border-[#FFD41C]/35 bg-[#06131b]/74 px-6 py-7 text-center shadow-[0_0_55px_rgba(255,212,28,0.18),0_32px_110px_rgba(0,0,0,0.62)] backdrop-blur-xl md:px-8 md:py-8">
-              <div className="text-[11px] font-black uppercase tracking-[0.26em] text-[#FFD41C]">
-                Processor Platform
-              </div>
-              <div className="mt-2 text-[30px] font-black leading-tight text-white">
-                Every PC starts with a decision
-              </div>
-              <div className="mx-auto mt-3 max-w-xl text-[14px] leading-6 text-[#dbe6f5]">
-                What processor platform will power your system?
-              </div>
-
-              <div className="mt-7 grid gap-4 sm:grid-cols-2">
-                {platforms.map((platform) => (
-                  <button
-                    key={platform.id}
-                    type="button"
-                    onClick={() => onSelectPlatform?.(platform.id)}
-                    className="articton-platform-option rounded-[18px] border border-white/12 bg-white/[0.04] px-6 py-6 text-left transition hover:scale-[1.02] hover:border-[#FFD41C]/45 hover:bg-[#FFD41C]/12 focus:outline-none focus:ring-2 focus:ring-[#FFD41C]/25"
-                  >
-                    <div className="text-[28px] font-black text-white">
-                      {platform.name}
-                    </div>
-                    <div className="mt-3 text-[12px] leading-5 text-[#b7c6dd]">
-                      {platform.detail}
-                    </div>
-                    <div className="mt-5 text-[11px] font-black uppercase tracking-[0.18em] text-[#FFD41C]">
-                      Select {platform.name}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
+          <div className="relative z-10 flex flex-1 items-center justify-center px-6 py-7 md:px-8 md:py-8">
+            <PlatformChoicePanel
+              title="Every PC starts with a decision"
+              subtitle="Choose the processor platform you want to assemble."
+              platforms={platforms}
+              onSelectPlatform={onSelectPlatform}
+            />
           </div>
         </div>
       </div>
@@ -257,7 +245,7 @@ function Module2Sidebar({
                 className={[
                   "flex w-full items-center gap-3 rounded-2xl border px-3 py-3 text-left transition",
                   active
-                    ? "border-[#FFD41C]/25 bg-[#FFD41C]/10"
+                    ? "border-[#00ffb4]/25 bg-[#00ffb4]/10"
                     : "border-[#1a2438] bg-white/[0.03]",
                   unlocked
                     ? "hover:bg-white/[0.06]"
@@ -268,9 +256,9 @@ function Module2Sidebar({
                   className={[
                     "flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold transition",
                     done
-                      ? "bg-[#FFD41C] text-[#0a0e17]"
+                      ? "bg-[#00ffb4] text-[#0a0e17]"
                       : active
-                      ? "border border-[#FFD41C]/35 bg-[#FFD41C]/10 text-[#FFD41C]"
+                      ? "border border-[#00ffb4]/35 bg-[#00ffb4]/10 text-[#00ffb4]"
                       : "border border-[#1a2438] bg-[#0d1220] text-[#7a8ba8]",
                   ].join(" ")}
                 >
@@ -305,8 +293,8 @@ function Module2Sidebar({
               type="button"
               onClick={onViewCertificate}
               className={[
-                "flex items-center justify-center rounded-2xl bg-[#FFD41C] font-black text-[#0a0e17]",
-                "shadow-[0_18px_50px_rgba(255,212,28,0.22)] transition hover:scale-[1.03]",
+                "flex items-center justify-center rounded-2xl bg-[#00ffb4] font-black text-[#0a0e17]",
+                "shadow-[0_18px_50px_rgba(0,255,180,0.22)] transition hover:scale-[1.03]",
                 open ? "w-full px-5 py-3 text-sm" : "h-10 w-10 text-sm",
               ].join(" ")}
               title="View Certificate"
@@ -666,19 +654,19 @@ const askAI = async () => {
 
   if (showCertificate) {
     return (
-      <div className="articton-app-shell articton-module-page min-h-screen w-full overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased">
+      <div className="min-h-screen w-full overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased">
         <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden px-6">
           <Module2Background />
 
-          <div className="relative z-10 w-full max-w-3xl rounded-[34px] border border-[#FFD41C]/35 bg-[#0d1220]/90 p-8 text-center shadow-[0_40px_120px_rgba(0,0,0,0.65)] backdrop-blur-xl md:p-12">
-            <div className="pointer-events-none absolute inset-4 rounded-[26px] border border-dashed border-[#FFD41C]/30" />
+          <div className="relative z-10 w-full max-w-3xl rounded-[34px] border border-[#00ffb4]/35 bg-[#0d1220]/90 p-8 text-center shadow-[0_40px_120px_rgba(0,0,0,0.65)] backdrop-blur-xl md:p-12">
+            <div className="pointer-events-none absolute inset-4 rounded-[26px] border border-dashed border-[#00ffb4]/30" />
 
             <div className="relative">
-              <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full border border-[#FFD41C]/40 bg-[#FFD41C]/10 text-4xl font-black text-[#FFD41C] shadow-[0_0_40px_rgba(255,212,28,0.18)]">
+              <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full border border-[#00ffb4]/40 bg-[#00ffb4]/10 text-4xl font-black text-[#00ffb4] shadow-[0_0_40px_rgba(0,255,180,0.18)]">
                 ✓
               </div>
 
-              <div className="mb-3 text-[12px] font-bold uppercase tracking-[0.32em] text-[#FFD41C]">
+              <div className="mb-3 text-[12px] font-bold uppercase tracking-[0.32em] text-[#00ffb4]">
                 Certificate of Completion
               </div>
 
@@ -698,7 +686,7 @@ const askAI = async () => {
               <button
                 type="button"
                 onClick={handleBackToDashboard}
-                className="rounded-2xl bg-[#FFD41C] px-7 py-3 text-sm font-black text-[#0a0e17] shadow-[0_18px_50px_rgba(255,212,28,0.22)] transition hover:scale-[1.03]"
+                className="rounded-2xl bg-[#00ffb4] px-7 py-3 text-sm font-black text-[#0a0e17] shadow-[0_18px_50px_rgba(0,255,180,0.22)] transition hover:scale-[1.03]"
               >
                 Back to Dashboard →
               </button>
@@ -710,17 +698,17 @@ const askAI = async () => {
   }
 
   return (
-    <div className="articton-app-shell articton-module-page min-h-screen w-full overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased">
+    <div className="min-h-screen w-full overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased">
       <div className="relative h-screen w-full overflow-hidden">
         <Module2Background />
 
         <div className="relative h-full w-full overflow-hidden p-0 md:p-3">
           <div className="relative h-full w-full overflow-hidden border border-[#1a2438] bg-[linear-gradient(135deg,#0a0e17,#0d1220,#101a2d)] shadow-[0_70px_180px_rgba(0,0,0,0.70)] md:rounded-[30px]">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(255,212,28,0.08),transparent_35%)]" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(0,255,180,0.08),transparent_35%)]" />
 
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_88%_20%,rgba(255,212,28,0.05),transparent_30%)]" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_88%_20%,rgba(0,255,180,0.05),transparent_30%)]" />
 
-            <div className="absolute inset-0 bg-[linear-gradient(rgba(255,212,28,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(255,212,28,0.025)_1px,transparent_1px)] bg-[size:54px_54px] opacity-55" />
+            <div className="absolute inset-0 bg-[linear-gradient(rgba(0,255,180,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,180,0.025)_1px,transparent_1px)] bg-[size:54px_54px] opacity-55" />
 
             <div className="absolute inset-0 bg-black/10 ring-1 ring-white/5" />
 
@@ -750,7 +738,7 @@ const askAI = async () => {
                         Articton
                       </div>
 
-                      <div className="text-[11px] uppercase tracking-[0.24em] text-[#FFD41C]">
+                      <div className="text-[11px] uppercase tracking-[0.24em] text-[#00ffb4]">
                         Assembly View
                       </div>
                     </div>
@@ -815,11 +803,11 @@ const askAI = async () => {
                       left: sidebarOpen ? 270 : 24,
                     }}
                   >
-                    <div className="pointer-events-none absolute inset-0 rounded-[18px] ring-1 ring-[#FFD41C]/15 shadow-[0_0_0_1px_rgba(255,212,28,0.08)]" />
+                    <div className="pointer-events-none absolute inset-0 rounded-[18px] ring-1 ring-[#00ffb4]/15 shadow-[0_0_0_1px_rgba(0,255,180,0.08)]" />
 
-                    <div className="pointer-events-none absolute -left-24 -top-24 h-56 w-56 rounded-full bg-[#FFD41C]/10 blur-3xl" />
+                    <div className="pointer-events-none absolute -left-24 -top-24 h-56 w-56 rounded-full bg-[#00ffb4]/10 blur-3xl" />
 
-                    <div className="pointer-events-none absolute left-[10%] top-[8%] h-[58%] w-[2px] animate-pulse bg-[linear-gradient(180deg,transparent,#FFD41C,transparent)] opacity-25" />
+                    <div className="pointer-events-none absolute left-[10%] top-[8%] h-[58%] w-[2px] animate-pulse bg-[linear-gradient(180deg,transparent,#00ffb4,transparent)] opacity-25" />
                   </div>
 
                   <div
@@ -833,7 +821,7 @@ const askAI = async () => {
     <button
       type="button"
       onClick={() => setAiOpen(true)}
-      className="rounded-2xl border border-[#FFD41C]/25 bg-[#0b1220]/90 px-4 py-3 text-sm font-semibold text-[#FFD41C] shadow-[0_10px_40px_rgba(255,212,28,0.15)] backdrop-blur-xl transition hover:scale-[1.03]"
+      className="rounded-2xl border border-[#00ffb4]/25 bg-[#0b1220]/90 px-4 py-3 text-sm font-semibold text-[#00ffb4] shadow-[0_10px_40px_rgba(0,255,180,0.15)] backdrop-blur-xl transition hover:scale-[1.03]"
     >
       AI Assistant
     </button>
@@ -867,7 +855,7 @@ const askAI = async () => {
             key={index}
             className={`rounded-2xl px-4 py-3 text-sm leading-6 ${
               msg.role === "assistant"
-                ? "bg-[#FFD41C]/10 text-[#dffef5]"
+                ? "bg-[#00ffb4]/10 text-[#dffef5]"
                 : "bg-white/5 text-white"
             }`}
           >
@@ -890,14 +878,14 @@ const askAI = async () => {
               setAiInput(e.target.value)
             }
             placeholder="Ask about this step..."
-            className="flex-1 rounded-xl border border-[#1a2438] bg-[#111827] px-4 py-3 text-sm text-white outline-none transition focus:border-[#FFD41C]/35"
+            className="flex-1 rounded-xl border border-[#1a2438] bg-[#111827] px-4 py-3 text-sm text-white outline-none transition focus:border-[#00ffb4]/35"
           />
 
           <button
             type="button"
             onClick={askAI}
             disabled={aiLoading}
-            className="rounded-xl bg-[#FFD41C] px-4 py-3 text-sm font-bold text-[#0a0e17] transition hover:scale-[1.03]"
+            className="rounded-xl bg-[#00ffb4] px-4 py-3 text-sm font-bold text-[#0a0e17] transition hover:scale-[1.03]"
           >
             {aiLoading ? "..." : "Send"}
           </button>

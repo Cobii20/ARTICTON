@@ -3,6 +3,7 @@ import { Canvas } from "@react-three/fiber";
 import { Bounds, Environment, Html, OrbitControls, useGLTF } from "@react-three/drei";
 import { motion, AnimatePresence } from "framer-motion";
 import Settings from "../../Components/Settings";
+import PlatformChoicePanel from "../../Components/PlatformChoicePanel";
 import { getUserSettings } from "../../utils/userSettings";
 import * as THREE from "three";
 import { auth, db } from "../../firebase.js";
@@ -14,6 +15,7 @@ import {
   module1ScenesAMD,
   module1ScenesIntel,
 } from "./module1-scenes";
+import { INSPECTION_ORBIT_PROPS } from "../../utils/threeCameraControls";
 
 const THEME = {
   bg: "#0a0e17",
@@ -21,267 +23,10 @@ const THEME = {
   surface2: "#111d33",
   text: "#e8ecf4",
   muted: "#7a8ba8",
-  accent: "#FFD41C",
-  accentSoft: "rgba(255,212,28,0.12)",
+  accent: "#00ffb4",
+  accentSoft: "rgba(0,255,180,0.12)",
   border: "#1a2438",
 };
-
-
-const COMPONENT_FULL_NAMES = {
-  cpu: "Central Processing Unit (CPU)",
-  motherboard: "Motherboard",
-  ram: "Random Access Memory (RAM)",
-  hdd: "Hard Disk Drive (HDD)",
-  ssd: "Solid-State Drive (SSD)",
-  psu: "Power Supply Unit (PSU)",
-  gpu: "Graphics Processing Unit (GPU)",
-  case: "Computer Case (PC Case)",
-  pccase: "Computer Case (PC Case)",
-  "pc-case": "Computer Case (PC Case)",
-};
-
-function getFullComponentName(component) {
-  if (!component) return "Hardware Component";
-
-  const key = String(component.key || "").trim().toLowerCase();
-  if (COMPONENT_FULL_NAMES[key]) {
-    return COMPONENT_FULL_NAMES[key];
-  }
-
-  const name = String(component.name || "").trim();
-  const normalizedName = name.toLowerCase();
-
-  const aliases = {
-    cpu: "Central Processing Unit (CPU)",
-    ram: "Random Access Memory (RAM)",
-    hdd: "Hard Disk Drive (HDD)",
-    ssd: "Solid-State Drive (SSD)",
-    psu: "Power Supply Unit (PSU)",
-    gpu: "Graphics Processing Unit (GPU)",
-    "pc case": "Computer Case (PC Case)",
-    case: "Computer Case (PC Case)",
-  };
-
-  return aliases[normalizedName] || name || "Hardware Component";
-}
-
-
-const COMPONENT_PARTS = {
-  cpu: [
-    {
-      part: "Integrated Heat Spreader (IHS)",
-      definition:
-        "A metal cover on top of the CPU die that transfers heat from the processor to the cooler while protecting the internal silicon.",
-    },
-    {
-      part: "CPU Pins / Contact Pads",
-      definition:
-        "Electrical connection points that allow the CPU to communicate power and data with the motherboard socket.",
-    },
-    {
-      part: "CPU Die",
-      definition:
-        "The silicon chip containing billions of transistors where calculations and processing operations happen.",
-    },
-    {
-      part: "Cache Memory",
-      definition:
-        "High-speed memory inside the CPU that stores frequently used data to reduce processing delays.",
-    },
-  ],
-  motherboard: [
-    {
-      part: "CPU Socket",
-      definition:
-        "The motherboard connector where the processor is installed and electrically connected.",
-    },
-    {
-      part: "RAM Slots (DIMM Slots)",
-      definition:
-        "Slots that hold memory modules and provide communication between RAM and the processor.",
-    },
-    {
-      part: "PCI Express Slots",
-      definition:
-        "Expansion connectors used for graphics cards, storage cards, and other high-speed devices.",
-    },
-    {
-      part: "Chipset",
-      definition:
-        "A controller that manages communication between the CPU, storage, USB devices, and expansion components.",
-    },
-  ],
-  ram: [
-    {
-      part: "Memory Chips",
-      definition:
-        "Integrated circuits that store temporary data used by the computer while programs are running.",
-    },
-    {
-      part: "Memory Module PCB",
-      definition:
-        "The circuit board that connects memory chips to the motherboard.",
-    },
-    {
-      part: "Gold Contacts",
-      definition:
-        "Conductive contacts that transfer electrical signals between RAM and the motherboard slot.",
-    },
-    {
-      part: "Heat Spreader",
-      definition:
-        "A protective cover that helps distribute heat away from memory chips.",
-    },
-  ],
-  ssd: [
-    {
-      part: "NAND Flash Memory",
-      definition:
-        "Non-volatile storage chips that keep data even when the computer is powered off.",
-    },
-    {
-      part: "Controller",
-      definition:
-        "A processor inside the SSD that manages data storage, reading, writing, and error correction.",
-    },
-    {
-      part: "Cache Memory",
-      definition:
-        "Fast temporary memory that improves SSD performance during data transfers.",
-    },
-    {
-      part: "PCB",
-      definition:
-        "The printed circuit board connecting all SSD electronic components.",
-    },
-  ],
-  hdd: [
-    {
-      part: "Platters",
-      definition:
-        "Magnetic disks where digital information is physically stored.",
-    },
-    {
-      part: "Read/Write Head",
-      definition:
-        "A component that reads and writes information on the magnetic platters.",
-    },
-    {
-      part: "Spindle Motor",
-      definition:
-        "A motor that spins the platters at high speed.",
-    },
-    {
-      part: "Actuator Arm",
-      definition:
-        "A mechanism that moves the read/write head across the platter surface.",
-    },
-  ],
-  gpu: [
-    {
-      part: "Graphics Processing Unit Core",
-      definition:
-        "The main processor responsible for rendering graphics and parallel computations.",
-    },
-    {
-      part: "VRAM",
-      definition:
-        "Dedicated memory that stores textures, frames, and graphics data.",
-    },
-    {
-      part: "Cooling System",
-      definition:
-        "Fans and heatsinks that remove heat generated during graphics processing.",
-    },
-    {
-      part: "PCIe Connector",
-      definition:
-        "The interface that connects the graphics card to the motherboard.",
-    },
-  ],
-  psu: [
-    {
-      part: "Transformer",
-      definition:
-        "Converts electrical energy into usable voltage levels for computer components.",
-    },
-    {
-      part: "Cooling Fan",
-      definition:
-        "Moves air through the power supply to maintain safe temperatures.",
-    },
-    {
-      part: "Capacitors",
-      definition:
-        "Store and regulate electrical energy to provide stable power delivery.",
-    },
-    {
-      part: "Power Connectors",
-      definition:
-        "Cables that deliver power to the motherboard, GPU, and storage devices.",
-    },
-  ],
-  case: [
-    {
-      part: "Chassis",
-      definition:
-        "The main frame that holds and protects all computer components.",
-    },
-    {
-      part: "Cooling Fans",
-      definition:
-        "Fans that control airflow and help maintain component temperatures.",
-    },
-    {
-      part: "Drive Bays",
-      definition:
-        "Mounting areas used for storage devices such as HDDs and SSDs.",
-    },
-    {
-      part: "Expansion Slots",
-      definition:
-        "Rear openings that allow installation of expansion cards.",
-    },
-  ],
-};
-
-function ComponentPartsPanel({ current }) {
-  const [open, setOpen] = useState(false);
-  const key = String(current?.key || "").toLowerCase();
-  const parts = COMPONENT_PARTS[key] || [];
-
-  return (
-    <div className="articton-module1-details mt-5">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="articton-module1-details-toggle rounded-full border border-[#FFD41C]/30 bg-[#FFD41C]/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-[#baffee]"
-      >
-        {open ? "Hide details" : "Click for more details"}
-      </button>
-
-      <AnimatePresence>
-        {open ? (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="mt-4 space-y-3 overflow-hidden"
-          >
-            {parts.map((item) => (
-              <div key={item.part} className="articton-module1-detail-card rounded-xl border border-[#FFD41C]/15 bg-black/20 p-3">
-                <div className="text-[12px] font-black text-[#FFD41C]">{item.part}</div>
-                <div className="mt-1 text-[11px] leading-5 text-[#dbe6f5]">
-                  {item.definition}
-                </div>
-              </div>
-            ))}
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
-    </div>
-  );
-}
 
 function IntroDeck({ slides, onDone }) {
   const [index, setIndex] = useState(0);
@@ -295,7 +40,7 @@ function IntroDeck({ slides, onDone }) {
             id: "fallback-intro",
             title: "Component Overview",
             body: "Explore this component in the 3D hardware lab.",
-            points: ["Rotate the model.", "Zoom in for details."],
+            points: ["Rotate the model.", "Zoom in for details.", "Select hotspots when available."],
           },
         ];
   const slide = safeSlides[Math.min(index, safeSlides.length - 1)];
@@ -303,7 +48,7 @@ function IntroDeck({ slides, onDone }) {
 
   return (
     <div className="pointer-events-none absolute inset-0 z-50">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,rgba(255,212,28,0.08),rgba(0,0,0,0.58)_58%,rgba(0,0,0,0.75))]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,rgba(0,255,180,0.08),rgba(0,0,0,0.58)_58%,rgba(0,0,0,0.75))]" />
 
       <div className="relative flex h-full w-full items-end justify-center p-4 pb-8 sm:items-center sm:p-6">
         <AnimatePresence mode="wait">
@@ -313,11 +58,11 @@ function IntroDeck({ slides, onDone }) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.99 }}
             transition={{ duration: 0.22 }}
-            className="pointer-events-auto w-[760px] max-w-[calc(100vw-32px)] overflow-hidden rounded-[18px] border border-[#FFD41C]/30 bg-[#06131b]/72 shadow-[0_0_45px_rgba(255,212,28,0.16),0_32px_100px_rgba(0,0,0,0.55)] backdrop-blur-xl"
+            className="pointer-events-auto w-[760px] max-w-[calc(100vw-32px)] overflow-hidden rounded-[18px] border border-[#00ffb4]/30 bg-[#06131b]/72 shadow-[0_0_45px_rgba(0,255,180,0.16),0_32px_100px_rgba(0,0,0,0.55)] backdrop-blur-xl"
           >
-            <div className="flex items-center justify-between gap-4 border-b border-[#FFD41C]/20 bg-[#FFD41C]/5 px-5 py-4 sm:px-7">
+            <div className="flex items-center justify-between gap-4 border-b border-[#00ffb4]/20 bg-[#00ffb4]/5 px-5 py-4 sm:px-7">
               <div className="min-w-0">
-                <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#FFD41C]">
+                <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#00ffb4]">
                   Hologram Briefing
                 </div>
                 <div className="truncate text-[20px] font-extrabold text-[#e8ecf4] sm:text-[26px]">
@@ -325,7 +70,7 @@ function IntroDeck({ slides, onDone }) {
                 </div>
               </div>
 
-              <div className="rounded-full border border-[#FFD41C]/20 bg-[#FFD41C]/10 px-3 py-1 text-[12px] font-bold text-[#baffee]">
+              <div className="rounded-full border border-[#00ffb4]/20 bg-[#00ffb4]/10 px-3 py-1 text-[12px] font-bold text-[#baffee]">
                 {Math.min(index + 1, safeSlides.length)}/{safeSlides.length}
               </div>
             </div>
@@ -339,16 +84,32 @@ function IntroDeck({ slides, onDone }) {
                 <ul className="mt-6 space-y-3 text-[#c8d4e6]">
                   {slide.points.map((p, i) => (
                     <li key={i} className="flex gap-3 text-[17px] leading-relaxed">
-                      <span className="mt-[10px] h-2 w-2 flex-none rounded-full bg-[#FFD41C]/70" />
+                      <span className="mt-[10px] h-2 w-2 flex-none rounded-full bg-[#00ffb4]/70" />
                       <span>{p}</span>
                     </li>
                   ))}
                 </ul>
               ) : null}
 
-              <div className="mt-10 flex items-center justify-end gap-4">
-                <div className="flex items-center justify-end gap-4">
-                 
+              <div className="mt-10 flex items-center justify-between gap-4">
+                <button
+                  type="button"
+                  onClick={() => setIndex((i) => Math.max(0, i - 1))}
+                  disabled={index === 0}
+                  className="h-12 rounded-2xl border border-[#1a2438] bg-white/[0.03] px-6 text-[16px] font-semibold text-[#dbe6f5] transition hover:bg-white/[0.06] disabled:opacity-40"
+                >
+                  ← Back
+                </button>
+
+                <div className="flex items-center gap-4">
+                  <button
+                    type="button"
+                    onClick={onDone}
+                    className="h-12 rounded-2xl border border-[#1a2438] bg-white/[0.03] px-6 text-[16px] font-semibold text-[#dbe6f5] transition hover:bg-white/[0.06]"
+                    title="Skip introduction"
+                  >
+                    Skip
+                  </button>
 
                   <button
                     type="button"
@@ -356,7 +117,7 @@ function IntroDeck({ slides, onDone }) {
                       if (isLast) onDone();
                       else setIndex((i) => Math.min(i + 1, safeSlides.length - 1));
                     }}
-                    className="h-12 rounded-2xl bg-[#FFD41C] px-7 text-[16px] font-semibold text-[#0a0e17] transition hover:scale-[1.02]"
+                    className="h-12 rounded-2xl bg-[#00ffb4] px-7 text-[16px] font-semibold text-[#0a0e17] transition hover:scale-[1.02]"
                   >
                     {isLast ? "Start 3D →" : "Next →"}
                   </button>
@@ -421,7 +182,7 @@ function HotspotPin({
       <mesh visible={pinOpacity > 0.02}>
         <sphereGeometry args={[glow, 24, 24]} />
         <meshBasicMaterial
-          color={active ? "#FFD41C" : "white"}
+          color={active ? "#00ffb4" : "white"}
           transparent
           opacity={active ? 0.22 * pinOpacity : 0.08 * pinOpacity}
         />
@@ -437,7 +198,7 @@ function HotspotPin({
           className={[
             "relative flex items-center justify-center rounded-full border backdrop-blur-md shadow-[0_16px_45px_rgba(0,0,0,0.55)] transition select-none",
             active
-              ? "border-[#FFD41C]/30 bg-[#FFD41C]/95 text-[#0a0e17]"
+              ? "border-[#00ffb4]/30 bg-[#00ffb4]/95 text-[#0a0e17]"
               : "border-white/20 bg-white/75 text-black hover:bg-white/90",
           ].join(" ")}
           style={{
@@ -568,12 +329,12 @@ function HotspotHologram({ hotspot, onClose }) {
         initial={{ opacity: 0, y: 10, scale: 0.94 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 8, scale: 0.96 }}
-        className="w-[300px] max-w-[72vw] overflow-hidden rounded-[14px] border border-[#FFD41C]/35 bg-[#06131b]/78 text-left shadow-[0_0_35px_rgba(255,212,28,0.20),0_20px_70px_rgba(0,0,0,0.62)] backdrop-blur-xl"
+        className="w-[300px] max-w-[72vw] overflow-hidden rounded-[14px] border border-[#00ffb4]/35 bg-[#06131b]/78 text-left shadow-[0_0_35px_rgba(0,255,180,0.20),0_20px_70px_rgba(0,0,0,0.62)] backdrop-blur-xl"
       >
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,212,28,0.06)_1px,transparent_1px)] bg-[size:100%_16px]" />
-        <div className="relative flex items-start justify-between gap-3 border-b border-[#FFD41C]/20 px-4 py-3">
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(0,255,180,0.06)_1px,transparent_1px)] bg-[size:100%_16px]" />
+        <div className="relative flex items-start justify-between gap-3 border-b border-[#00ffb4]/20 px-4 py-3">
           <div className="min-w-0">
-            <div className="text-[10px] font-black uppercase tracking-[0.22em] text-[#FFD41C]">
+            <div className="text-[10px] font-black uppercase tracking-[0.22em] text-[#00ffb4]">
               Hotspot {hotspot.number}
             </div>
             <div className="mt-1 text-[14px] font-black leading-5 text-white">
@@ -584,7 +345,7 @@ function HotspotHologram({ hotspot, onClose }) {
           <button
             type="button"
             onClick={onClose}
-            className="flex h-7 w-7 flex-none items-center justify-center rounded-full border border-[#FFD41C]/20 bg-white/[0.04] text-[12px] text-white/80 transition hover:bg-white/[0.1]"
+            className="flex h-7 w-7 flex-none items-center justify-center rounded-full border border-[#00ffb4]/20 bg-white/[0.04] text-[12px] text-white/80 transition hover:bg-white/[0.1]"
             aria-label="Close hotspot"
           >
             x
@@ -599,16 +360,14 @@ function HotspotHologram({ hotspot, onClose }) {
   );
 }
 
-function LabEnvironment() {
+function LabEnvironment({ sceneName, activeHotspot, showLabels = true }) {
   const ringRef = useRef();
   const scanRef = useRef();
 
   useFrame((_, delta) => {
     if (ringRef.current) ringRef.current.rotation.z += delta * 0.22;
-
     if (scanRef.current) {
-      scanRef.current.position.y =
-        0.14 + Math.sin(Date.now() * 0.0016) * 0.035;
+      scanRef.current.position.y = 0.14 + Math.sin(Date.now() * 0.0016) * 0.035;
     }
   });
 
@@ -616,129 +375,40 @@ function LabEnvironment() {
     <group>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.74, 0]}>
         <circleGeometry args={[2.75, 96]} />
-        <meshBasicMaterial color="#FFD41C" transparent opacity={0.045} />
+        <meshBasicMaterial color="#00ffb4" transparent opacity={0.045} />
       </mesh>
 
-      <mesh
-        ref={ringRef}
-        rotation={[-Math.PI / 2, 0, 0]}
-        position={[0, -0.72, 0]}
-      >
+      <mesh ref={ringRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.72, 0]}>
         <ringGeometry args={[1.35, 1.38, 96]} />
-        <meshBasicMaterial color="#FFD41C" transparent opacity={0.34} />
+        <meshBasicMaterial color="#00ffb4" transparent opacity={0.34} />
       </mesh>
 
-      <gridHelper
-        args={[7, 36, "#FFD41C", "#1d4450"]}
-        position={[0, -0.78, 0]}
-      />
+      <gridHelper args={[7, 36, "#00ffb4", "#1d4450"]} position={[0, -0.78, 0]} />
 
-      <mesh
-        ref={scanRef}
-        position={[0, 0.15, 0]}
-        rotation={[-Math.PI / 2, 0, 0]}
-      >
+      <mesh ref={scanRef} position={[0, 0.15, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[1.05, 1.08, 96]} />
         <meshBasicMaterial color="#baffee" transparent opacity={0.18} />
       </mesh>
+
+      {showLabels ? (
+        <>
+          <Html position={[-1.95, 1.12, -0.75]} center distanceFactor={8} occlude={false}>
+            <div className="w-[250px] rounded-[14px] border border-[#00ffb4]/25 bg-[#06131b]/68 px-4 py-3 text-left shadow-[0_0_30px_rgba(0,255,180,0.14)] backdrop-blur-xl">
+              <div className="text-[10px] font-black uppercase tracking-[0.24em] text-[#00ffb4]">
+                Articton Lab
+              </div>
+              <div className="mt-1 text-[18px] font-black text-white">
+                {activeHotspot?.title || sceneName}
+              </div>
+              <div className="mt-2 text-[11px] leading-5 text-[#9fb0ca]">
+                {activeHotspot?.en ||
+                  "Select a glowing marker to inspect component details inside the 3D workspace."}
+              </div>
+            </div>
+          </Html>
+        </>
+      ) : null}
     </group>
-  );
-}
-
-function FixedLabInfoPanel({
-  current,
-  activeHotspot,
-  moduleIndex,
-  totalModules,
-  showIntro,
-  selectedPlatform,
-  afkAutoRotate,
-}) {
-  const componentName = getFullComponentName(current);
-  const componentDescription =
-    current?.slides?.[0]?.body ||
-    "Explore the component, rotate the model, zoom in, and select the glowing markers to inspect its parts.";
-
-  const panelContent = (
-    <div className="articton-module1-info-card relative overflow-hidden rounded-[18px] border border-[#FFD41C]/25 bg-[#06131b]/88 p-5 shadow-[0_0_35px_rgba(255,212,28,0.13),0_24px_70px_rgba(0,0,0,0.42)] backdrop-blur-xl">
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,212,28,0.045)_1px,transparent_1px)] bg-[size:100%_18px]" />
-
-      <div className="relative">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <div className="text-[10px] font-black uppercase tracking-[0.26em] text-[#FFD41C]">
-              Articton Lab Environment
-            </div>
-
-            <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[#8fa3bf]">
-              Module 1 · Page {moduleIndex + 1} of {totalModules}
-            </div>
-          </div>
-
-          <div className="rounded-full border border-[#FFD41C]/20 bg-[#FFD41C]/8 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#baffee]">
-            {selectedPlatform ? selectedPlatform.toUpperCase() : "PC"}
-          </div>
-        </div>
-
-        <h2 className="mt-3 text-[22px] font-black leading-tight text-white">
-          {componentName}
-        </h2>
-
-        <p className="mt-3 text-[12px] leading-6 text-[#9fb0ca]">
-          {componentDescription}
-        </p>
-
-        <div className="articton-module1-info-status mt-4 rounded-xl border border-[#FFD41C]/14 bg-black/16 px-3 py-2 text-[11px] text-[#8fa3bf]">
-          {showIntro
-            ? "Hologram briefing active"
-            : afkAutoRotate
-            ? "Auto-rotate active"
-            : "Manual rotation active"}
-        </div>
-
-        <div className="my-5 h-px bg-[#FFD41C]/16" />
-
-        <AnimatePresence mode="wait">
-          {activeHotspot ? (
-            <motion.div
-              key={activeHotspot.id}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.18 }}
-            >
-              <div className="text-[10px] font-black uppercase tracking-[0.22em] text-[#FFD41C]">
-                Hotspot {activeHotspot.number}
-              </div>
-
-              <div className="mt-2 text-[16px] font-black leading-5 text-white">
-                {activeHotspot.title}
-              </div>
-
-              <div className="mt-2 text-[12px] leading-6 text-[#dbe6f5]">
-                {activeHotspot.en}
-              </div>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="hotspot-instructions"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.18 }}
-            >
-              <ComponentPartsPanel current={current} />
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-    </div>
-  );
-
-  return (
-    <div className="articton-module1-info-panel pointer-events-auto absolute left-3 top-3 z-[130] max-h-[calc(100%-1.5rem)] w-[340px] max-w-[calc(100%-1.5rem)] overflow-y-auto pr-1 md:left-6 md:top-6 md:max-h-[calc(100%-3rem)]">
-      {panelContent}
-    </div>
   );
 }
 
@@ -832,9 +502,9 @@ function WelcomeHologram({ onStart, onOpenTutorial }) {
         initial={{ opacity: 0, y: 18, scale: 0.94 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.45 }}
-        className="w-[min(720px,82vw)] rounded-[18px] border border-[#FFD41C]/35 bg-[#06131b]/72 px-6 py-6 text-center shadow-[0_0_55px_rgba(255,212,28,0.18),0_32px_110px_rgba(0,0,0,0.62)] backdrop-blur-xl"
+        className="w-[min(720px,82vw)] rounded-[18px] border border-[#00ffb4]/35 bg-[#06131b]/72 px-6 py-6 text-center shadow-[0_0_55px_rgba(0,255,180,0.18),0_32px_110px_rgba(0,0,0,0.62)] backdrop-blur-xl"
       >
-        <div className="text-[11px] font-black uppercase tracking-[0.32em] text-[#FFD41C]">
+        <div className="text-[11px] font-black uppercase tracking-[0.32em] text-[#00ffb4]">
           Welcome to Articton
         </div>
         <div className="mt-3 text-[34px] font-black leading-none text-white sm:text-[54px]">
@@ -848,14 +518,14 @@ function WelcomeHologram({ onStart, onOpenTutorial }) {
           <button
             type="button"
             onClick={onStart}
-            className="h-12 rounded-full bg-[#FFD41C] px-6 text-[14px] font-black text-[#06131b] shadow-[0_0_30px_rgba(255,212,28,0.28)] transition hover:scale-[1.03]"
+            className="h-12 rounded-full bg-[#00ffb4] px-6 text-[14px] font-black text-[#06131b] shadow-[0_0_30px_rgba(0,255,180,0.28)] transition hover:scale-[1.03]"
           >
             Start Exploration
           </button>
           <button
             type="button"
             onClick={onOpenTutorial}
-            className="h-12 rounded-full border border-[#FFD41C]/25 bg-white/[0.04] px-6 text-[14px] font-bold text-[#dbe6f5] transition hover:bg-white/[0.09]"
+            className="h-12 rounded-full border border-[#00ffb4]/25 bg-white/[0.04] px-6 text-[14px] font-bold text-[#dbe6f5] transition hover:bg-white/[0.09]"
           >
             How to Navigate
           </button>
@@ -876,11 +546,11 @@ function NavigationTutorialHologram({ page, onPrev, onNext }) {
         initial={{ opacity: 0, y: 14, scale: 0.96 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: -10, scale: 0.98 }}
-        className="relative w-[min(640px,82vw)] overflow-hidden rounded-[18px] border border-[#FFD41C]/32 bg-[#06131b]/74 px-6 py-5 shadow-[0_0_48px_rgba(255,212,28,0.17),0_30px_100px_rgba(0,0,0,0.60)] backdrop-blur-xl"
+        className="relative w-[min(640px,82vw)] overflow-hidden rounded-[18px] border border-[#00ffb4]/32 bg-[#06131b]/74 px-6 py-5 shadow-[0_0_48px_rgba(0,255,180,0.17),0_30px_100px_rgba(0,0,0,0.60)] backdrop-blur-xl"
       >
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,212,28,0.055)_1px,transparent_1px)] bg-[size:100%_18px]" />
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(0,255,180,0.055)_1px,transparent_1px)] bg-[size:100%_18px]" />
         <div className="relative">
-          <div className="text-[11px] font-black uppercase tracking-[0.26em] text-[#FFD41C]">
+          <div className="text-[11px] font-black uppercase tracking-[0.26em] text-[#00ffb4]">
             Navigation Tutorial
           </div>
          <div className="mt-2 text-[28px] font-black text-white">
@@ -891,9 +561,9 @@ function NavigationTutorialHologram({ page, onPrev, onNext }) {
             : "Rotate Tutorial"}
         </div>
 
-          <div className="relative my-6 h-36 rounded-[16px] border border-[#FFD41C]/20 bg-black/22">
+          <div className="relative my-6 h-36 rounded-[16px] border border-[#00ffb4]/20 bg-black/22">
             <motion.div
-              className="absolute left-1/2 top-1/2 h-20 w-32 -translate-x-1/2 -translate-y-1/2 rounded-[18px] border border-[#FFD41C]/30 bg-[#FFD41C]/10 shadow-[0_0_40px_rgba(255,212,28,0.18)]"
+              className="absolute left-1/2 top-1/2 h-20 w-32 -translate-x-1/2 -translate-y-1/2 rounded-[18px] border border-[#00ffb4]/30 bg-[#00ffb4]/10 shadow-[0_0_40px_rgba(0,255,180,0.18)]"
               animate={
                 isDragSnap
                   ? { x: [-40, 40, -40] }
@@ -942,7 +612,7 @@ function NavigationTutorialHologram({ page, onPrev, onNext }) {
               type="button"
               onClick={onPrev}
               disabled={page === 0}
-              className="h-11 rounded-full border border-[#FFD41C]/20 bg-white/[0.04] px-5 text-[13px] font-bold text-[#dbe6f5] transition hover:bg-white/[0.09] disabled:opacity-40"
+              className="h-11 rounded-full border border-[#00ffb4]/20 bg-white/[0.04] px-5 text-[13px] font-bold text-[#dbe6f5] transition hover:bg-white/[0.09] disabled:opacity-40"
             >
               Back
             </button>
@@ -954,7 +624,7 @@ function NavigationTutorialHologram({ page, onPrev, onNext }) {
             <button
               type="button"
               onClick={onNext}
-              className="h-11 rounded-full bg-[#FFD41C] px-6 text-[13px] font-black text-[#06131b] shadow-[0_0_28px_rgba(255,212,28,0.22)] transition hover:scale-[1.03]"
+              className="h-11 rounded-full bg-[#00ffb4] px-6 text-[13px] font-black text-[#06131b] shadow-[0_0_28px_rgba(0,255,180,0.22)] transition hover:scale-[1.03]"
             >
              {isDragSnap
             ? "Choose Platform"
@@ -970,59 +640,32 @@ function NavigationTutorialHologram({ page, onPrev, onNext }) {
 }
 
 function PlatformChoiceHologram({ selectedPlatform, onSelectPlatform }) {
+  const platforms = [
+    {
+      id: "amd",
+      name: "AMD",
+      detail: "AM4 and AM5 platforms with socket, motherboard, and memory compatibility paths.",
+    },
+    {
+      id: "intel",
+      name: "Intel",
+      detail: "Intel Core platforms with matching sockets, chipsets, and supported memory generations.",
+    },
+  ];
+
   return (
     <Html position={[0, 0.6, 0.15]} center distanceFactor={3} occlude={false}>
       <motion.div
         initial={{ opacity: 0, y: 18, scale: 0.95 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        className="w-[min(760px,86vw)] rounded-[18px] border border-[#FFD41C]/35 bg-[#06131b]/74 px-6 py-6 text-center shadow-[0_0_55px_rgba(255,212,28,0.18),0_32px_110px_rgba(0,0,0,0.62)] backdrop-blur-xl"
       >
-        <div className="text-[11px] font-black uppercase tracking-[0.26em] text-[#FFD41C]">
-          Processor Platform
-        </div>
-        <div className="mt-2 text-[30px] font-black leading-tight text-white">
-          Every PC starts with a decision
-        </div>
-        <div className="mx-auto mt-3 max-w-xl text-[14px] leading-6 text-[#dbe6f5]">
-          What processor platform will power your system?
-        </div>
-
-        <div className="mt-7 grid gap-3 sm:grid-cols-2">
-          {[
-            {
-              id: "amd",
-              name: "AMD",
-              detail: "AM4 and AM5 platforms with socket, motherboard, and memory compatibility paths.",
-            },
-            {
-              id: "intel",
-              name: "Intel",
-              detail: "Intel Core platforms with matching sockets, chipsets, and supported memory generations.",
-            },
-          ].map((platform) => {
-            const active = selectedPlatform === platform.id;
-
-            return (
-              <button
-                key={platform.id}
-                type="button"
-                onClick={() => onSelectPlatform(platform.id)}
-                className={[
-                  "rounded-[16px] border px-5 py-5 text-left transition hover:scale-[1.02]",
-                  active
-                    ? "border-[#FFD41C]/55 bg-[#FFD41C]/16 shadow-[0_0_34px_rgba(255,212,28,0.18)]"
-                    : "border-white/12 bg-white/[0.04] hover:bg-white/[0.08]",
-                ].join(" ")}
-              >
-                <div className="text-[28px] font-black text-white">{platform.name}</div>
-                <div className="mt-3 text-[12px] leading-5 text-[#b7c6dd]">{platform.detail}</div>
-                <div className="mt-5 text-[11px] font-black uppercase tracking-[0.18em] text-[#FFD41C]">
-                  Select {platform.name}
-                </div>
-              </button>
-            );
-          })}
-        </div>
+        <PlatformChoicePanel
+          title="Every PC starts with a decision"
+          subtitle="Choose the processor platform you want to explore."
+          platforms={platforms}
+          selectedPlatform={selectedPlatform}
+          onSelectPlatform={onSelectPlatform}
+        />
       </motion.div>
     </Html>
   );
@@ -1090,7 +733,7 @@ function HeaderDropdown({ userName, avatarUrl = "", onBack, onLogout, setIsSetti
       <details className="group relative z-50">
         <summary className="list-none cursor-pointer rounded-2xl border border-[#1a2438] bg-[#0d1220]/95 px-4 py-2.5 transition hover:bg-[#111b2f]">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-[#FFD41C]/25 bg-[#FFD41C]/10 text-sm font-bold text-[#FFD41C]">
+            <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/10 text-sm font-bold text-[#00ffb4]">
               {avatarUrl ? (
                 <img src={avatarUrl} alt="Profile" className="h-full w-full object-cover" />
               ) : (
@@ -1144,6 +787,7 @@ export default function Module1Page({ onBack, onLogout }) {
   const [showIntro, setShowIntro] = useState(true);
   const [debug, setDebug] = useState(false);
   const [lastCoords, setLastCoords] = useState(null);
+  const [cameraResetRequest, setCameraResetRequest] = useState(0);
   const [firebaseUser, setFirebaseUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -1265,8 +909,8 @@ export default function Module1Page({ onBack, onLogout }) {
   );
   const isComponentStage = experienceStep === "components";
   const sceneCamera = isComponentStage
-    ? { position: current?.view?.cameraPos || [0, 1.2, 3.2], fov: 45 }
-    : { position: [0, 1.05, 3.8], fov: 42 };
+    ? { position: current?.view?.cameraPos || [0, 1.2, 3.2], fov: current?.view?.fov ?? 40 }
+    : { position: [0, 1.05, 3.8], fov: 40 };
 
   const completedParts = localCompletedParts;
 
@@ -1284,11 +928,11 @@ export default function Module1Page({ onBack, onLogout }) {
   }, [moduleIndex, modules.length, safeModuleIndex]);
 
   useEffect(() => {
-    if (!current || experienceStep !== "components") return;
+    if (!current) return;
 
-    setShowIntro(true);
-    setActiveId(null);
-  }, [current?.key, experienceStep]);
+    const isFinished = completedParts[current.key];
+    setShowIntro(!isFinished);
+  }, [current, completedParts]);
 
   useEffect(() => {
     modules.forEach((m) => useGLTF.preload(m.url));
@@ -1483,11 +1127,11 @@ export default function Module1Page({ onBack, onLogout }) {
         ? Math.max(0, Math.min(nextPlatformProgress.currentPage - 1, modules.length - 1))
         : safeModuleIndex
     );
-    setShowIntro(true);
+    setShowIntro(!nextPlatformParts[current?.key]);
 
     await saveModule1Progress({
       page: safeModuleIndex + 1,
-      introDone: false,
+      introDone: !nextPlatformParts[current?.key],
       moduleKey: current?.key,
       completedParts: nextPlatformParts,
       replaceCompletedParts: true,
@@ -1615,35 +1259,36 @@ export default function Module1Page({ onBack, onLogout }) {
 
   const handleSelectModule = async (index) => {
     const key = modules[index].key;
+    const isFinished = completedParts[key];
 
     setCertificateWarning("");
     setActiveId(null);
     setLastCoords(null);
     setModuleIndex(index);
-    setShowIntro(true);
+    setShowIntro(!isFinished);
 
     await saveModule1Progress({
       page: index + 1,
-      introDone: false,
+      introDone: isFinished,
       moduleKey: key,
     });
   };
 
   if (showCertificate) {
     return (
-      <div className="articton-app-shell articton-module-page min-h-screen w-full overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased">
+      <div className="min-h-screen w-full overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased">
         <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden px-6">
           <ModulePageBackground />
 
-          <div className="relative z-10 w-full max-w-3xl rounded-[34px] border border-[#FFD41C]/35 bg-[#0d1220]/90 p-8 text-center shadow-[0_40px_120px_rgba(0,0,0,0.65)] backdrop-blur-xl md:p-12">
-            <div className="pointer-events-none absolute inset-4 rounded-[26px] border border-dashed border-[#FFD41C]/30" />
+          <div className="relative z-10 w-full max-w-3xl rounded-[34px] border border-[#00ffb4]/35 bg-[#0d1220]/90 p-8 text-center shadow-[0_40px_120px_rgba(0,0,0,0.65)] backdrop-blur-xl md:p-12">
+            <div className="pointer-events-none absolute inset-4 rounded-[26px] border border-dashed border-[#00ffb4]/30" />
 
             <div className="relative">
-              <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full border border-[#FFD41C]/40 bg-[#FFD41C]/10 text-4xl font-black text-[#FFD41C] shadow-[0_0_40px_rgba(255,212,28,0.18)]">
+              <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full border border-[#00ffb4]/40 bg-[#00ffb4]/10 text-4xl font-black text-[#00ffb4] shadow-[0_0_40px_rgba(0,255,180,0.18)]">
                 ✓
               </div>
 
-              <div className="mb-3 text-[12px] font-bold uppercase tracking-[0.32em] text-[#FFD41C]">
+              <div className="mb-3 text-[12px] font-bold uppercase tracking-[0.32em] text-[#00ffb4]">
                 Certificate of Completion
               </div>
 
@@ -1664,7 +1309,7 @@ export default function Module1Page({ onBack, onLogout }) {
                 <button
                   type="button"
                   onClick={handleBackToDashboard}
-                  className="rounded-2xl bg-[#FFD41C] px-7 py-3 text-sm font-black text-[#0a0e17] shadow-[0_18px_50px_rgba(255,212,28,0.22)] transition hover:scale-[1.03]"
+                  className="rounded-2xl bg-[#00ffb4] px-7 py-3 text-sm font-black text-[#0a0e17] shadow-[0_18px_50px_rgba(0,255,180,0.22)] transition hover:scale-[1.03]"
                 >
                   Back to Dashboard →
                 </button>
@@ -1672,7 +1317,7 @@ export default function Module1Page({ onBack, onLogout }) {
                 <button
                   type="button"
                   onClick={handleSwitchPlatform}
-                  className="rounded-2xl border border-[#FFD41C]/40 bg-[#0d1220] px-7 py-3 text-sm font-bold text-[#dbe6f5] shadow-[0_12px_32px_rgba(255,212,28,0.12)] transition hover:bg-white/5"
+                  className="rounded-2xl border border-[#00ffb4]/40 bg-[#0d1220] px-7 py-3 text-sm font-bold text-[#dbe6f5] shadow-[0_12px_32px_rgba(0,255,180,0.12)] transition hover:bg-white/5"
                 >
                   Switch to {selectedPlatform === "amd" ? "Intel" : "AMD"}
                 </button>
@@ -1685,15 +1330,15 @@ export default function Module1Page({ onBack, onLogout }) {
   }
 
   return (
-    <div className="articton-app-shell articton-module-page min-h-screen w-full overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased">
+    <div className="min-h-screen w-full overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased">
       <div className="relative h-screen w-full overflow-hidden">
         <ModulePageBackground />
 
         <div className="relative h-full w-full overflow-hidden p-0 md:p-3">
           <div className="relative h-full w-full overflow-hidden border border-[#1a2438] bg-[linear-gradient(135deg,#0a0e17,#0d1220,#101a2d)] shadow-[0_70px_180px_rgba(0,0,0,0.70)] md:rounded-[30px]">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(255,212,28,0.08),transparent_35%)]" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_88%_20%,rgba(255,212,28,0.05),transparent_30%)]" />
-            <div className="absolute inset-0 bg-[linear-gradient(rgba(255,212,28,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(255,212,28,0.025)_1px,transparent_1px)] bg-[size:54px_54px] opacity-55" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(0,255,180,0.08),transparent_35%)]" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_88%_20%,rgba(0,255,180,0.05),transparent_30%)]" />
+            <div className="absolute inset-0 bg-[linear-gradient(rgba(0,255,180,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,180,0.025)_1px,transparent_1px)] bg-[size:54px_54px] opacity-55" />
             <div className="absolute inset-0 bg-black/10 ring-1 ring-white/5" />
 
             <div className="relative flex h-full w-full flex-col overflow-hidden">
@@ -1736,7 +1381,7 @@ export default function Module1Page({ onBack, onLogout }) {
                         Articton
                       </div>
 
-                      <div className="text-[11px] uppercase tracking-[0.24em] text-[#FFD41C]">
+                      <div className="text-[11px] uppercase tracking-[0.24em] text-[#00ffb4]">
                         3D Learning View
                       </div>
                     </div>
@@ -1760,25 +1405,12 @@ export default function Module1Page({ onBack, onLogout }) {
               </div>
 
               <div className="min-h-0 flex-1 px-3 py-3 md:px-6 md:py-5">
-                <div className="relative h-full overflow-hidden rounded-[22px] border border-[#FFD41C]/18 bg-[#031018] shadow-[0_30px_100px_rgba(0,0,0,0.52)]">
-                  <div className="relative h-full min-h-0 min-w-0 overflow-hidden">
-                    <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_44%,rgba(255,212,28,0.12),transparent_36%),radial-gradient(circle_at_82%_18%,rgba(95,149,152,0.14),transparent_28%)]" />
-                    <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,212,28,0.032)_1px,transparent_1px),linear-gradient(90deg,rgba(255,212,28,0.032)_1px,transparent_1px)] bg-[size:48px_48px] opacity-75" />
-                    <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_150px_rgba(0,0,0,0.68)]" />
+                <div className="relative h-full overflow-hidden rounded-[22px] border border-[#00ffb4]/18 bg-[#031018] shadow-[0_30px_100px_rgba(0,0,0,0.52)]">
+                  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_44%,rgba(0,255,180,0.12),transparent_36%),radial-gradient(circle_at_82%_18%,rgba(95,149,152,0.14),transparent_28%)]" />
+                  <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(0,255,180,0.032)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,180,0.032)_1px,transparent_1px)] bg-[size:48px_48px] opacity-75" />
+                  <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_150px_rgba(0,0,0,0.68)]" />
 
-                    {isComponentStage && !showIntro ? (
-                      <FixedLabInfoPanel
-                        current={current}
-                        activeHotspot={activeHotspot}
-                        moduleIndex={safeModuleIndex}
-                        totalModules={modules.length}
-                        showIntro={showIntro}
-                        selectedPlatform={selectedPlatform}
-                        afkAutoRotate={afkAutoRotate}
-                      />
-                    ) : null}
-
-                    <motion.div
+                  <motion.div
                     key={`three-${current.key}`}
                     className="absolute inset-0"
                     initial={{ opacity: 0 }}
@@ -1791,14 +1423,18 @@ export default function Module1Page({ onBack, onLogout }) {
                       camera={sceneCamera}
                       dpr={[1, 1.8]}
                     >
-                      <color attach="background" args={[typeof document !== "undefined" && document.documentElement.classList.contains("articton-light") ? "#f8f9ff" : "#06131b"]} />
+                      <color attach="background" args={["#06131b"]} />
                       <ambientLight intensity={0.78} />
                       <directionalLight position={[6, 8, 6]} intensity={1.25} />
                       <directionalLight position={[-6, -2, -6]} intensity={0.45} />
-                      <pointLight position={[0, 1.2, 2.2]} intensity={0.75} color="#FFD41C" />
+                      <pointLight position={[0, 1.2, 2.2]} intensity={0.75} color="#00ffb4" />
 
                       <Suspense fallback={null}>
-                        <LabEnvironment />
+                        <LabEnvironment
+                          sceneName={isComponentStage ? current.name : "Processor Platform Lab"}
+                          activeHotspot={activeHotspot}
+                          showLabels={isComponentStage}
+                        />
 
                         <ModuleIntroExperience
                           step={experienceStep}
@@ -1812,7 +1448,8 @@ export default function Module1Page({ onBack, onLogout }) {
                         />
 
                         {isComponentStage ? (
-                        <Bounds
+                          <Bounds
+                            key={`${current.key}-${cameraResetRequest}`}
                             fit
                             clip
                             margin={current?.view?.boundsMargin ?? 1.15}
@@ -1842,8 +1479,7 @@ export default function Module1Page({ onBack, onLogout }) {
                       <OrbitControls
                         ref={controlsRef}
                         makeDefault
-                        enablePan={false}
-                        enableZoom
+                        {...INSPECTION_ORBIT_PROPS}
                         minDistance={isComponentStage ? current?.view?.minDistance ?? 1.2 : 2.8}
                         maxDistance={isComponentStage ? current?.view?.maxDistance ?? 7 : 5.2}
                         autoRotate={
@@ -1852,17 +1488,39 @@ export default function Module1Page({ onBack, onLogout }) {
                           afkAutoRotate
                         }
                         autoRotateSpeed={0.85}
-                        enableDamping
-                        dampingFactor={0.08}
                         onStart={handleSceneInteraction}
                         onChange={() => {
                           if (activeId && experienceStep === "components") {
                             setActiveId(null);
                           }
                         }}
+                        mouseButtons={{
+                          LEFT: THREE.MOUSE.ROTATE,
+                          MIDDLE: THREE.MOUSE.DOLLY,
+                          RIGHT: THREE.MOUSE.ROTATE,
+                        }}
+                        touches={{
+                          ONE: THREE.TOUCH.ROTATE,
+                          TWO: THREE.TOUCH.DOLLY_ROTATE,
+                        }}
                       />
                     </Canvas>
                   </motion.div>
+
+                  {isComponentStage ? (
+                    <div className="absolute left-4 top-4 z-40 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveId(null);
+                          setCameraResetRequest((value) => value + 1);
+                        }}
+                        className="rounded-xl border border-[#00ffb4]/30 bg-[#0b1220]/88 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#7dffdc] shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl transition hover:bg-[#00ffb4]/12"
+                      >
+                        Reset View
+                      </button>
+                    </div>
+                  ) : null}
 
                   {isComponentStage && showIntro ? (
                     <IntroDeck
@@ -1898,9 +1556,12 @@ export default function Module1Page({ onBack, onLogout }) {
 
                       <SceneControls
                         current={current}
+                        moduleIndex={safeModuleIndex}
                         totalModules={modules.length}
+                        showIntro={showIntro}
                         debug={debug}
                         lastCoords={lastCoords}
+                        selectedPlatform={selectedPlatform}
                         afkAutoRotate={afkAutoRotate}
                         completedParts={completedParts}
                         onWelcome={handleReturnToWelcome}
@@ -1909,7 +1570,6 @@ export default function Module1Page({ onBack, onLogout }) {
                       />
                     </>
                   ) : null}
-                  </div>
                 </div>
               </div>
               <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_120px_rgba(0,0,0,0.45)]" />
@@ -1938,7 +1598,7 @@ function PartsDock({
         </div>
       ) : null}
 
-      <div className="articton-module1-bottom-nav pointer-events-auto flex max-w-full items-center gap-2 overflow-x-auto rounded-full border border-[#FFD41C]/24 bg-[#06131b]/72 p-2 shadow-[0_0_35px_rgba(255,212,28,0.13),0_18px_70px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+      <div className="pointer-events-auto flex max-w-full items-center gap-2 overflow-x-auto rounded-full border border-[#00ffb4]/24 bg-[#06131b]/72 p-2 shadow-[0_0_35px_rgba(0,255,180,0.13),0_18px_70px_rgba(0,0,0,0.45)] backdrop-blur-xl">
         {modules.map((m, index) => {
           const done = !!completedParts[m.key];
           const active = currentKey === m.key;
@@ -1949,16 +1609,16 @@ function PartsDock({
               type="button"
               onClick={() => onSelect(index)}
               className={[
-                "articton-module1-nav-button flex h-11 items-center gap-2 whitespace-nowrap rounded-full border px-3 text-[12px] font-bold transition",
+                "flex h-11 items-center gap-2 whitespace-nowrap rounded-full border px-3 text-[12px] font-bold transition",
                 active
-                  ? "is-active border-[#FFD41C]/45 bg-[#FFD41C]/16 text-white shadow-[0_0_22px_rgba(255,212,28,0.13)]"
+                  ? "border-[#00ffb4]/45 bg-[#00ffb4]/16 text-white shadow-[0_0_22px_rgba(0,255,180,0.13)]"
                   : "border-white/10 bg-white/[0.035] text-[#b7c6dd] hover:bg-white/[0.08]",
               ].join(" ")}
             >
               <span
                 className={[
-                  "articton-module1-nav-index flex h-6 w-6 items-center justify-center rounded-full text-[11px]",
-                  done ? "bg-[#FFD41C] text-[#06131b]" : "border border-white/15 text-[#9fb0ca]",
+                  "flex h-6 w-6 items-center justify-center rounded-full text-[11px]",
+                  done ? "bg-[#00ffb4] text-[#06131b]" : "border border-white/15 text-[#9fb0ca]",
                 ].join(" ")}
               >
                 {done ? "OK" : index + 1}
@@ -1972,7 +1632,7 @@ function PartsDock({
           <button
             type="button"
             onClick={onViewCertificate}
-            className="h-11 whitespace-nowrap rounded-full bg-[#FFD41C] px-4 text-[12px] font-black text-[#06131b] shadow-[0_0_28px_rgba(255,212,28,0.22)] transition hover:scale-[1.02]"
+            className="h-11 whitespace-nowrap rounded-full bg-[#00ffb4] px-4 text-[12px] font-black text-[#06131b] shadow-[0_0_28px_rgba(0,255,180,0.22)] transition hover:scale-[1.02]"
           >
             Certificate
           </button>
@@ -1984,9 +1644,12 @@ function PartsDock({
 
 function SceneControls({
   current,
+  moduleIndex,
   totalModules,
+  showIntro,
   debug,
   lastCoords,
+  selectedPlatform,
   afkAutoRotate,
   completedParts,
   onWelcome,
@@ -1995,20 +1658,39 @@ function SceneControls({
 }) {
   return (
     <>
+      <div className="pointer-events-none absolute left-4 top-4 z-[110] max-w-[calc(100vw-48px)] rounded-[16px] border border-[#00ffb4]/22 bg-[#06131b]/66 px-4 py-3 shadow-[0_18px_60px_rgba(0,0,0,0.35)] backdrop-blur-xl md:left-6 md:top-6">
+        <div className="text-[10px] font-black uppercase tracking-[0.24em] text-[#00ffb4]">
+          Module 1
+        </div>
+        <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <div className="text-[20px] font-black leading-none text-white">{current.name}</div>
+          <div className="text-[11px] font-semibold text-[#9fb0ca]">
+            Page {moduleIndex + 1} of {totalModules}
+          </div>
+        </div>
+        <div className="mt-2 text-[11px] text-[#8fa3bf]">
+          {showIntro
+            ? "Hologram briefing active"
+            : `${selectedPlatform ? selectedPlatform.toUpperCase() : "PC"} platform / ${
+                afkAutoRotate ? "auto-rotate active" : "select glowing pins"
+              }`}
+        </div>
+      </div>
+
       <div className="absolute right-4 top-4 z-[110] flex items-center gap-2 md:right-6 md:top-6">
         <button
           type="button"
           onClick={onWelcome}
-          className="rounded-full border border-[#FFD41C]/22 bg-[#06131b]/70 px-4 py-2 text-[11px] font-black uppercase tracking-[0.14em] text-[#dbe6f5] shadow-[0_18px_60px_rgba(0,0,0,0.30)] backdrop-blur-xl transition hover:bg-white/[0.08]"
+          className="rounded-full border border-[#00ffb4]/22 bg-[#06131b]/70 px-4 py-2 text-[11px] font-black uppercase tracking-[0.14em] text-[#dbe6f5] shadow-[0_18px_60px_rgba(0,0,0,0.30)] backdrop-blur-xl transition hover:bg-white/[0.08]"
         >
           Welcome
         </button>
 
-        <div className="pointer-events-none rounded-full border border-[#FFD41C]/18 bg-[#06131b]/60 px-3 py-2 text-[11px] text-[#9fb0ca] backdrop-blur-xl">
+        <div className="pointer-events-none rounded-full border border-[#00ffb4]/18 bg-[#06131b]/60 px-3 py-2 text-[11px] text-[#9fb0ca] backdrop-blur-xl">
           {`${Object.values(completedParts).filter(Boolean).length}/${totalModules} parts complete`}
         </div>
 
-        <div className="pointer-events-none hidden rounded-full border border-[#FFD41C]/18 bg-[#06131b]/60 px-3 py-2 text-[11px] text-[#9fb0ca] backdrop-blur-xl md:block">
+        <div className="pointer-events-none hidden rounded-full border border-[#00ffb4]/18 bg-[#06131b]/60 px-3 py-2 text-[11px] text-[#9fb0ca] backdrop-blur-xl md:block">
           {debug
             ? lastCoords
               ? `Debug on / [${lastCoords.join(", ")}]`
@@ -2024,7 +1706,7 @@ function SceneControls({
           type="button"
           onClick={onPrev}
           aria-label="Previous module"
-          className="absolute left-4 top-1/2 z-[115] flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-[#FFD41C]/25 bg-[#06131b]/74 text-lg font-black text-[#dbe6f5] shadow-[0_18px_60px_rgba(0,0,0,0.36)] backdrop-blur-xl transition hover:bg-white/[0.08] md:left-6"
+          className="absolute left-4 top-1/2 z-[115] flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-[#00ffb4]/25 bg-[#06131b]/74 text-lg font-black text-[#dbe6f5] shadow-[0_18px_60px_rgba(0,0,0,0.36)] backdrop-blur-xl transition hover:bg-white/[0.08] md:left-6"
         >
           &lt;
         </button>
@@ -2035,7 +1717,7 @@ function SceneControls({
           type="button"
           onClick={onNext}
           aria-label="Next module"
-          className="absolute right-4 top-1/2 z-[115] flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-[#FFD41C]/25 bg-[#06131b]/74 text-lg font-black text-[#dbe6f5] shadow-[0_18px_60px_rgba(0,0,0,0.36)] backdrop-blur-xl transition hover:bg-white/[0.08] md:right-6"
+          className="absolute right-4 top-1/2 z-[115] flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-[#00ffb4]/25 bg-[#06131b]/74 text-lg font-black text-[#dbe6f5] shadow-[0_18px_60px_rgba(0,0,0,0.36)] backdrop-blur-xl transition hover:bg-white/[0.08] md:right-6"
         >
           &gt;
         </button>
@@ -2093,7 +1775,7 @@ function PartsSidebar({
                 className={[
                   "flex w-full items-center gap-3 rounded-2xl border px-3 py-3 text-left transition",
                   active
-                    ? "border-[#FFD41C]/25 bg-[#FFD41C]/10"
+                    ? "border-[#00ffb4]/25 bg-[#00ffb4]/10"
                     : "border-[#1a2438] bg-white/[0.03] hover:bg-white/[0.06]",
                 ].join(" ")}
               >
@@ -2102,12 +1784,12 @@ function PartsSidebar({
                     "flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold transition",
                     open
                       ? done
-                        ? "bg-[#FFD41C] text-[#0a0e17]"
+                        ? "bg-[#00ffb4] text-[#0a0e17]"
                         : "border border-[#1a2438] bg-[#0d1220] text-[#7a8ba8]"
                       : done
-                      ? "text-[#FFD41C]"
+                      ? "text-[#00ffb4]"
                       : active
-                      ? "text-[#FFD41C]"
+                      ? "text-[#00ffb4]"
                       : "text-[#7a8ba8]",
                   ].join(" ")}
                 >
@@ -2140,7 +1822,7 @@ function PartsSidebar({
               <button
                 type="button"
                 onClick={onViewCertificate}
-                className="mt-3 w-full rounded-2xl bg-[#FFD41C] px-4 py-3 text-sm font-semibold text-[#0a0e17] shadow-[0_12px_40px_rgba(255,212,28,0.22)] transition hover:scale-[1.01]"
+                className="mt-3 w-full rounded-2xl bg-[#00ffb4] px-4 py-3 text-sm font-semibold text-[#0a0e17] shadow-[0_12px_40px_rgba(0,255,180,0.22)] transition hover:scale-[1.01]"
               >
                 View Certificate ✓
               </button>
@@ -2148,7 +1830,7 @@ function PartsSidebar({
               <button
                 type="button"
                 onClick={onViewCertificate}
-                className="mt-3 flex h-12 w-full items-center justify-center rounded-2xl bg-[#FFD41C] text-[#0a0e17] shadow-[0_12px_40px_rgba(255,212,28,0.22)] transition hover:scale-[1.01]"
+                className="mt-3 flex h-12 w-full items-center justify-center rounded-2xl bg-[#00ffb4] text-[#0a0e17] shadow-[0_12px_40px_rgba(0,255,180,0.22)] transition hover:scale-[1.01]"
                 aria-label="View certificate"
               >
                 ✓
@@ -2163,8 +1845,8 @@ function PartsSidebar({
 function ModulePageBackground() {
   return (
     <>
-      <div className="pointer-events-none absolute -left-44 -top-44 h-[720px] w-[720px] rounded-full bg-[#FFD41C]/10 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-56 -right-52 h-[820px] w-[820px] rounded-full bg-[#FFD41C]/6 blur-3xl" />
+      <div className="pointer-events-none absolute -left-44 -top-44 h-[720px] w-[720px] rounded-full bg-[#00ffb4]/10 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-56 -right-52 h-[820px] w-[820px] rounded-full bg-[#00ffb4]/6 blur-3xl" />
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#0a0e17] via-[#0a0e17] to-[#0d1220]" />
     </>
   );

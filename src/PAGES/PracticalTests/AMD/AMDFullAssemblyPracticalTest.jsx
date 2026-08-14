@@ -15,6 +15,14 @@ import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { AchievementToast, unlockAchievement } from "../../../utils/achievements.jsx";
 import { getUserSettings } from "../../../utils/userSettings";
+import { useCompactWorkspace } from "../../../hooks/useCompactWorkspace";
+import {
+  GUIDED_ASSEMBLY_CAMERA_PRESET,
+  GUIDED_ASSEMBLY_ORBIT_PROPS,
+  collectFocusObjects,
+  frameSceneCamera,
+  getAssemblyCameraFocus,
+} from "../../../utils/threeCameraControls";
 
 /* ================================================================== */
 /* AMD FULL ASSEMBLY — PRACTICAL TEST                                 */
@@ -1442,6 +1450,7 @@ function InteractiveCenteredObject({
       <group
         ref={groupRef}
         position={startPosition}
+        userData={{ artictonFocusKey: partKey }}
         onPointerDown={handlePointerDown}
         onPointerOver={handlePointerOver}
         onPointerOut={handlePointerOut}
@@ -1650,7 +1659,11 @@ function CaseWorkspace({
   });
 
   return (
-    <group ref={groundedGroupRef} position={[0, groundOffsetY, 0]}>
+    <group
+      ref={groundedGroupRef}
+      position={[0, groundOffsetY, 0]}
+      userData={{ artictonFocusKey: "case" }}
+    >
       <group position={bounds.center.toArray()}>
         <group ref={caseRotationRef} quaternion={layFlatQuaternion.toArray()}>
           <group ref={contentFrameRef} position={inverseCenter.toArray()}>
@@ -1884,10 +1897,16 @@ function AssemblyScene({
   );
 }
 
-function FullTableBirdEyeCamera({ sceneRootRef, controlsRef, overviewRequest }) {
+function FullTableBirdEyeCamera({
+  sceneRootRef,
+  controlsRef,
+  overviewRequest,
+  activePartKeys = [],
+}) {
   const { camera, size } = useThree();
   const initializedRef = useRef(false);
   const handledRequestRef = useRef(-1);
+  const activePartKeysKey = activePartKeys.join("|");
 
   useEffect(() => {
     const isInitial = !initializedRef.current;
@@ -1914,35 +1933,34 @@ function FullTableBirdEyeCamera({ sceneRootRef, controlsRef, overviewRequest }) 
         return;
       }
 
-      const center = box.getCenter(new THREE.Vector3());
-      const sceneSize = box.getSize(new THREE.Vector3());
-      const aspect = Math.max(size.width / Math.max(size.height, 1), 0.5);
-      const verticalFov = THREE.MathUtils.degToRad(camera.fov);
-      const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * aspect);
-      const verticalDistance = (sceneSize.y * 0.72) / Math.max(Math.tan(verticalFov / 2), 0.2);
-      const horizontalDistance = (sceneSize.x * 0.72) / Math.max(Math.tan(horizontalFov / 2), 0.2);
-      const depthDistance = sceneSize.z * 0.9;
-      const distance = Math.max(verticalDistance, horizontalDistance, depthDistance, 12);
+      const focus = getAssemblyCameraFocus(
+        activePartKeysKey ? activePartKeysKey.split("|") : []
+      );
+      const focusObjects = collectFocusObjects(root, focus.keys);
+      if (focus.keys?.length && !focusObjects.length) {
+        attempts += 1;
+        if (attempts < 90) frameId = requestAnimationFrame(frameWholeWorkspace);
+        return;
+      }
+      const framed = frameSceneCamera({
+        camera,
+        controls,
+        root,
+        objects: focusObjects.length ? focusObjects : undefined,
+        size: { width: size.width, height: size.height },
+        preset: focus.preset || GUIDED_ASSEMBLY_CAMERA_PRESET,
+        minDistance: focus.minDistance ?? 12,
+      });
 
-      const direction = new THREE.Vector3(0.42, 1.28, 0.88).normalize();
-      const target = center.clone();
-      target.y += sceneSize.y * 0.02;
-
-      camera.position.copy(target).addScaledVector(direction, distance * 1.52);
-      camera.near = Math.max(0.01, distance / 600);
-      camera.far = Math.max(1600, distance * 24);
-      camera.updateProjectionMatrix();
-
-      controls.target.copy(target);
-      camera.lookAt(target);
-      controls.update();
-      initializedRef.current = true;
-      handledRequestRef.current = overviewRequest;
+      if (framed) {
+        initializedRef.current = true;
+        handledRequestRef.current = overviewRequest;
+      }
     };
 
     frameId = requestAnimationFrame(frameWholeWorkspace);
     return () => cancelAnimationFrame(frameId);
-  }, [camera, controlsRef, overviewRequest, sceneRootRef, size.height, size.width]);
+  }, [activePartKeysKey, camera, controlsRef, overviewRequest, sceneRootRef, size.height, size.width]);
 
   return null;
 }
@@ -1963,6 +1981,17 @@ function ModelViewer({
   const viewerRef = useRef(null);
   const controlsRef = useRef(null);
   const sceneRootRef = useRef(null);
+  const cameraActivePartKeys = useMemo(
+    () => (testActive ? [...reachableKeys] : []),
+    [reachableKeys, testActive]
+  );
+  const cameraActivePartKeysKey = cameraActivePartKeys.join("|");
+
+  useEffect(() => {
+    if (!isDraggingPart) {
+      setOverviewRequest((value) => value + 1);
+    }
+  }, [cameraActivePartKeysKey, isDraggingPart]);
 
   const refreshOverviewAfterResize = useCallback(() => {
     requestAnimationFrame(() => {
@@ -2017,7 +2046,7 @@ function ModelViewer({
       style={isFullscreen ? { width: "100vw", height: "100vh" } : undefined}
     >
       <Canvas
-        camera={{ position: [35, 72, 52], fov: 46, near: 0.01, far: 1400 }}
+        camera={{ position: [35, 72, 52], fov: 42, near: 0.01, far: 1800 }}
         dpr={[1, 1.45]}
         shadows
         performance={{ min: 0.55 }}
@@ -2048,22 +2077,18 @@ function ModelViewer({
           </Suspense>
         </ModelErrorBoundary>
 
-        <FullTableBirdEyeCamera sceneRootRef={sceneRootRef} controlsRef={controlsRef} overviewRequest={overviewRequest} />
+        <FullTableBirdEyeCamera
+          sceneRootRef={sceneRootRef}
+          controlsRef={controlsRef}
+          overviewRequest={overviewRequest}
+          activePartKeys={cameraActivePartKeys}
+        />
 
         <OrbitControls
           ref={controlsRef}
           makeDefault
           enabled={!isDraggingPart}
-          enablePan={false}
-          enableZoom
-          zoomSpeed={0.48}
-          zoomToCursor
-          enableDamping
-          dampingFactor={0.12}
-          minPolarAngle={0.08}
-          maxPolarAngle={Math.PI * 0.46}
-          minDistance={10}
-          maxDistance={190}
+          {...GUIDED_ASSEMBLY_ORBIT_PROPS}
           mouseButtons={{ LEFT: null, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE }}
         />
       </Canvas>
@@ -2075,7 +2100,8 @@ function ModelViewer({
           disabled={isDraggingPart}
           className="rounded-xl border border-[#FFD41C]/30 bg-[#FFD41C]/12 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#7dffdc] shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl transition hover:bg-[#FFD41C]/20 disabled:cursor-not-allowed disabled:opacity-45"
         >
-          Reset Camera View
+          <span className="hidden sm:inline">Reset Camera View</span>
+          <span className="sm:hidden">Work View</span>
         </button>
         <button
           type="button"
@@ -2084,7 +2110,10 @@ function ModelViewer({
           aria-pressed={isFullscreen}
           className="rounded-xl border border-[#FFD41C]/30 bg-[#0b1220]/92 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#7dffdc] shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl transition hover:bg-[#FFD41C]/12 disabled:cursor-not-allowed disabled:opacity-45"
         >
-          {isFullscreen ? "Exit Full Screen" : "Full Screen"}
+          <span className="hidden sm:inline">
+            {isFullscreen ? "Exit Full Screen" : "Full Screen"}
+          </span>
+          <span className="sm:hidden">{isFullscreen ? "Exit" : "Full"}</span>
         </button>
       </div>
 
@@ -2327,6 +2356,9 @@ export default function AMDFullAssemblyPracticalTest({ onFinish, onBack }) {
   const [firebaseUser, setFirebaseUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const compactWorkspace = useCompactWorkspace();
+  const effectiveSidebarOpen = sidebarOpen && !compactWorkspace;
+  const viewerLeftOffset = effectiveSidebarOpen ? "clamp(220px, 22vw, 280px)" : "64px";
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showIntro, setShowIntro] = useState(true);
   const [testActive, setTestActive] = useState(false);
@@ -2659,7 +2691,7 @@ export default function AMDFullAssemblyPracticalTest({ onFinish, onBack }) {
             <div className="min-h-0 flex-1 px-4 py-4 md:px-8 md:py-5">
               <div className="relative h-full overflow-hidden rounded-[24px] border border-[#1a2438] bg-[#0d1220]/78 shadow-[0_28px_90px_rgba(0,0,0,0.45)] backdrop-blur-xl">
                 <ChecklistSidebar
-                  open={sidebarOpen}
+                  open={effectiveSidebarOpen}
                   onToggle={() => setSidebarOpen((value) => !value)}
                   completedParts={completedParts}
                   checklistOrder={checklistOrder}
@@ -2670,8 +2702,8 @@ export default function AMDFullAssemblyPracticalTest({ onFinish, onBack }) {
                 <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_120px_rgba(0,0,0,0.55)]" />
 
                 <div
-                  className="absolute bottom-3 right-3 top-3 z-[40] overflow-hidden rounded-[18px] border border-[#1a2438] bg-black/20 transition-all duration-300 md:bottom-4 md:right-4 md:top-4"
-                  style={{ left: sidebarOpen ? "clamp(220px, 22vw, 280px)" : 64 }}
+                  className="absolute bottom-3 left-[var(--assembly-viewer-left)] right-3 top-3 z-[40] overflow-hidden rounded-[18px] border border-[#1a2438] bg-black/20 transition-all duration-300 md:bottom-4 md:right-4 md:top-4"
+                  style={{ "--assembly-viewer-left": viewerLeftOffset }}
                 >
                   <ModelViewer
                     key={sceneRevision}

@@ -15,6 +15,11 @@ import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { AchievementToast, unlockAchievement } from "../../../utils/achievements.jsx";
 import { getUserSettings } from "../../../utils/userSettings";
+import {
+  GUIDED_DISASSEMBLY_CAMERA_PRESET,
+  GUIDED_DISASSEMBLY_ORBIT_PROPS,
+  frameSceneCamera,
+} from "../../../utils/threeCameraControls";
 
 /* ================================================================== */
 /* AMD FULL DISASSEMBLY — PRACTICAL TEST                              */
@@ -173,8 +178,6 @@ const WORKSPACE_PADDING_MULTIPLIER = 1.5;
 const TELEMETRY_FRAME_INTERVAL = 3;
 const TELEMETRY_IDLE_FRAME_INTERVAL = 16;
 const DRAG_SCREEN_GAIN = 1.06;
-const EASY_DRAG_CAMERA_DIRECTION = [0.42, 0.96, 1.08];
-const OVERVIEW_CAMERA_DISTANCE_MULTIPLIER = 1.52;
 const SAFE_CARRY_RISE_START = 0.18;
 const SAFE_CARRY_DESCENT_START = 0.68;
 const SAFE_CARRY_Y_SPEED = 9.5;
@@ -1618,29 +1621,19 @@ function InitialSceneCamera({ sceneRootRef, controlsRef, overviewRequest }) {
         return;
       }
 
-      const center = box.getCenter(new THREE.Vector3());
-      const sceneSize = box.getSize(new THREE.Vector3());
-      const verticalFov = THREE.MathUtils.degToRad(camera.fov);
-      const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * Math.max(size.width / size.height, 0.5));
-      const verticalDistance = (sceneSize.y * 0.58) / Math.max(Math.tan(verticalFov / 2), 0.2);
-      const horizontalDistance = (sceneSize.x * 0.58) / Math.max(Math.tan(horizontalFov / 2), 0.2);
-      const depthDistance = sceneSize.z * 0.72;
-      const distance = Math.max(verticalDistance, horizontalDistance, depthDistance, 8);
+      const framed = frameSceneCamera({
+        camera,
+        controls,
+        root,
+        size: { width: size.width, height: size.height },
+        preset: GUIDED_DISASSEMBLY_CAMERA_PRESET,
+        minDistance: 8,
+      });
 
-      const direction = new THREE.Vector3(...EASY_DRAG_CAMERA_DIRECTION).normalize();
-      const target = center.clone();
-      target.y += sceneSize.y * 0.015;
-
-      camera.position.copy(target).addScaledVector(direction, distance * OVERVIEW_CAMERA_DISTANCE_MULTIPLIER);
-      camera.near = Math.max(0.01, distance / 500);
-      camera.far = Math.max(1000, distance * 20);
-      camera.updateProjectionMatrix();
-
-      controls.target.copy(target);
-      camera.lookAt(target);
-      controls.update();
-      initializedRef.current = true;
-      handledOverviewRequestRef.current = overviewRequest;
+      if (framed) {
+        initializedRef.current = true;
+        handledOverviewRequestRef.current = overviewRequest;
+      }
     };
 
     frameId = requestAnimationFrame(initialize);
@@ -1769,16 +1762,7 @@ function ModelViewer({
           ref={controlsRef}
           makeDefault
           enabled={!isDraggingPart}
-          enablePan={false}
-          enableZoom
-          zoomSpeed={0.46}
-          zoomToCursor
-          enableDamping
-          dampingFactor={0.1}
-          minPolarAngle={0.16}
-          maxPolarAngle={Math.PI * 0.49}
-          minDistance={8}
-          maxDistance={260}
+          {...GUIDED_DISASSEMBLY_ORBIT_PROPS}
           mouseButtons={{ LEFT: null, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE }}
         />
       </Canvas>

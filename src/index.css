@@ -2047,3 +2047,607 @@ html.articton-light :where(.articton-app-shell, .articton-landing-page) button:d
     transition-duration: 0.01ms !important;
   }
 }
+
+/* -------------------------------------------------------------------------- */
+/* Site-wide browser-zoom responsive layout                                   */
+/* -------------------------------------------------------------------------- */
+/*
+ * Browser zoom should remain native (Ctrl + mouse wheel / Ctrl + +/-).
+ * On desktop, increasing browser zoom reduces the effective CSS viewport.
+ * These rules make the ENTIRE Articton site reflow around that smaller
+ * viewport instead of letting full-screen shells and large fixed spacing clip
+ * important content. The 3D training workspaces have additional camera-aware
+ * rules below this section.
+ */
+
+#root {
+  --articton-responsive-gutter: clamp(0.55rem, 1.45vw, 1.25rem);
+  --articton-responsive-gap: clamp(0.5rem, 1vw, 1rem);
+  width: 100%;
+  min-width: 0;
+  min-height: 100dvh;
+  overflow-x: clip;
+}
+
+#root > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+#root :where(main, section, article, aside, nav, header, footer, form) {
+  min-width: 0;
+}
+
+/* Fixed-width Tailwind arbitrary values should never force the page wider than
+ * the effective viewport after browser zoom. */
+#root [class*="w-["] {
+  max-width: 100%;
+}
+
+/* Medium desktop / common 125-150% browser zoom density. */
+@media (max-width: 1366px), (max-height: 760px) {
+  :root {
+    --articton-page-padding: clamp(0.5rem, 1.15vw, 1rem);
+  }
+
+  /* Pages such as Dashboard and the module selectors use a full-screen,
+   * overflow-hidden shell at 100%. At higher browser zoom, allow the page to
+   * grow vertically rather than cutting off the bottom of the UI. */
+  #root > [class~="min-h-screen"][class~="overflow-hidden"] {
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+  }
+
+  #root
+    > [class~="min-h-screen"][class~="overflow-hidden"]
+    > [class~="h-screen"][class~="overflow-hidden"] {
+    height: auto !important;
+    min-height: 100dvh !important;
+    overflow: visible !important;
+  }
+
+  /* Compress structural spacing, not the browser's text zoom. This keeps the
+   * important content larger while preventing padding/gaps from consuming the
+   * viewport. */
+  #root [class~="p-10"] { padding: 1.25rem !important; }
+  #root [class~="p-9"] { padding: 1.125rem !important; }
+  #root [class~="p-8"] { padding: 1rem !important; }
+  #root [class~="p-7"] { padding: 0.95rem !important; }
+  #root [class~="p-6"] { padding: 0.875rem !important; }
+  #root [class~="px-10"] { padding-inline: 1.25rem !important; }
+  #root [class~="px-9"] { padding-inline: 1.125rem !important; }
+  #root [class~="px-8"] { padding-inline: 1rem !important; }
+  #root [class~="px-7"] { padding-inline: 0.95rem !important; }
+  #root [class~="px-6"] { padding-inline: 0.875rem !important; }
+  #root [class~="py-10"] { padding-block: 1.25rem !important; }
+  #root [class~="py-9"] { padding-block: 1.125rem !important; }
+  #root [class~="py-8"] { padding-block: 1rem !important; }
+  #root [class~="py-7"] { padding-block: 0.95rem !important; }
+  #root [class~="py-6"] { padding-block: 0.875rem !important; }
+
+  #root [class~="gap-10"] { gap: 1.25rem !important; }
+  #root [class~="gap-8"] { gap: 1rem !important; }
+  #root [class~="gap-7"] { gap: 0.95rem !important; }
+  #root [class~="gap-6"] { gap: 0.8rem !important; }
+  #root [class~="mb-10"] { margin-bottom: 1.25rem !important; }
+  #root [class~="mb-8"] { margin-bottom: 1rem !important; }
+  #root [class~="mt-10"] { margin-top: 1.25rem !important; }
+  #root [class~="mt-8"] { margin-top: 1rem !important; }
+
+  /* Dashboard sidebar: keep more of the primary content visible at 125-150%. */
+  #root [class~="lg:grid-cols-[290px_1fr]"],
+  #root [class~="xl:grid-cols-[310px_1fr]"] {
+    grid-template-columns: 230px minmax(0, 1fr) !important;
+  }
+
+  /* Admin/module sidebars and helper panels use fixed desktop widths. */
+  #root [class~="w-[282px]"] { width: 230px !important; }
+  #root [class~="w-[280px]"] { width: 225px !important; }
+  #root [class~="w-[300px]"] { width: min(260px, 29vw) !important; }
+  #root [class~="w-[360px]"] { width: min(320px, 34vw) !important; }
+  #root [class~="w-[380px]"] { width: min(330px, 35vw) !important; }
+  #root [class~="lg:w-[420px]"] { width: min(360px, 38vw) !important; }
+
+  /* Prevent practical-test cards from demanding a 680px-tall viewport after
+   * the browser has already reduced the usable CSS height. */
+  #root [class~="min-h-[680px]"] {
+    min-height: max(470px, calc(100dvh - 11rem)) !important;
+  }
+
+  #root [class*="min-h-[min(760px"] {
+    min-height: min(640px, calc(100dvh - 1rem)) !important;
+  }
+
+  #root [class~="h-[500px]"] {
+    height: min(500px, max(380px, calc(100dvh - 9rem))) !important;
+  }
+
+  /* Dialogs/modals should fit the zoomed viewport and scroll internally when
+   * their content is taller than the available space. */
+  #root [role="dialog"],
+  #root [aria-modal="true"] {
+    max-width: calc(100dvw - 1rem) !important;
+    max-height: calc(100dvh - 1rem) !important;
+  }
+}
+
+/* Tighter desktop / common 150-175% browser zoom density. */
+@media (max-width: 1120px), (max-height: 650px) {
+  #root [class~="p-8"],
+  #root [class~="p-7"] { padding: 0.8rem !important; }
+  #root [class~="p-6"] { padding: 0.72rem !important; }
+  #root [class~="px-8"],
+  #root [class~="px-7"] { padding-inline: 0.8rem !important; }
+  #root [class~="px-6"] { padding-inline: 0.72rem !important; }
+  #root [class~="py-8"],
+  #root [class~="py-7"] { padding-block: 0.8rem !important; }
+  #root [class~="py-6"] { padding-block: 0.72rem !important; }
+
+  #root [class~="gap-8"],
+  #root [class~="gap-7"] { gap: 0.75rem !important; }
+  #root [class~="gap-6"] { gap: 0.65rem !important; }
+  #root [class~="mb-8"] { margin-bottom: 0.8rem !important; }
+  #root [class~="mt-8"] { margin-top: 0.8rem !important; }
+
+  #root [class~="lg:grid-cols-[290px_1fr]"],
+  #root [class~="xl:grid-cols-[310px_1fr]"] {
+    grid-template-columns: 205px minmax(0, 1fr) !important;
+  }
+
+  #root [class~="w-[282px]"],
+  #root [class~="w-[280px]"] { width: 205px !important; }
+  #root [class~="w-[360px]"] { width: min(290px, 38vw) !important; }
+  #root [class~="w-[380px]"] { width: min(300px, 39vw) !important; }
+  #root [class~="lg:w-[420px]"] { width: min(320px, 40vw) !important; }
+
+  #root [class~="min-h-[680px]"] {
+    min-height: max(430px, calc(100dvh - 9rem)) !important;
+  }
+}
+
+/* At very high zoom, reachability is more important than preserving a rigid
+ * desktop frame. Standard pages scroll vertically; the dedicated 3D workspace
+ * below keeps its own stage-specific behavior. */
+@media (max-height: 520px) {
+  #root > [class~="min-h-screen"] {
+    min-height: 520px !important;
+  }
+
+  #root > [class~="min-h-screen"][class~="overflow-hidden"] {
+    min-height: 520px !important;
+    overflow-y: auto !important;
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Zoom-aware training workspace                                              */
+/* -------------------------------------------------------------------------- */
+/*
+ * Desktop browser zoom (Ctrl + mouse wheel / Ctrl + +/-) reduces the CSS
+ * viewport. The workspace responds to that smaller viewport instead of trying
+ * to cancel or replace the browser's native zoom. This preserves accessibility
+ * while keeping the 3D stage, current step, navigation and AI guide visible.
+ */
+.articton-workspace-page {
+  --articton-sidebar-open: clamp(220px, 22vw, 280px);
+  --articton-sidebar-closed: 64px;
+  --articton-stage-edge: 1rem;
+}
+
+.articton-workspace-page .articton-toolbar-inner,
+.articton-workspace-page .articton-header-actions,
+.articton-workspace-page .articton-step-strip-inner,
+.articton-workspace-page .articton-step-description {
+  min-width: 0;
+}
+
+.articton-workspace-page .articton-viewer-shell,
+.articton-workspace-page .articton-sidebar {
+  will-change: left, width;
+}
+
+@media (max-width: 1280px), (max-height: 760px) {
+  .articton-workspace-page {
+    --articton-sidebar-open: clamp(188px, 19vw, 230px);
+    --articton-sidebar-closed: 54px;
+    --articton-stage-edge: 0.65rem;
+  }
+
+  .articton-topline {
+    padding-top: 0.55rem !important;
+    padding-inline: 1rem !important;
+    font-size: 10px !important;
+  }
+
+  .articton-toolbar {
+    margin-top: 0.45rem !important;
+    padding-inline: 1rem !important;
+  }
+
+  .articton-toolbar-inner {
+    min-height: 50px;
+    flex-wrap: nowrap !important;
+    gap: 0.55rem !important;
+    padding: 0.45rem 0.75rem !important;
+    border-radius: 16px !important;
+  }
+
+  .articton-brand {
+    min-width: max-content;
+    flex-wrap: nowrap !important;
+    gap: 0.45rem !important;
+  }
+
+  .articton-brand-logo {
+    width: 2rem !important;
+    height: 2rem !important;
+    margin-left: 0.2rem !important;
+  }
+
+  .articton-brand-title {
+    font-size: 0.875rem !important;
+    line-height: 1rem !important;
+  }
+
+  .articton-brand-subtitle {
+    font-size: 9px !important;
+    line-height: 0.9rem !important;
+    letter-spacing: 0.14em !important;
+  }
+
+  .articton-header-actions,
+  .articton-user-controls {
+    min-width: 0;
+    flex-wrap: nowrap !important;
+    gap: 0.45rem !important;
+  }
+
+  .articton-validation {
+    max-width: min(32vw, 330px) !important;
+    overflow: hidden;
+    padding: 0.32rem 0.55rem !important;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: 10px !important;
+    line-height: 1rem !important;
+  }
+
+  .articton-back-button {
+    border-radius: 12px !important;
+    padding: 0.45rem 0.65rem !important;
+    font-size: 11px !important;
+    white-space: nowrap;
+  }
+
+  .articton-profile-summary {
+    border-radius: 12px !important;
+    padding: 0.4rem 0.55rem !important;
+  }
+
+  .articton-profile-summary > div {
+    max-width: 178px !important;
+    gap: 0.5rem !important;
+  }
+
+  .articton-profile-summary > div > div:first-child {
+    width: 1.85rem !important;
+    height: 1.85rem !important;
+    font-size: 0.72rem !important;
+  }
+
+  .articton-step-strip {
+    padding-top: 0.4rem !important;
+    padding-inline: 1rem !important;
+  }
+
+  .articton-step-strip-inner {
+    flex-wrap: nowrap !important;
+    gap: 0.6rem !important;
+    padding: 0.42rem 0.72rem !important;
+    border-radius: 14px !important;
+  }
+
+  .articton-step-title {
+    font-size: 12px !important;
+    line-height: 1rem !important;
+  }
+
+  .articton-step-description {
+    max-width: 62vw;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: 9px !important;
+    line-height: 0.95rem !important;
+    letter-spacing: 0.09em !important;
+  }
+
+  .articton-step-progress {
+    flex-shrink: 0;
+    gap: 0.35rem !important;
+  }
+
+  .articton-step-progress-pill {
+    width: 1.55rem !important;
+    height: 0.38rem !important;
+  }
+
+  .articton-stage {
+    padding: 0.45rem 0.8rem 0.55rem !important;
+  }
+
+  .articton-stage-frame {
+    border-radius: 16px !important;
+  }
+
+  .articton-viewer-shell {
+    top: 0.5rem !important;
+    right: 0.5rem !important;
+    bottom: 0.5rem !important;
+    border-radius: 13px !important;
+  }
+
+  .articton-sidebar-header {
+    padding: 0.55rem 0.65rem !important;
+  }
+
+  .articton-sidebar-header button {
+    width: 2rem !important;
+    height: 2rem !important;
+    border-radius: 10px !important;
+  }
+
+  .articton-sidebar-header .text-sm {
+    font-size: 11px !important;
+    line-height: 0.95rem !important;
+  }
+
+  .articton-sidebar-header .text-\[11px\] {
+    font-size: 9px !important;
+  }
+
+  .articton-sidebar-list {
+    padding: 0.45rem !important;
+    padding-right: 0.35rem !important;
+  }
+
+  .articton-sidebar-item {
+    gap: 0.5rem !important;
+    border-radius: 12px !important;
+    padding: 0.45rem 0.5rem !important;
+  }
+
+  .articton-sidebar-item > span {
+    width: 1.8rem !important;
+    height: 1.8rem !important;
+    font-size: 11px !important;
+  }
+
+  .articton-sidebar-item .text-sm {
+    font-size: 11px !important;
+    line-height: 0.95rem !important;
+  }
+
+  .articton-sidebar-item .text-\[11px\] {
+    font-size: 9px !important;
+    line-height: 0.85rem !important;
+  }
+
+  .articton-sidebar-footer {
+    padding: 0.45rem !important;
+  }
+
+  .articton-sidebar-footer button {
+    min-height: 2rem;
+    border-radius: 11px !important;
+    padding-top: 0.42rem !important;
+    padding-bottom: 0.42rem !important;
+    font-size: 11px !important;
+  }
+
+  .articton-viewer-actions {
+    left: 0.5rem !important;
+    top: 0.5rem !important;
+    max-width: calc(100% - 150px) !important;
+    gap: 0.35rem !important;
+  }
+
+  .articton-viewer-actions button {
+    border-radius: 9px !important;
+    padding: 0.38rem 0.55rem !important;
+    font-size: 8.5px !important;
+    letter-spacing: 0.09em !important;
+  }
+
+  .articton-telemetry {
+    left: 0.5rem !important;
+    bottom: 0.5rem !important;
+    width: min(300px, calc(100% - 1rem)) !important;
+    border-radius: 12px !important;
+    padding: 0.5rem 0.65rem !important;
+    font-size: 9.5px !important;
+    line-height: 1rem !important;
+  }
+
+  .articton-assistant-collapsed {
+    right: 0.55rem !important;
+    top: 0.55rem !important;
+    width: min(330px, 38%) !important;
+    border-radius: 15px !important;
+    padding: 0.65rem !important;
+  }
+
+  .articton-assistant-collapsed .articton-assistant-note {
+    margin-top: 0.35rem !important;
+    display: -webkit-box !important;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    font-size: 10px !important;
+    line-height: 1rem !important;
+  }
+
+  .articton-assistant-collapsed .articton-assistant-ask {
+    margin-top: 0.45rem !important;
+    padding: 0.28rem 0.55rem !important;
+    font-size: 9px !important;
+  }
+
+  .articton-assistant-open {
+    right: 0.55rem !important;
+    top: 0.55rem !important;
+    height: min(480px, calc(100% - 1.1rem)) !important;
+    width: min(340px, calc(100% - 1.1rem)) !important;
+    border-radius: 16px !important;
+  }
+
+  .articton-footer {
+    display: none !important;
+  }
+}
+
+/* 150% browser zoom on common 1600-1920 px desktop displays usually lands in
+ * this effective viewport-height range. Reserve almost all vertical space for
+ * the 3D workspace and the active task. */
+@media (max-height: 650px) {
+  .articton-workspace-page {
+    --articton-sidebar-open: clamp(174px, 18vw, 210px);
+    --articton-sidebar-closed: 50px;
+  }
+
+  .articton-topline {
+    display: none !important;
+  }
+
+  .articton-toolbar {
+    margin-top: 0.45rem !important;
+    padding-inline: 0.75rem !important;
+  }
+
+  .articton-toolbar-inner {
+    min-height: 44px;
+    padding: 0.32rem 0.6rem !important;
+    border-radius: 13px !important;
+  }
+
+  .articton-brand-logo {
+    width: 1.75rem !important;
+    height: 1.75rem !important;
+  }
+
+  .articton-brand-subtitle {
+    display: none !important;
+  }
+
+  .articton-validation {
+    max-width: min(34vw, 290px) !important;
+    padding: 0.22rem 0.45rem !important;
+    font-size: 9px !important;
+  }
+
+  .articton-back-button {
+    padding: 0.35rem 0.55rem !important;
+    font-size: 10px !important;
+  }
+
+  .articton-profile-summary {
+    padding: 0.3rem 0.45rem !important;
+  }
+
+  .articton-profile-summary > div {
+    max-width: 155px !important;
+  }
+
+  .articton-profile-summary > div > div:first-child {
+    width: 1.65rem !important;
+    height: 1.65rem !important;
+  }
+
+  .articton-step-strip {
+    padding-top: 0.28rem !important;
+    padding-inline: 0.75rem !important;
+  }
+
+  .articton-step-strip-inner {
+    padding: 0.3rem 0.6rem !important;
+    border-radius: 12px !important;
+  }
+
+  .articton-step-title {
+    font-size: 11px !important;
+  }
+
+  .articton-step-description {
+    max-width: 56vw;
+    font-size: 8px !important;
+    line-height: 0.8rem !important;
+  }
+
+  .articton-step-progress-pill {
+    width: 1.25rem !important;
+    height: 0.32rem !important;
+  }
+
+  .articton-stage {
+    padding: 0.32rem 0.6rem 0.42rem !important;
+  }
+
+  .articton-viewer-shell {
+    top: 0.38rem !important;
+    right: 0.38rem !important;
+    bottom: 0.38rem !important;
+  }
+
+  .articton-sidebar-header {
+    padding: 0.42rem 0.5rem !important;
+  }
+
+  .articton-sidebar-list {
+    padding: 0.35rem !important;
+  }
+
+  .articton-sidebar-item {
+    padding: 0.34rem 0.42rem !important;
+  }
+
+  .articton-sidebar-footer {
+    padding: 0.35rem !important;
+  }
+
+  .articton-assistant-collapsed {
+    width: min(292px, 36%) !important;
+    padding: 0.55rem !important;
+  }
+
+  .articton-assistant-collapsed .articton-assistant-note {
+    -webkit-line-clamp: 2;
+    font-size: 9px !important;
+    line-height: 0.9rem !important;
+  }
+
+  .articton-assistant-collapsed .articton-assistant-ask {
+    display: none !important;
+  }
+
+  .articton-assistant-open {
+    height: calc(100% - 0.9rem) !important;
+    width: min(315px, 42%) !important;
+  }
+}
+
+/* At extreme zoom, never clip the functional UI. The fixed page itself becomes
+ * internally scrollable and maintains a usable minimum working height. */
+@media (max-height: 500px) {
+  .articton-workspace-page {
+    overflow-y: auto !important;
+  }
+
+  .articton-workspace-frame {
+    min-height: 500px;
+    height: 500px !important;
+  }
+
+  .articton-validation {
+    display: none !important;
+  }
+}
