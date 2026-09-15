@@ -150,7 +150,7 @@ function Module3PlatformChoice({
   ];
 
   return (
-    <div className="min-h-screen w-full overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased">
+    <div className="articton-guided-module articton-platform-selection articton-module-theme min-h-screen w-full overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased">
       <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden p-4 md:p-8">
         <Module3Background />
 
@@ -163,7 +163,7 @@ function Module3PlatformChoice({
 
           <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(0,255,180,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,180,0.04)_1px,transparent_1px)] bg-[size:54px_54px] opacity-55" />
 
-          <div className="relative z-10 flex items-center justify-between gap-4 px-6 pt-5 md:px-8 md:pt-6">
+          <div className="relative z-10 flex flex-wrap items-center justify-between gap-4 px-6 pt-5 md:px-8 md:pt-6">
             <div className="flex items-center gap-3">
               <img
                 src="/PNG/Articton.png"
@@ -826,7 +826,7 @@ const askAI = async () => {
 
   if (showCertificate) {
     return (
-      <div className="min-h-screen w-full overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased">
+      <div className="articton-guided-module articton-platform-selection articton-module-theme min-h-screen w-full overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased">
         <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden px-6">
           <Module3Background />
 
@@ -870,7 +870,7 @@ const askAI = async () => {
   }
 
   return (
-    <div className="min-h-screen w-full overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased">
+    <div className="articton-guided-module articton-platform-selection articton-module-theme min-h-screen w-full overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased">
       <div className="relative h-screen w-full overflow-hidden">
         <Module3Background />
 

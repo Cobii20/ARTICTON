@@ -1,7 +1,5 @@
-const crypto = require("crypto");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
-const nodemailer = require("nodemailer");
 const { PROCEDURE_DETAILS, getProcedureText } = require("./procedureNotes");
 
 if (admin.apps.length === 0) {
@@ -11,38 +9,14 @@ if (admin.apps.length === 0) {
 const db = admin.firestore();
 const authAdmin = admin.auth();
 
-const OTP_TTL_MS = 5 * 60 * 1000;
-const OTP_SESSION_TTL_MS = 8 * 60 * 60 * 1000;
-const OTP_RESEND_COOLDOWN_MS = 60 * 1000;
-const OTP_MAX_ATTEMPTS = 5;
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 const GEMINI_TUTOR_ENABLED = process.env.GEMINI_TUTOR_ENABLED === "true";
-
-function requireEnv(name, message) {
-  const value = String(process.env[name] || "").trim();
-
-  if (!value) {
-    throw new HttpsError("failed-precondition", message);
-  }
-
-  return value;
-}
-
-function createEmailTransporter() {
-  return nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-      user: requireEnv("GMAIL_USER", "The email sender is not configured."),
-      pass: requireEnv("GMAIL_APP_PASSWORD", "The email password is not configured."),
-    },
-  });
-}
 
 function requireAuthenticatedUser(request) {
   if (!request.auth) {
     throw new HttpsError(
       "unauthenticated",
-      "You must sign in before requesting an OTP."
+      "You must sign in to continue."
     );
   }
 
@@ -67,70 +41,8 @@ function requireAuthenticatedUser(request) {
   return { uid, email, authTime };
 }
 
-function hashOtp({ uid, email, authTime, otp }) {
-  const secret = process.env.OTP_HASH_SECRET;
-
-  if (!secret) {
-    throw new HttpsError(
-      "failed-precondition",
-      "The OTP hashing secret is not configured."
-    );
-  }
-
-  const scope = email || authTime;
-
-  return crypto
-    .createHmac("sha256", secret)
-    .update(`${uid}:${scope}:${otp}`)
-    .digest("hex");
-}
-
-function hashesMatch(firstHash, secondHash) {
-  try {
-    const firstBuffer = Buffer.from(firstHash, "hex");
-    const secondBuffer = Buffer.from(secondHash, "hex");
-
-    return (
-      firstBuffer.length === secondBuffer.length &&
-      crypto.timingSafeEqual(firstBuffer, secondBuffer)
-    );
-  } catch {
-    return false;
-  }
-}
-
-async function assertOtpVerified(request) {
-  const authContext = requireAuthenticatedUser(request);
-
-  const sessionSnapshot = await db.doc(`otp_sessions/${authContext.uid}`).get();
-
-  if (!sessionSnapshot.exists) {
-    throw new HttpsError("permission-denied", "OTP verification is required.");
-  }
-
-  const session = sessionSnapshot.data();
-  const correctSession =
-    session.uid === authContext.uid &&
-    session.email === authContext.email &&
-    Number(session.authTime) === authContext.authTime;
-
-  const hasValidExpiry =
-    session.expiresAt &&
-    typeof session.expiresAt.toMillis === "function" &&
-    session.expiresAt.toMillis() > Date.now();
-
-  if (!correctSession || !hasValidExpiry) {
-    throw new HttpsError(
-      "permission-denied",
-      "Your OTP session is missing, invalid, or expired."
-    );
-  }
-
-  return authContext;
-}
-
 async function assertAdmin(request) {
-  const authContext = await assertOtpVerified(request);
+  const authContext = await requireAuthenticatedUser(request);
   const profileSnapshot = await db.doc(`users/${authContext.uid}`).get();
 
   if (!profileSnapshot.exists) {
@@ -407,7 +319,7 @@ exports.askModuleTutor = onCall(
   { secrets: ["GEMINI_API_KEY"] },
   async (request) => {
     if (process.env.FUNCTIONS_EMULATOR !== "true") {
-      await assertOtpVerified(request);
+      await requireAuthenticatedUser(request);
     }
 
     const message = requireNonEmptyString(request.data?.message, "message");
@@ -434,241 +346,6 @@ exports.askModuleTutor = onCall(
     return tutorResult;
   }
 );
-
-exports.sendEmailOtp = onCall(
-  { secrets: ["GMAIL_USER", "GMAIL_APP_PASSWORD", "OTP_HASH_SECRET"] },
-  async (request) => {
-    const { uid, email, authTime } = requireAuthenticatedUser(request);
-    const now = Date.now();
-    const otp = crypto.randomInt(100000, 1000000).toString();
-    const challengeId = crypto.randomUUID();
-    const challengeRef = db.doc(`otp_challenges/${uid}`);
-    const sessionRef = db.doc(`otp_sessions/${uid}`);
-    const expiresAt = admin.firestore.Timestamp.fromMillis(now + OTP_TTL_MS);
-    const resendAvailableAt = admin.firestore.Timestamp.fromMillis(
-      now + OTP_RESEND_COOLDOWN_MS
-    );
-
-    const delivery = await db.runTransaction(async (transaction) => {
-      const currentSnapshot = await transaction.get(challengeRef);
-
-      if (currentSnapshot.exists) {
-        const currentChallenge = currentSnapshot.data();
-        const currentExpiresAt = currentChallenge.expiresAt;
-        const currentResendAvailableAt = currentChallenge.resendAvailableAt;
-        const hasActiveChallenge =
-          currentChallenge.uid === uid &&
-          currentChallenge.email === email &&
-          currentExpiresAt &&
-          typeof currentExpiresAt.toMillis === "function" &&
-          currentExpiresAt.toMillis() > now;
-
-        if (
-          hasActiveChallenge &&
-          currentResendAvailableAt &&
-          currentResendAvailableAt.toMillis() > now
-        ) {
-          transaction.delete(sessionRef);
-
-          return {
-            shouldSend: false,
-            alreadySent: true,
-            expiresAt: currentExpiresAt.toDate().toISOString(),
-            resendAvailableAt: currentResendAvailableAt.toDate().toISOString(),
-          };
-        }
-      }
-
-      transaction.set(challengeRef, {
-        uid,
-        email,
-        authTime,
-        challengeId,
-        otpHash: hashOtp({ uid, authTime, otp }),
-        attempts: 0,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        expiresAt,
-        resendAvailableAt,
-      });
-
-      transaction.delete(sessionRef);
-
-      return {
-        shouldSend: true,
-        alreadySent: false,
-        expiresAt: expiresAt.toDate().toISOString(),
-        resendAvailableAt: resendAvailableAt.toDate().toISOString(),
-      };
-    });
-
-    if (!delivery.shouldSend) {
-      return {
-        sent: false,
-        ...delivery,
-      };
-    }
-
-    try {
-      const gmailUser = requireEnv("GMAIL_USER", "The email sender is not configured.");
-      const transporter = createEmailTransporter();
-
-      await transporter.sendMail({
-        from: `Articton <${gmailUser}>`,
-        to: email,
-        subject: "Your ARTICTON verification code",
-        text: [
-          `Your ARTICTON verification code is: ${otp}`,
-          "",
-          "This code expires in 5 minutes.",
-          "Do not share this code with anyone.",
-        ].join("\n"),
-      });
-    } catch (error) {
-      await db.runTransaction(async (transaction) => {
-        const currentSnapshot = await transaction.get(challengeRef);
-
-        if (
-          currentSnapshot.exists &&
-          currentSnapshot.data().challengeId === challengeId
-        ) {
-          transaction.delete(challengeRef);
-        }
-      });
-
-      console.error("OTP email error:", error);
-      throw new HttpsError("internal", "The verification email could not be sent.");
-    }
-
-    return {
-      sent: true,
-      ...delivery,
-    };
-  }
-);
-
-exports.verifyEmailOtp = onCall(
-  { secrets: ["OTP_HASH_SECRET"] },
-  async (request) => {
-    const { uid, email, authTime } = requireAuthenticatedUser(request);
-    const otp = String(request.data?.otp || "").trim();
-
-    if (!/^\d{6}$/.test(otp)) {
-      throw new HttpsError("invalid-argument", "Enter a valid six-digit OTP.");
-    }
-
-    const challengeRef = db.doc(`otp_challenges/${uid}`);
-    const sessionRef = db.doc(`otp_sessions/${uid}`);
-    const now = Date.now();
-
-    const result = await db.runTransaction(async (transaction) => {
-      const challengeSnapshot = await transaction.get(challengeRef);
-
-      if (!challengeSnapshot.exists) {
-        return {
-          ok: false,
-          code: "failed-precondition",
-          message: "Request a new verification code.",
-        };
-      }
-
-      const challenge = challengeSnapshot.data();
-      const sameAccount =
-        challenge.uid === uid &&
-        challenge.email === email &&
-        Number(challenge.authTime) === authTime;
-
-      if (!sameAccount) {
-        transaction.delete(challengeRef);
-
-        return {
-          ok: false,
-          code: "failed-precondition",
-          message: "This code belongs to another account. Request a new code.",
-        };
-      }
-
-      if (!challenge.expiresAt || challenge.expiresAt.toMillis() <= now) {
-        transaction.delete(challengeRef);
-
-        return {
-          ok: false,
-          code: "deadline-exceeded",
-          message: "The verification code has expired. Request a new code.",
-        };
-      }
-
-      const attempts = Number(challenge.attempts || 0);
-
-      if (attempts >= OTP_MAX_ATTEMPTS) {
-        transaction.delete(challengeRef);
-
-        return {
-          ok: false,
-          code: "resource-exhausted",
-          message: "Too many incorrect attempts. Request a new code.",
-        };
-      }
-
-      const submittedHash = hashOtp({ uid, authTime, otp });
-
-      if (!hashesMatch(challenge.otpHash, submittedHash)) {
-        const nextAttempts = attempts + 1;
-
-        if (nextAttempts >= OTP_MAX_ATTEMPTS) {
-          transaction.delete(challengeRef);
-        } else {
-          transaction.update(challengeRef, {
-            attempts: nextAttempts,
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          });
-        }
-
-        return {
-          ok: false,
-          code: "permission-denied",
-          message:
-            nextAttempts >= OTP_MAX_ATTEMPTS
-              ? "Too many incorrect attempts. Request a new code."
-              : "The verification code is incorrect.",
-        };
-      }
-
-      transaction.delete(challengeRef);
-      transaction.set(sessionRef, {
-        uid,
-        email,
-        authTime,
-        verifiedAt: admin.firestore.FieldValue.serverTimestamp(),
-        expiresAt: admin.firestore.Timestamp.fromMillis(
-          now + OTP_SESSION_TTL_MS
-        ),
-      });
-
-      return { ok: true };
-    });
-
-    if (!result.ok) {
-      throw new HttpsError(result.code, result.message);
-    }
-
-    return {
-      verified: true,
-      sessionExpiresAt: new Date(now + OTP_SESSION_TTL_MS).toISOString(),
-    };
-  }
-);
-
-exports.endOtpSession = onCall(async (request) => {
-  const { uid } = requireAuthenticatedUser(request);
-  const batch = db.batch();
-
-  batch.delete(db.doc(`otp_sessions/${uid}`));
-  batch.delete(db.doc(`otp_challenges/${uid}`));
-
-  await batch.commit();
-
-  return { signedOut: true };
-});
 
 exports.deleteStudentAccount = onCall(async (request) => {
   const administrator = await assertAdmin(request);
@@ -724,7 +401,7 @@ exports.deleteStudentAccount = onCall(async (request) => {
 });
 
 exports.startAssessment = onCall(async (request) => {
-  const { uid, authTime } = await assertOtpVerified(request);
+  const { uid, authTime } = await requireAuthenticatedUser(request);
   const activityId = requireNonEmptyString(request.data?.activityId, "activityId");
   const definitionSnapshot = await db
     .doc(`assessment_definitions/${activityId}`)
@@ -776,7 +453,7 @@ exports.startAssessment = onCall(async (request) => {
 });
 
 exports.submitAssessment = onCall(async (request) => {
-  const { uid, authTime } = await assertOtpVerified(request);
+  const { uid, authTime } = await requireAuthenticatedUser(request);
   const attemptId = requireNonEmptyString(request.data?.attemptId, "attemptId");
   const submittedAnswers = request.data?.answers;
 

@@ -13,11 +13,11 @@ Use this before building or deploying production.
 
 ## Firebase Functions
 
-- Store runtime secrets in Firebase Secret Manager, not in tracked files:
-  - `GMAIL_USER`
-  - `GMAIL_APP_PASSWORD`
-  - `OTP_HASH_SECRET`
-- Rotate `GMAIL_APP_PASSWORD` if it was ever shared outside local development.
+- Login uses Firebase email/password authentication without an email OTP step.
+- The OTP-free Firestore rules and four active callable functions have been deployed to `articton-57fd8`; Storage and legacy-score rule fixes were deployed on September 12, 2026. Keep mobile deployments aligned with this shared backend.
+- Remove the obsolete deployed `sendEmailOtp`, `verifyEmailOtp`, and `endOtpSession` functions after checking that no older/mobile client still calls them.
+- Once obsolete functions are removed, retire their unused `GMAIL_USER`, `GMAIL_APP_PASSWORD`, and `OTP_HASH_SECRET` secrets. Historical OTP collections remain denied to clients; no user data needs to be deleted for this migration.
+- Keep the tutor's `GEMINI_API_KEY` secret if the tutor is enabled.
 - Do not commit service account JSON files, private keys, or generated admin credentials.
 
 ## Public Assets

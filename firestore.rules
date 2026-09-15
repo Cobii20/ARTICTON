@@ -7,22 +7,6 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function hasVerifiedOtp() {
-      return signedIn()
-        && exists(
-          /databases/$(database)/documents/otp_sessions/$(request.auth.uid)
-        )
-        && get(
-          /databases/$(database)/documents/otp_sessions/$(request.auth.uid)
-        ).data.uid == request.auth.uid
-        && get(
-          /databases/$(database)/documents/otp_sessions/$(request.auth.uid)
-        ).data.authTime == request.auth.token.auth_time
-        && get(
-          /databases/$(database)/documents/otp_sessions/$(request.auth.uid)
-        ).data.expiresAt > request.time;
-    }
-
     function userRole() {
       return get(
         /databases/$(database)/documents/users/$(request.auth.uid)
@@ -30,15 +14,15 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return hasVerifiedOtp() && userRole() in ["admin", "Admin", "ADMIN"];
+      return signedIn() && userRole() in ["admin", "Admin", "ADMIN"];
     }
 
     function isFaculty() {
-      return hasVerifiedOtp() && userRole() in ["faculty", "Faculty", "FACULTY"];
+      return signedIn() && userRole() in ["faculty", "Faculty", "FACULTY"];
     }
 
     function isOwnUser(uid) {
-      return hasVerifiedOtp() && request.auth.uid == uid;
+      return signedIn() && request.auth.uid == uid;
     }
 
     function immutableUserFieldsUnchanged() {
@@ -118,7 +102,7 @@ service cloud.firestore {
     }
 
     function isValidSupportTicket() {
-      return hasVerifiedOtp()
+      return signedIn()
         && request.resource.data.keys().hasOnly([
           "name",
           "email",
@@ -180,7 +164,7 @@ service cloud.firestore {
     }
 
     function isValidUserActivity() {
-      return hasVerifiedOtp()
+      return signedIn()
         && request.resource.data.keys().hasOnly([
           "uid",
           "name",
@@ -211,7 +195,7 @@ service cloud.firestore {
     }
 
     match /assessment_questions/{document=**} {
-      allow read: if hasVerifiedOtp();
+      allow read: if signedIn();
       allow write: if isAdmin();
     }
 
@@ -247,6 +231,12 @@ service cloud.firestore {
         allow delete: if false;
       }
 
+      // Legacy mobile score collections consumed by the score dashboard.
+      match /{scoreCollection}/{scoreId} {
+        allow read: if scoreCollection in ["scores", "mobileScores", "studentScores", "quizScores", "practicalScores"]
+          && (isOwnUser(uid) || isAdmin() || isFaculty());
+      }
+
       match /assessment_attempts/{attemptId} {
         allow read: if isAdmin() || isFaculty() || isOwnUser(uid);
         allow create, update, delete: if false;
@@ -260,7 +250,7 @@ service cloud.firestore {
     }
 
     match /module_content_cards/{cardId} {
-      allow read: if hasVerifiedOtp();
+      allow read: if signedIn();
       allow create, update, delete: if isAdmin();
     }
 

@@ -3,14 +3,13 @@ import { motion } from "framer-motion";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, useGLTF, Bounds, Grid } from "@react-three/drei";
 import { Cpu, GraduationCap, Moon, MousePointerClick, Rotate3d, Sun } from "lucide-react";
-import { auth, db, functions } from "../firebase.js";
+import { auth, db } from "../firebase.js";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
 } from "firebase/auth";
 import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
-import { httpsCallable } from "firebase/functions";
 import { getUserSettings, saveUserSetting, subscribeUserSettings } from "../utils/userSettings";
 
 export default function ArtictonLandingPage({ onLogin }) {
@@ -19,7 +18,7 @@ export default function ArtictonLandingPage({ onLogin }) {
 
   useEffect(() => {
     return subscribeUserSettings((settings) => {
-      setIsLightPage(!(settings.darkMode ?? true));
+      setIsLightPage(!(settings.darkMode ?? false));
     });
   }, []);
 
@@ -235,7 +234,7 @@ function HeroShowcaseFull({ onLogin, onSignup }) {
             initial={{ opacity: 0, y: 28 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
-            className="text-5xl font-black leading-[1.02] tracking-tight text-[#e8ecf4] sm:text-6xl lg:text-7xl"
+            className="text-4xl font-black leading-[1.1] tracking-tight text-[#e8ecf4] sm:text-5xl lg:text-6xl"
           >
             Learn PC Hardware.
             <br />
@@ -246,7 +245,7 @@ function HeroShowcaseFull({ onLogin, onSignup }) {
             initial={{ opacity: 0, y: 28 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.12 }}
-            className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-[#7a8ba8] lg:mx-0 sm:text-xl"
+            className="mx-auto mt-6 max-w-xl text-base leading-relaxed text-[#7a8ba8] lg:mx-0 sm:text-lg"
           >
             Rotate, inspect, and understand each PC component in an immersive 3D
             workspace designed for guided learning and hands-on exploration.
@@ -492,7 +491,7 @@ function SignupPage({ onBack, onSwitchToLogin, onAfterSignup }) {
 
       await signOut(auth);
       setLoading(false);
-      alert("Registration successful. Please sign in and complete OTP verification.");
+      alert("Registration successful. Please sign in to continue.");
       onAfterSignup?.();
     } catch (error) {
       try {
@@ -708,49 +707,10 @@ function SignupPage({ onBack, onSwitchToLogin, onAfterSignup }) {
 function LoginPage({ onBack, onSwitchToSignup, onSuccessLogin }) {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
-  const DEV_BYPASS_LOGIN = import.meta.env.VITE_DEV_BYPASS_LOGIN === "true";
+  const DEV_BYPASS_LOGIN = import.meta.env.DEV && import.meta.env.VITE_DEV_BYPASS_LOGIN === "true";
 
-  const [step, setStep] = useState("login");
-  const [otp, setOtp] = useState("");
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
-  const [otpNotice, setOtpNotice] = useState("");
-  const [resendAvailableAt, setResendAvailableAt] = useState(null);
-  const [otpExpiresAt, setOtpExpiresAt] = useState(null);
-  const [resendLoading, setResendLoading] = useState(false);
-  const [nowMs, setNowMs] = useState(Date.now());
-
-  const resendSeconds = resendAvailableAt
-    ? Math.max(0, Math.ceil((resendAvailableAt - nowMs) / 1000))
-    : 0;
-
-  useEffect(() => {
-    if (step !== "otp" || !resendAvailableAt || resendSeconds === 0) return;
-
-    const timer = window.setInterval(() => {
-      setNowMs(Date.now());
-    }, 1000);
-
-    return () => window.clearInterval(timer);
-  }, [resendAvailableAt, resendSeconds, step]);
-
-  const applyOtpDelivery = (delivery) => {
-    const nextResendAvailableAt = Date.parse(delivery?.resendAvailableAt || "");
-    const nextOtpExpiresAt = Date.parse(delivery?.expiresAt || "");
-
-    setNowMs(Date.now());
-    setResendAvailableAt(
-      Number.isFinite(nextResendAvailableAt)
-        ? nextResendAvailableAt
-        : Date.now() + 60 * 1000
-    );
-    setOtpExpiresAt(Number.isFinite(nextOtpExpiresAt) ? nextOtpExpiresAt : null);
-    setOtpNotice(
-      delivery?.alreadySent
-        ? "A verification code was already sent. Check your email."
-        : "A verification code was sent to your email."
-    );
-  };
 
   const handleDevBypass = async () => {
     try {
@@ -786,13 +746,12 @@ function LoginPage({ onBack, onSwitchToSignup, onSuccessLogin }) {
 
       const cleanEmail = email.trim().toLowerCase();
 
-      await signInWithEmailAndPassword(auth, cleanEmail, pass);
-      const sendEmailOtp = httpsCallable(functions, "sendEmailOtp");
-
-      const otpResponse = await sendEmailOtp({ email: cleanEmail });
-      applyOtpDelivery(otpResponse.data);
-      setOtp("");
-      setStep("otp");
+      const { user } = await signInWithEmailAndPassword(auth, cleanEmail, pass);
+      const profileSnapshot = await getDoc(doc(db, "users", user.uid));
+      if (!profileSnapshot.exists()) {
+        throw new Error("Your account profile could not be found. Contact an administrator.");
+      }
+      onSuccessLogin?.({ ...profileSnapshot.data(), uid: user.uid, email: user.email });
     } catch (error) {
       console.error("Login failed:", error.code, error.message);
 
@@ -813,98 +772,15 @@ function LoginPage({ onBack, onSwitchToSignup, onSuccessLogin }) {
         setErr("Too many failed login attempts. Please wait a moment before trying again.");
       } else if (error.code === "auth/user-disabled") {
         setErr("This Firebase Authentication account is disabled.");
-      } else if (error.code === "functions/internal") {
-        setErr("Login worked, but the OTP email could not be sent. Check the deployed Function logs and email secrets.");
-      } else if (error.code === "functions/unauthenticated") {
-        setErr("Login worked, but the OTP request lost its authentication session. Please try again.");
+      } else if (error.code === "permission-denied") {
+        setErr("Your password was accepted, but your account profile could not be accessed. Please contact an administrator.");
+      } else if (error.code === "auth/network-request-failed" || error.code === "unavailable") {
+        setErr("Could not connect. Check your internet connection and try again.");
       } else {
         setErr(error.message);
       }
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleVerifyOtp = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setErr("");
-
-    try {
-      const verifyEmailOtp = httpsCallable(functions, "verifyEmailOtp");
-
-      await verifyEmailOtp({
-        email: email.trim().toLowerCase(),
-        otp: otp.trim(),
-      });
-
-      const user = auth.currentUser;
-      if (!user) {
-        throw new Error("The authentication session was lost.");
-      }
-
-      const d = await getDoc(doc(db, "users", user.uid));
-
-      if (!d.exists()) {
-        await signOut(auth);
-        throw new Error(
-          "Your account profile could not be found. Contact an administrator."
-        );
-      }
-
-      const profile = d.data();
-
-      onSuccessLogin?.({
-        ...profile,
-        uid: user.uid,
-        email: user.email,
-      });
-    } catch (error) {
-      console.error("OTP verification failed:", error.code, error.message);
-
-      if (error.code === "functions/permission-denied") {
-        setErr("The verification code is incorrect.");
-      } else if (error.code === "functions/deadline-exceeded") {
-        setErr("The verification code has expired. Please request a new code.");
-      } else if (error.code === "functions/failed-precondition") {
-        setErr("Request a new verification code, then try again.");
-      } else if (error.code === "functions/resource-exhausted") {
-        setErr("Too many incorrect OTP attempts. Please request a new code.");
-      } else {
-        setErr(error.message);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleResendOtp = async () => {
-    if (resendSeconds > 0) return;
-
-    setErr("");
-    setResendLoading(true);
-
-    try {
-      if (!auth.currentUser) {
-        throw new Error("The authentication session was lost. Please log in again.");
-      }
-
-      const cleanEmail = email.trim().toLowerCase();
-      const sendEmailOtp = httpsCallable(functions, "sendEmailOtp");
-      const otpResponse = await sendEmailOtp({ email: cleanEmail });
-
-      applyOtpDelivery(otpResponse.data);
-      setOtp("");
-    } catch (error) {
-      console.error("OTP resend failed:", error.code, error.message);
-
-      if (error.code === "functions/internal") {
-        setErr("The verification email could not be sent. Check the email Function secrets.");
-      } else {
-        setErr(error.message);
-      }
-    } finally {
-      setResendLoading(false);
     }
   };
 
@@ -957,7 +833,6 @@ function LoginPage({ onBack, onSwitchToSignup, onSuccessLogin }) {
               </div>
             )}
 
-            {step === "login" ? (
               <form onSubmit={handleLogin} className="space-y-5">
                 <div>
                   <label className="mb-2 block text-sm font-medium text-[#9fb0c9]">
@@ -1004,56 +879,6 @@ function LoginPage({ onBack, onSwitchToSignup, onSuccessLogin }) {
                   </button>
                 )}
               </form>
-            ) : (
-              <form onSubmit={handleVerifyOtp} className="space-y-4">
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-[#9fb0c9]">
-                    Enter OTP
-                  </label>
-                  <InputBlockLight
-                    value={otp}
-                    onChange={(e) => setOtp(e.target.value)}
-                    placeholder="6-digit code"
-                  />
-                  {otpNotice && (
-                    <p className="mt-2 text-sm text-[#7a8ba8]">
-                      {otpNotice}
-                      {otpExpiresAt ? (
-                        <span>
-                          {" "}
-                          It expires at{" "}
-                          {new Date(otpExpiresAt).toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                          .
-                        </span>
-                      ) : null}
-                    </p>
-                  )}
-                </div>
-
-                <button
-                  disabled={loading}
-                  className="w-full rounded-xl bg-[#FFD41C] px-6 py-3 font-semibold text-[#0a0e17] transition hover:scale-[1.01] disabled:opacity-60"
-                >
-                  {loading ? "Verifying..." : "Verify OTP"}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleResendOtp}
-                  disabled={loading || resendLoading || resendSeconds > 0}
-                  className="w-full rounded-xl border border-[#FFD41C]/25 bg-[#FFD41C]/8 px-6 py-3 font-semibold text-[#FFD41C] transition hover:bg-[#FFD41C]/14 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {resendLoading
-                    ? "Sending..."
-                    : resendSeconds > 0
-                      ? `Resend OTP in ${resendSeconds}s`
-                      : "Resend OTP"}
-                </button>
-              </form>
-            )}
           </div>
         </div>
       </div>

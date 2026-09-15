@@ -436,24 +436,24 @@ canvas {
   color: var(--articton-text);
 }
 
-:where(.articton-app-shell, .articton-landing-page) :focus-visible {
+:where(.articton-app-shell, .articton-landing-page, .articton-module-theme) :focus-visible {
   outline: 3px solid color-mix(in srgb, var(--articton-accent) 42%, transparent);
   outline-offset: 2px;
 }
 
-html.articton-dark :where(.articton-app-shell, .articton-landing-page)
+html.articton-dark :where(.articton-app-shell, .articton-landing-page, .articton-module-theme)
   [class*="bg-[#FFD41C]"]:not([class*="bg-[#FFD41C]/"]) {
   background:
     linear-gradient(135deg, var(--articton-secondary) 0%, var(--articton-secondary) 74%, var(--articton-primary) 74%, var(--articton-primary) 100%) !important;
 }
 
-html.articton-dark :where(.articton-app-shell, .articton-landing-page)
+html.articton-dark :where(.articton-app-shell, .articton-landing-page, .articton-module-theme)
   [class*="bg-[#FFD41C]/"] {
   background:
     linear-gradient(135deg, rgba(255, 212, 28, 0.14), rgba(53, 64, 142, 0.22)) !important;
 }
 
-html.articton-dark :where(.articton-app-shell, .articton-landing-page)
+html.articton-dark :where(.articton-app-shell, .articton-landing-page, .articton-module-theme)
   [class*="border-[#FFD41C]/"] {
   box-shadow: 0 0 0 1px rgba(53, 64, 142, 0.22) inset;
 }
@@ -482,7 +482,6 @@ html.articton-dark :where(.articton-app-shell, .articton-landing-page)
 }
 
 @media (max-width: 1024px), (max-height: 760px) {
-  .articton-dashboard-page,
   .articton-admin-page,
   .articton-faculty-page {
     height: auto;
@@ -491,57 +490,80 @@ html.articton-dark :where(.articton-app-shell, .articton-landing-page)
     overflow-y: auto;
   }
 
-  .articton-dashboard-page .h-screen {
-    height: auto !important;
-    min-height: 100dvh !important;
-  }
-
-  .articton-dashboard-page .articton-dashboard-viewport,
-  .articton-dashboard-page .articton-dashboard-frame,
-  .articton-dashboard-page .articton-dashboard-layout {
-    height: auto !important;
-    min-height: 100dvh !important;
-    overflow: visible !important;
-  }
-
-  .articton-dashboard-page [class*="grid-cols-[290px_1fr]"] {
-    grid-template-columns: minmax(0, 1fr) !important;
-  }
-
-  .articton-dashboard-page .articton-dashboard-sidebar {
-    position: fixed;
-    inset: 0 auto 0 0;
-    z-index: 80;
-    display: block;
-    width: min(86vw, 20rem);
-    max-width: 100%;
-    border-right: 1px solid var(--articton-border);
-    border-radius: 0 1.5rem 1.5rem 0;
-    box-shadow: 0 28px 90px rgba(0, 0, 0, 0.38);
-    transform: translateX(-105%);
-    transition: transform 220ms ease, box-shadow 220ms ease;
-  }
-
-  .articton-dashboard-page .articton-dashboard-sidebar.is-open {
-    transform: translateX(0);
-  }
-
-  .articton-dashboard-page .articton-sidebar-menu-button {
-    display: inline-flex;
-  }
-
-  .articton-dashboard-page .articton-dashboard-content {
-    height: auto !important;
-    min-height: 100dvh;
-    overflow: visible !important;
-    padding: clamp(1rem, 3vw, 1.5rem) !important;
-  }
-
-  .articton-dashboard-page main,
   .articton-admin-page main,
   .articton-faculty-page main {
     overflow: visible;
   }
+}
+
+/* Keep the dashboard scroll area bounded at every zoom level. */
+.articton-dashboard-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.articton-dashboard-sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 80;
+  width: min(86vw, 20rem);
+  height: 100dvh;
+  visibility: hidden;
+  transform: translateX(-105%);
+  transition: transform 220ms ease, visibility 220ms;
+}
+
+.articton-dashboard-sidebar.is-open {
+  visibility: visible;
+  transform: translateX(0);
+}
+
+.articton-dashboard-page .articton-sidebar-menu-button {
+  display: inline-flex;
+}
+
+.articton-dashboard-header > div:first-child {
+  flex: 1 1 16rem;
+}
+
+.articton-dashboard-content {
+  min-height: 0;
+  padding: clamp(0.75rem, 2vw, 2rem);
+}
+
+@media (min-width: 1024px) {
+  .articton-dashboard-layout {
+    grid-template-columns: 18rem minmax(0, 1fr);
+  }
+
+  .articton-dashboard-sidebar {
+    position: relative;
+    inset: auto;
+    width: auto;
+    height: 100%;
+    visibility: visible;
+    transform: none;
+  }
+
+  .articton-dashboard-page .articton-sidebar-menu-button,
+  .articton-dashboard-page .articton-sidebar-close,
+  .articton-dashboard-page .articton-sidebar-backdrop {
+    display: none;
+  }
+}
+
+@media (max-width: 1023px) {
+  .articton-dashboard-page .articton-sidebar-close,
+  .articton-dashboard-page .articton-sidebar-backdrop {
+    display: inline-flex;
+  }
+}
+
+html.articton-light .articton-landing-nav h1.articton-nav-label-optional {
+  color: #fff !important;
+}
+
+.articton-landing-page {
+  font-family: "Outfit", ui-sans-serif, system-ui, sans-serif;
 }
 
 @media (max-width: 760px) {
@@ -698,7 +720,7 @@ html.articton-light .articton-dashboard-page
 }
 
 /* Convert the recurring dark surfaces into a restrained white hierarchy. */
-html.articton-light :where(.articton-app-shell, .articton-landing-page)
+html.articton-light :where(.articton-app-shell, .articton-landing-page, .articton-module-theme)
   :where(
     [class*="bg-[#080c14]"],
     [class*="bg-[#0a0e17]"],
@@ -711,7 +733,7 @@ html.articton-light :where(.articton-app-shell, .articton-landing-page)
   background-color: var(--articton-surface) !important;
 }
 
-html.articton-light :where(.articton-app-shell, .articton-landing-page)
+html.articton-light :where(.articton-app-shell, .articton-landing-page, .articton-module-theme)
   :where(
     [class*="bg-[#061e29]"],
     [class*="bg-[#031018]"],
@@ -720,7 +742,7 @@ html.articton-light :where(.articton-app-shell, .articton-landing-page)
   background-color: var(--articton-bg) !important;
 }
 
-html.articton-light :where(.articton-app-shell, .articton-landing-page)
+html.articton-light :where(.articton-app-shell, .articton-landing-page, .articton-module-theme)
   :where(
     [class*="bg-white/[0.02]"],
     [class*="bg-white/[0.03]"],
@@ -733,7 +755,7 @@ html.articton-light :where(.articton-app-shell, .articton-landing-page)
   background-color: var(--articton-surface-strong) !important;
 }
 
-html.articton-light :where(.articton-app-shell, .articton-landing-page)
+html.articton-light :where(.articton-app-shell, .articton-landing-page, .articton-module-theme)
   :where(
     [class*="border-[#1a2438]"],
     [class*="border-[#26324a]"],
@@ -746,7 +768,7 @@ html.articton-light :where(.articton-app-shell, .articton-landing-page)
   --tw-ring-color: var(--articton-border-soft) !important;
 }
 
-html.articton-light :where(.articton-app-shell, .articton-landing-page)
+html.articton-light :where(.articton-app-shell, .articton-landing-page, .articton-module-theme)
   :where(
     [class*="text-white"],
     [class*="text-[#e8ecf4]"],
@@ -759,7 +781,7 @@ html.articton-light :where(.articton-app-shell, .articton-landing-page)
   color: var(--articton-text) !important;
 }
 
-html.articton-light :where(.articton-app-shell, .articton-landing-page)
+html.articton-light :where(.articton-app-shell, .articton-landing-page, .articton-module-theme)
   :where(
     [class*="text-[#7a8ba8]"],
     [class*="text-[#9fb0ca]"],
@@ -773,12 +795,12 @@ html.articton-light :where(.articton-app-shell, .articton-landing-page)
   color: var(--articton-text-muted) !important;
 }
 
-html.articton-light :where(.articton-app-shell, .articton-landing-page)
+html.articton-light :where(.articton-app-shell, .articton-landing-page, .articton-module-theme)
   :where([class*="text-[#4a5b78]"], [class*="text-[#6f8499]"]) {
   color: var(--articton-text-subtle) !important;
 }
 
-html.articton-light :where(.articton-app-shell, .articton-landing-page)
+html.articton-light :where(.articton-app-shell, .articton-landing-page, .articton-module-theme)
   :where(
     [class*="text-[#FFD41C]"],
     [class*="text-[#73ffd4]"],
@@ -788,73 +810,73 @@ html.articton-light :where(.articton-app-shell, .articton-landing-page)
   color: var(--articton-primary) !important;
 }
 
-html.articton-light :where(.articton-app-shell, .articton-landing-page)
+html.articton-light :where(.articton-app-shell, .articton-landing-page, .articton-module-theme)
   [class*="bg-[#FFD41C]"]:not([class*="bg-[#FFD41C]/"]) {
   background:
     linear-gradient(135deg, var(--articton-primary) 0%, var(--articton-primary) 72%, var(--articton-secondary) 72%, var(--articton-secondary) 100%) !important;
 }
 
-html.articton-light :where(.articton-app-shell, .articton-landing-page)
+html.articton-light :where(.articton-app-shell, .articton-landing-page, .articton-module-theme)
   [class*="bg-[#FFD41C]/"],
-html.articton-light :where(.articton-app-shell, .articton-landing-page)
+html.articton-light :where(.articton-app-shell, .articton-landing-page, .articton-module-theme)
   [class*="bg-[#00b4ff]/"] {
   background:
     linear-gradient(135deg, rgba(53, 64, 142, 0.1), rgba(255, 212, 28, 0.2)) !important;
 }
 
-html.articton-light :where(.articton-app-shell, .articton-landing-page)
+html.articton-light :where(.articton-app-shell, .articton-landing-page, .articton-module-theme)
   [class*="border-[#FFD41C]/"] {
   border-color: rgba(53, 64, 142, 0.32) !important;
   box-shadow: 0 0 0 1px rgba(255, 212, 28, 0.2) inset;
 }
 
 /* Text sitting on a solid accent must remain high contrast. */
-html.articton-light :where(.articton-app-shell, .articton-landing-page)
+html.articton-light :where(.articton-app-shell, .articton-landing-page, .articton-module-theme)
   [class*="bg-[#FFD41C]"][class*="text-[#07111d]"],
-html.articton-light :where(.articton-app-shell, .articton-landing-page)
+html.articton-light :where(.articton-app-shell, .articton-landing-page, .articton-module-theme)
   [class*="bg-[#FFD41C]"][class*="text-[#0a0e17]"],
-html.articton-light :where(.articton-app-shell, .articton-landing-page)
+html.articton-light :where(.articton-app-shell, .articton-landing-page, .articton-module-theme)
   [class*="bg-[#FFD41C]"][class*="text-[#111633]"] {
   color: #ffffff !important;
 }
 
-html.articton-light :where(.articton-app-shell, .articton-landing-page)
+html.articton-light :where(.articton-app-shell, .articton-landing-page, .articton-module-theme)
   :where(button, span, div)[class*="bg-[#FFD41C]"]:not([class*="bg-[#FFD41C]/"]) {
   color: #ffffff !important;
 }
 
-html.articton-light :where(.articton-app-shell, .articton-landing-page)
+html.articton-light :where(.articton-app-shell, .articton-landing-page, .articton-module-theme)
   :where(button, span, div)[class*="bg-[#FFD41C]"]:not([class*="bg-[#FFD41C]/"]) * {
   color: #ffffff !important;
 }
 
-html.articton-light :where(.articton-app-shell, .articton-landing-page)
+html.articton-light :where(.articton-app-shell, .articton-landing-page, .articton-module-theme)
   [class*="text-[#8ec5ff]"] {
   color: var(--articton-info) !important;
 }
 
-html.articton-light :where(.articton-app-shell, .articton-landing-page)
+html.articton-light :where(.articton-app-shell, .articton-landing-page, .articton-module-theme)
   :where([class*="text-yellow-"], [class*="text-[#ffd166]"], [class*="text-[#ffd27d]"]) {
   color: var(--articton-warning) !important;
 }
 
-html.articton-light :where(.articton-app-shell, .articton-landing-page)
+html.articton-light :where(.articton-app-shell, .articton-landing-page, .articton-module-theme)
   :where([class*="text-red-"], [class*="text-[#ff9a92]"], [class*="text-[#ff9f7d]"]) {
   color: var(--articton-danger) !important;
 }
 
-html.articton-light :where(.articton-app-shell, .articton-landing-page)
+html.articton-light :where(.articton-app-shell, .articton-landing-page, .articton-module-theme)
   :where([class*="bg-red-500/10"], [class*="bg-[#ff9f7d]/8"]) {
   background-color: rgba(180, 35, 24, 0.075) !important;
 }
 
-html.articton-light :where(.articton-app-shell, .articton-landing-page)
+html.articton-light :where(.articton-app-shell, .articton-landing-page, .articton-module-theme)
   :where([class*="border-red-500/20"], [class*="border-[#ff9f7d]/30"]) {
   border-color: rgba(180, 35, 24, 0.24) !important;
 }
 
 /* Inputs and interactive controls. */
-html.articton-light :where(.articton-app-shell, .articton-landing-page)
+html.articton-light :where(.articton-app-shell, .articton-landing-page, .articton-module-theme)
   :where(input, textarea, select, .articton-field) {
   border-color: var(--articton-border-strong) !important;
   background: #ffffff !important;
@@ -862,13 +884,13 @@ html.articton-light :where(.articton-app-shell, .articton-landing-page)
   box-shadow: inset 0 1px 0 rgba(16, 37, 58, 0.025);
 }
 
-html.articton-light :where(.articton-app-shell, .articton-landing-page)
+html.articton-light :where(.articton-app-shell, .articton-landing-page, .articton-module-theme)
   :where(input, textarea)::placeholder {
   color: #8092a3 !important;
   opacity: 1;
 }
 
-html.articton-light :where(.articton-app-shell, .articton-landing-page)
+html.articton-light :where(.articton-app-shell, .articton-landing-page, .articton-module-theme)
   :where(input, textarea, select, .articton-field):focus {
   border-color: rgba(53, 64, 142, 0.58) !important;
   box-shadow: 0 0 0 4px rgba(53, 64, 142, 0.11) !important;
@@ -881,7 +903,7 @@ html.articton-light .articton-dropdown-menu {
 }
 
 /* Replace heavy black shadows with soft elevation. */
-html.articton-light :where(.articton-app-shell, .articton-landing-page)
+html.articton-light :where(.articton-app-shell, .articton-landing-page, .articton-module-theme)
   :where(
     [class*="shadow-[0_70px"],
     [class*="shadow-[0_40px"],
@@ -899,23 +921,23 @@ html.articton-light :where(.articton-app-shell, .articton-landing-page)
   box-shadow: var(--articton-shadow) !important;
 }
 
-html.articton-light :where(.articton-app-shell, .articton-landing-page)
+html.articton-light :where(.articton-app-shell, .articton-landing-page, .articton-module-theme)
   [class*="shadow-[inset"]:not(.articton-3d-stage) {
   box-shadow: inset 0 0 0 1px rgba(103, 128, 150, 0.2) !important;
 }
 
-html.articton-light :where(.articton-app-shell, .articton-landing-page)
+html.articton-light :where(.articton-app-shell, .articton-landing-page, .articton-module-theme)
   :where([class*="bg-black/70"], [class*="bg-black/60"], [class*="bg-black/50"]) {
   background-color: rgba(30, 49, 66, 0.28) !important;
 }
 
 /* Keep generated decorative grids and glows quiet in light mode. */
-html.articton-light :where(.articton-app-shell, .articton-landing-page)
+html.articton-light :where(.articton-app-shell, .articton-landing-page, .articton-module-theme)
   [class*="bg-[radial-gradient"]:not(.articton-3d-stage) {
   opacity: 0.5;
 }
 
-html.articton-light :where(.articton-app-shell, .articton-landing-page)
+html.articton-light :where(.articton-app-shell, .articton-landing-page, .articton-module-theme)
   [class*="bg-[linear-gradient(rgba(255,212,28"] {
   opacity: 0.34 !important;
 }
@@ -2005,7 +2027,7 @@ html.articton-light .articton-landing [class*="bg-[linear-gradient(180deg,rgba(1
 }
 
 /* Disabled states remain legible rather than looking faded into the page. */
-html.articton-light :where(.articton-app-shell, .articton-landing-page) button:disabled {
+html.articton-light :where(.articton-app-shell, .articton-landing-page, .articton-module-theme) button:disabled {
   opacity: 0.58;
   filter: saturate(0.72);
 }
@@ -2650,4 +2672,294 @@ html.articton-light :where(.articton-app-shell, .articton-landing-page) button:d
   .articton-validation {
     display: none !important;
   }
+}
+/* Instruction overlays can sit outside the themed application shell. */
+html.articton-light .articton-instruction-card {
+  color: #171d3d;
+}
+html.articton-light .articton-instruction-card :where(h1, h2, h3, p, li, span, div) {
+  color: #354361 !important;
+}
+html.articton-light .articton-instruction-card :where(h1, h2, h3) {
+  color: #171d3d !important;
+}
+html.articton-light .articton-instruction-card :where([class*="text-[#00ffb4]"], [class*="text-[#FFD41C]"]) {
+  color: #35408e !important;
+}
+html.articton-light .articton-instruction-card [class*="text-[#ffd166]"] {
+  color: #805500 !important;
+}
+html.articton-light .articton-instruction-card [class*="text-[#ff9a92]"] {
+  color: #a82424 !important;
+}
+html.articton-light .articton-instruction-button {
+  color: #171d3d !important;
+}
+html.articton-light .articton-module-theme {
+  color: var(--articton-text);
+  background: var(--articton-bg);
+}
+
+html.articton-light :where(.articton-module-page, .articton-module-theme)
+  :where([class*="text-[#00ffb4]"], [class*="text-[#7dffdc]"], [class*="text-[#baffee]"]) {
+  color: #35408e !important;
+}
+html.articton-light :where(.articton-module-page, .articton-module-theme)
+  :where([class*="text-[#8fa3bf]"], [class*="text-[#b7c6dd]"]) {
+  color: #4d587e !important;
+}
+
+/* Outside the scene container so clipping cannot hide the viewing tip. */
+.articton-zoom-notice {
+  display: none;
+  position: fixed;
+  z-index: 1200;
+  left: 50%;
+  bottom: max(0.75rem, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  width: min(36rem, calc(100% - 1.5rem));
+  max-height: calc(100dvh - 1.5rem);
+  overflow: auto;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--articton-border-strong);
+  border-radius: 1rem;
+  background: var(--articton-surface);
+  color: var(--articton-text);
+  box-shadow: var(--articton-shadow-sm);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+body:has(:where(.articton-module-page, .articton-module-theme, .articton-workspace-page, .articton-practice-page) canvas) > .articton-zoom-notice {
+  display: flex;
+}
+.articton-zoom-notice p { margin: 0.3rem 0 0; }
+.articton-zoom-notice kbd { font: inherit; font-weight: 700; white-space: nowrap; }
+.articton-zoom-notice button {
+  flex: 0 0 auto;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--articton-border);
+  border-radius: 0.5rem;
+  cursor: pointer;
+  color: inherit;
+  background: var(--articton-surface-muted);
+  font-size: 1.25rem;
+}
+.articton-zoom-notice button:focus-visible { outline: 2px solid var(--articton-primary); outline-offset: 2px; }
+@media print { .articton-zoom-notice { display: none !important; } }
+
+/* Full desktop dashboard: match the compact overview while keeping the
+   existing collapsed layout below this breakpoint unchanged. */
+@media (min-width: 1024px) {
+  .articton-dashboard-inset {
+    padding: 0;
+  }
+  .articton-dashboard-layout {
+    grid-template-columns: clamp(240px, 14.25vw, 264px) minmax(0, 1fr);
+  }
+  .articton-dashboard-content {
+    padding: 1.75rem;
+    gap: 1rem;
+  }
+  .articton-dashboard-sidebar > div {
+    padding: 1.4rem;
+  }
+  .articton-dashboard-sidebar .articton-side-item {
+    padding: 0.7rem 0.9rem;
+  }
+  .articton-dashboard-header h1 {
+    margin-top: 1.25rem;
+    font-size: 2.5rem;
+    line-height: 1.2;
+  }
+  .articton-dashboard-page .articton-top-card-hero > .flex {
+    min-height: 18rem;
+    padding: 1.9rem;
+  }
+}
+
+/* NU palette is scoped to learning modules; practical exams keep their styling.
+   Legacy JSX accent classes map here without changing Three.js materials. */
+:where(.articton-guided-module, .articton-platform-choice-panel) {
+  --module-accent: var(--articton-nu-gold);
+  --module-accent-soft: var(--articton-secondary-soft);
+  background: var(--articton-bg) !important;
+  color: var(--articton-text) !important;
+}
+html.articton-light :where(.articton-guided-module, .articton-platform-choice-panel) {
+  --module-accent: var(--articton-nu-blue);
+}
+.articton-platform-selection .articton-platform-choice-panel { max-width: 100%; }
+.articton-platform-selection { height: 100dvh; overflow-y: auto !important; }
+.articton-platform-selection summary { max-width: 100%; overflow-wrap: anywhere; }
+@media (max-width: 640px) {
+  .articton-platform-selection .flex.items-center.gap-4 { flex-wrap: wrap; }
+}
+
+/* Let overview cards keep their natural height within one scrolling column. */
+.articton-home-overview > * { flex-shrink: 0; min-width: 0; }
+html.articton-light .articton-home-overview [role="progressbar"] { background: #d6deec !important; }
+html.articton-light .articton-home-overview [role="progressbar"] > div { background: #35408e !important; }
+.articton-top-card-hero > .flex { flex-wrap: wrap; padding: clamp(1.25rem, 2.5vw, 2.5rem); }
+.articton-top-card-hero > .flex > .flex-1 { flex-basis: 18rem; overflow-wrap: anywhere; }
+.articton-top-card-hero > .flex > .flex-shrink-0 { width: min(100%, 22rem); max-width: 100%; flex-shrink: 1; }
+.articton-dashboard-page .articton-stat-card { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 640px) {
+  .articton-dashboard-content:has(.articton-home-overview) { padding: 1rem; }
+  .articton-top-card-hero > .flex > .flex-shrink-0 { display: none; }
+  .articton-top-card-hero .text-\[34px\] { font-size: 1.75rem; line-height: 1.2; }
+  .articton-dashboard-page .articton-progress-card > div { padding: 1.25rem; }
+}
+
+
+html :where(.articton-guided-module, .articton-platform-choice-panel) :where([class*="bg-[#0a0e17]"],
+  [class*="bg-[#0b1220]"],
+  [class*="bg-[#0d1220]"],
+  [class*="bg-[#111827]"],
+  [class*="bg-[#111b2f]"],
+  [class*="bg-[#07111d]"],
+  [class*="bg-[#07121c]"],
+  [class*="bg-[#0c1722]"],
+  [class*="bg-[#0b2a2a]"],
+  [class*="bg-[#070c14]"],
+  [class*="bg-[#06131b]"]) {
+  background: var(--articton-surface) !important; border-color: var(--articton-border) !important; box-shadow: var(--articton-shadow-sm) !important;
+}
+
+html :where(.articton-guided-module, .articton-platform-choice-panel) :where(.bg-gradient-to-b,
+  [class*="bg-[linear-gradient(135deg,#0a0e17"],
+  [class*="bg-[linear-gradient(135deg,#0d1220"]) {
+  background: linear-gradient(135deg, var(--articton-bg), var(--articton-surface)) !important;
+}
+
+html :where(.articton-guided-module, .articton-platform-choice-panel) :where(.text-white,
+  [class*="text-[#e8ecf4]"],
+  [class*="text-[#dbe6f5]"],
+  [class*="text-[#dffef5]"],
+  [class*="text-[#d7e1ee]"],
+  [class*="text-[#d8dfeb]"],
+  [class*="text-[#c3d1e4]"]) {
+  color: var(--articton-text) !important;
+}
+
+html :where(.articton-guided-module, .articton-platform-choice-panel) :where([class*="text-[#9fb0ca]"],
+  [class*="text-[#9fb0c9]"],
+  [class*="text-[#9fb0c8]"],
+  [class*="text-[#9eb0c7]"],
+  [class*="text-[#7a8ba8]"],
+  [class*="text-[#7f91ad]"],
+  [class*="text-[#aebdd3]"],
+  [class*="text-[#70839f]"],
+  [class*="text-[#c8d4e6]"],
+  [class*="text-[#b7fff0]"],
+  [class*="text-[#9fdccb]"]) {
+  color: var(--articton-text-muted) !important;
+}
+
+html :where(.articton-guided-module, .articton-platform-choice-panel) :where([class*="text-[#00ffb4]"],
+  [class*="text-[#67ffd1]"],
+  [class*="text-[#73ffd4]"],
+  [class*="text-[#7dffdc]"]) {
+  color: var(--module-accent) !important;
+}
+
+html :where(.articton-guided-module, .articton-platform-choice-panel) :where([class*="bg-white/"],
+  [class*="bg-black/20"]) {
+  background-color: var(--articton-surface-muted) !important;
+}
+
+html :where(.articton-guided-module, .articton-platform-choice-panel) :where([class*="border-[#1a2438]"],
+  [class*="border-white/"]) {
+  border-color: var(--articton-border) !important;
+}
+
+html :where(.articton-guided-module, .articton-platform-choice-panel) :where([class*="border-[#00ffb4]"]) {
+  border-color: color-mix(in srgb, var(--module-accent) 35%, transparent) !important;
+}
+
+html :where(.articton-guided-module, .articton-platform-choice-panel) :where([class*="bg-[#00ffb4]/"],
+  [class*="group-hover:bg-[#00ffb4]/"]) {
+  background-color: var(--module-accent-soft) !important;
+}
+
+html :where(.articton-guided-module, .articton-platform-choice-panel) :where([class~="bg-[#00ffb4]"]) {
+  background: var(--articton-nu-gold) !important; color: var(--articton-nu-blue-dark) !important;
+}
+
+html :where(.articton-guided-module, .articton-platform-choice-panel) :where([class*="rgba(0,255,180"]) {
+  box-shadow: none !important;
+}
+
+html :where(.articton-guided-module, .articton-platform-choice-panel) :where([class*="bg-[radial-gradient"][class*="0,255,180"]) {
+  background-image: radial-gradient(circle at 20% 10%, var(--articton-secondary-soft), transparent 60%) !important;
+}
+
+html :where(.articton-guided-module, .articton-platform-choice-panel) :where([class*="bg-[linear-gradient"][class*="0,255,180"]) {
+  background-image: linear-gradient(var(--articton-primary-soft) 1px, transparent 1px), linear-gradient(90deg, var(--articton-primary-soft) 1px, transparent 1px) !important;
+}
+
+html :where(.articton-guided-module, .articton-platform-choice-panel) :where([class*="via-[#00ffb4]"]) {
+  background-image: linear-gradient(to right, transparent, var(--articton-nu-gold), transparent) !important;
+}
+
+html :where(.articton-guided-module, .articton-platform-choice-panel) :where([class*="shadow-[inset_"]) {
+  box-shadow: inset 0 0 0 1px var(--articton-border) !important;
+}
+
+html .articton-guided-module .articton-module-intro-overlay {
+  background: color-mix(in srgb, var(--articton-bg) 94%, transparent) !important;
+}
+html .articton-guided-module .articton-module-intro { color: var(--articton-text-muted) !important; }
+html .articton-guided-module [class*="scrollbar-color"] {
+  scrollbar-color: var(--module-accent) var(--articton-surface-muted);
+}
+html .articton-platform-choice-panel button:hover,
+html .articton-platform-choice-panel button[aria-pressed="true"] {
+  background: var(--articton-secondary-soft) !important;
+  border-color: var(--module-accent) !important;
+}
+html .articton-guided-module :focus-visible,
+html .articton-platform-choice-panel :focus-visible {
+  outline: 3px solid var(--module-accent) !important;
+  outline-offset: 3px;
+  --tw-ring-color: var(--module-accent);
+}
+/* Dashboard uses a width breakpoint, independent of browser chrome height. */
+.articton-dashboard-layout > main { min-height: 0; min-width: 0; }
+.articton-dashboard-sidebar > div { height: auto; min-height: 100%; overflow: visible; }
+
+/* Collapsed step rails need their own padding: expanded rows plus a fixed
+   badge do not fit in the 50–64px rail. Keep scrolling vertical only. */
+#root [data-step-sidebar][data-collapsed="true"] [data-step-list] {
+  padding-inline: 3px !important;
+  overflow-x: hidden;
+}
+#root [data-step-sidebar][data-collapsed="true"] [data-step-button] {
+  min-width: 0;
+  justify-content: center;
+  gap: 0 !important;
+  padding: 5px 1px !important;
+}
+#root [data-step-sidebar][data-collapsed="true"] [data-step-button] > span {
+  width: min(28px, 100%) !important;
+  height: auto !important;
+  aspect-ratio: 1;
+  font-size: 12px !important;
+}
+#root [data-step-sidebar][data-collapsed="true"] > div > div:not([data-step-list]) {
+  justify-content: center;
+  padding-inline: 4px !important;
+}
+#root [data-step-sidebar][data-collapsed="true"] > div > div:not([data-step-list]) > button {
+  max-width: 100%;
+  margin-inline: auto;
+}
+.articton-home-overview .articton-progress-card,
+.articton-home-overview .articton-progress-card .scrollArea { height: auto; overflow: visible; }
+.articton-dashboard-header { gap: clamp(0.75rem, 2vw, 1.5rem); }
+@media (max-height: 600px) {
+  .articton-dashboard-header h1 { font-size: 1.75rem; margin-top: 0.5rem; }
+  .articton-dashboard-header p { margin-top: 0.5rem; }
 }

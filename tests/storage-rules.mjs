@@ -1,0 +1,16 @@
+﻿import { test, before, after } from 'node:test';
+import { readFileSync } from 'node:fs';
+import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
+import { ref, uploadBytes, getBytes } from 'firebase/storage';
+let env;
+before(async()=>{env=await initializeTestEnvironment({projectId:'demo-articton',storage:{host:'127.0.0.1',port:9199,rules:readFileSync('storage.rules','utf8')}});});
+after(async()=>{await env?.cleanup();});
+test('support images allow only the owner, with image type and size restrictions',async()=>{
+ const run=Date.now();
+ const storage=env.authenticatedContext('student').storage('gs://articton-57fd8.firebasestorage.app');
+ await assertSucceeds(uploadBytes(ref(storage,`supportTickets/student/${run}.png`),new Uint8Array([1,2,3]),{contentType:'image/png'}));
+ await assertFails(uploadBytes(ref(storage,'supportTickets/other/test.png'),new Uint8Array([1]),{contentType:'image/png'}));
+ await assertFails(uploadBytes(ref(storage,'supportTickets/student/test.txt'),new Uint8Array([1]),{contentType:'text/plain'}));
+ await assertFails(uploadBytes(ref(storage,'supportTickets/student/big.png'),new Uint8Array(5*1024*1024),{contentType:'image/png'}));
+ await assertFails(getBytes(ref(env.unauthenticatedContext().storage('gs://articton-57fd8.firebasestorage.app'),`supportTickets/student/${run}.png`)));
+});

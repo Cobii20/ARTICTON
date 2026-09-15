@@ -1,3 +1,5 @@
+import { getLastModuleVisit } from "../utils/moduleVisits";
+import ModuleImage from "../Components/ModuleImage";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import Settings from "../Components/Settings";
@@ -124,6 +126,7 @@ export default function Dashboard({
   onOpenModule,
   initialSection = "Dashboard",
   profileEditRequestId = 0,
+  onProfileEditRequestHandled,
 }) {
   const [section, setSection] = useState(initialSection);
   const [isLoading, setIsLoading] = useState(true);
@@ -148,6 +151,7 @@ export default function Dashboard({
     if (!user?.uid) return;
 
     try {
+      setError("");
       const userRef = doc(db, "users", user.uid);
       const userSnap = await getDoc(userRef);
 
@@ -156,9 +160,11 @@ export default function Dashboard({
         setProfile(mergeMobileScoresIntoProfile(userSnap.data(), mobileScores));
       } else {
         setProfile(null);
+        setError("Your account profile could not be found. Please contact an administrator.");
       }
     } catch (err) {
       console.error("Error refreshing profile:", err);
+      setError("Could not load your profile. Please retry or sign in again.");
     }
   }, []);
 
@@ -182,8 +188,9 @@ export default function Dashboard({
     if (profileEditRequestId > 0) {
       setSection("Profile");
       setIsProfileEditOpen(true);
+      onProfileEditRequestHandled?.();
     }
-  }, [profileEditRequestId]);
+  }, [profileEditRequestId, onProfileEditRequestHandled]);
 
   useEffect(() => {
     const prevHtml = document.documentElement.style.overflow;
@@ -856,15 +863,18 @@ const assemblyPracticalUnlocked =
         ? 0
         : Math.round(allModules.reduce((sum, m) => sum + m.progress, 0) / allModules.length);
 
-    const nextUp =
-      allModules
-        .filter((m) => m.progress > 0 && m.progress < 100)
-        .sort((a, b) => b.lastOpenedAt - a.lastOpenedAt)[0] ||
-      allModules.find((m) => m.progress === 0) ||
-      allModules[0];
+    const visit = getLastModuleVisit(firebaseUser?.uid);
+    const visitedModule = visit && allModules.find((module) => module.id === visit.moduleId);
+    const nextUp = visitedModule ? {
+      ...visitedModule,
+      resumeRoute: visit.route,
+      activity: visit.activity,
+      progress: Number.isFinite(visit.progress) ? Math.max(0, Math.min(100, visit.progress)) : visitedModule.progress,
+      progressLabel: visit.route.endsWith("amd") ? "AMD practice progress" : visit.route.endsWith("intel") ? "Intel practice progress" : "Module progress",
+    } : null;
 
     return { completed, inProgress, notStarted, overall, nextUp };
-  }, [allModules]);
+  }, [allModules, firebaseUser?.uid]);
 
   const isFullPracticalSection = [
     "AMD Full Assembly Practical",
@@ -894,7 +904,7 @@ const assemblyPracticalUnlocked =
       <div className="articton-dashboard-viewport relative h-screen w-full overflow-hidden">
         <DashboardBackground />
 
-        <div className="relative h-full w-full overflow-hidden p-0 md:p-3">
+        <div className="articton-dashboard-inset relative h-full w-full overflow-hidden p-0 md:p-3">
           <div className="articton-dashboard-frame relative h-full w-full overflow-hidden border border-[#1a2438] bg-[linear-gradient(135deg,#0a0e17,#0d1220,#101a2d)] shadow-[0_70px_180px_rgba(0,0,0,0.70)] md:rounded-[30px]">
             <div className="articton-dashboard-frame-glow articton-dashboard-frame-glow--gold absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(255,212,28,0.08),transparent_35%)]" />
             <div className="articton-dashboard-frame-glow articton-dashboard-frame-glow--blue absolute inset-0 bg-[radial-gradient(circle_at_88%_20%,rgba(53,64,142,0.12),transparent_30%)]" />
@@ -913,7 +923,7 @@ const assemblyPracticalUnlocked =
 
             {/* small-screen close button is inside the sidebar (shown only when sidebar is open) */}
 
-            <div className="articton-dashboard-layout relative grid h-full grid-cols-1 overflow-hidden lg:grid-cols-[290px_1fr] xl:grid-cols-[310px_1fr]">
+            <div className="articton-dashboard-layout relative grid h-full grid-cols-1 overflow-hidden lg:grid-cols-[290px_minmax(0,1fr)] xl:grid-cols-[310px_minmax(0,1fr)]">
               <aside
                 className={[
                   "articton-dashboard-sidebar h-full min-h-0 lg:sticky lg:top-3 overflow-auto border-r border-[#1a2438] bg-[#0b1220]/86 backdrop-blur-xl",
@@ -925,7 +935,7 @@ const assemblyPracticalUnlocked =
                     type="button"
                     aria-label="Close menu"
                     onClick={() => setIsSidebarOpen(false)}
-                    className={`${isSidebarOpen ? 'inline-flex' : 'hidden'} lg:hidden absolute right-3 top-3 z-[110] h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-[#FFD41C] text-[#0a0e17] hover:bg-[#e6bd00] focus:outline-none`}
+                    className={`${isSidebarOpen ? 'inline-flex' : 'hidden'} articton-sidebar-close lg:hidden absolute right-3 top-3 z-[110] h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-[#FFD41C] text-[#0a0e17] hover:bg-[#e6bd00] focus:outline-none`}
                   >
                     <span className="text-lg font-bold">✕</span>
                   </button>
@@ -955,9 +965,9 @@ const assemblyPracticalUnlocked =
                   </div>
 
                   <div className="mt-6 rounded-[24px] border border-[#1a2438] bg-[#0d1220] p-4 shadow-[0_20px_50px_rgba(0,0,0,0.28)]">
-                    <div className="text-[11px] uppercase tracking-[0.25em] text-[#FFD41C]">Current focus</div>
+                    <div className="text-[11px] uppercase tracking-[0.25em] text-[#FFD41C]">Last Visited Activity</div>
                     <div className="mt-3 text-sm font-semibold text-white">{stats.nextUp?.title || "No module yet"}</div>
-                    <div className="mt-1 text-xs text-[#7a8ba8]">{stats.nextUp?.subtitle || "Choose a module to begin learning."}</div>
+                    <div className="mt-1 text-xs text-[#7a8ba8]">{stats.nextUp?.activity || "Choose a module to begin learning."}</div>
 
                     <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/8">
                       <div className="h-full rounded-full bg-[#FFD41C]" style={{ width: `${stats.nextUp?.progress || 0}%` }} />
@@ -1138,7 +1148,7 @@ function DashboardBackground() {
 
 function HeaderBar({ section, sectionLabel, user, onMenu, onSettings, onLogout }) {
   return (
-    <div className="flex items-start justify-between gap-6">
+    <div className="articton-dashboard-header flex flex-wrap items-start justify-between gap-6">
       <div className="flex min-w-0 items-start gap-4">
         <button
           type="button"
@@ -1173,7 +1183,7 @@ function HeaderBar({ section, sectionLabel, user, onMenu, onSettings, onLogout }
       </div>
       </div>
 
-      <div className="relative z-50">
+      <div className="relative z-50 max-w-full shrink-0">
         <details className="group">
           <summary className="list-none cursor-pointer rounded-2xl border border-[#1a2438] bg-[#0d1220]/95 px-4 py-3 transition hover:bg-[#111b2f]">
             <div className="flex items-center gap-3">
@@ -1337,16 +1347,30 @@ function CustomerServiceModal({ isOpen, onClose, user }) {
   const [submitted, setSubmitted] = useState(false);
   const [screenshot, setScreenshot] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
   const handleSubmit = async () => {
-    if (!subject.trim() || !message.trim()) return;
+    if (uploading) return;
+    setSubmitError("");
+    if (!subject.trim() || !message.trim()) {
+      setSubmitError("Please enter a subject and message.");
+      return;
+    }
+    if (!auth.currentUser) {
+      setSubmitError("Please sign in again before sending a support request.");
+      return;
+    }
+    if (screenshot && (!screenshot.type.startsWith("image/") || screenshot.size >= 5 * 1024 * 1024)) {
+      setSubmitError("Choose an image smaller than 5 MB.");
+      return;
+    }
 
     try {
       setUploading(true);
       let screenshotURL = "";
 
       if (screenshot) {
-        const fileRef = ref(storage, `supportTickets/${Date.now()}-${screenshot.name}`);
+        const fileRef = ref(storage, `supportTickets/${auth.currentUser.uid}/${Date.now()}-${screenshot.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`);
         await uploadBytes(fileRef, screenshot);
         screenshotURL = await getDownloadURL(fileRef);
       }
@@ -1372,6 +1396,7 @@ function CustomerServiceModal({ isOpen, onClose, user }) {
       }, 1800);
     } catch (err) {
       console.error("Error submitting support ticket:", err);
+      setSubmitError("Your request could not be sent. Please try again.");
     } finally {
       setUploading(false);
     }
@@ -1435,6 +1460,8 @@ function CustomerServiceModal({ isOpen, onClose, user }) {
                 </label>
               </div>
 
+              {submitError ? <p role="alert" className="text-sm text-red-400">{submitError}</p> : null}
+
               {submitted ? (
                 <div className="rounded-2xl border border-[#FFD41C]/25 bg-[#FFD41C]/10 px-4 py-3 text-sm font-semibold text-[#FFD41C]">
                   Support request submitted successfully ✓
@@ -1446,7 +1473,7 @@ function CustomerServiceModal({ isOpen, onClose, user }) {
                   Cancel
                 </button>
 
-                <button type="button" onClick={handleSubmit} className="rounded-xl bg-[#FFD41C] px-5 py-2.5 text-sm font-bold text-[#0a0e17] transition hover:scale-[1.02]">
+                <button type="button" disabled={uploading} onClick={handleSubmit} className="rounded-xl bg-[#FFD41C] px-5 py-2.5 text-sm font-bold text-[#0a0e17] transition hover:scale-[1.02]">
                   {uploading ? "Submitting..." : "Submit Ticket"}
                 </button>
               </div>
@@ -1500,23 +1527,24 @@ function HomeOverview({
   mobileLearning,
 }) {
   return (
-   <div className="grid h-full min-h-0 grid-rows-[auto_auto_auto_auto_auto] gap-6 overflow-auto">
+   <div className="articton-home-overview flex min-h-0 flex-col gap-6">
       <div className="grid grid-cols-1 gap-6">
         <TopCardHero
-          title="Continue Module"
-          headline={nextUp ? nextUp.subtitle : "Start learning"}
-          sub={nextUp ? nextUp.title : "Pick your first lesson"}
-          meta={nextUp ? `Module Progress: ${nextUp.lessonsCompleted} / ${nextUp.lessonsTotal} Lessons` : "Ready when you are"}
-          button={nextUp ? (nextUp.progress >= 100 ? "Review" : nextUp.progress > 0 ? "Resume" : "Start") : "Browse"}
-          imageSrc="/PNG/PCpng1.png"
-          onClick={() => (nextUp ? openModule(nextUp.id) : setSection("Modules"))}
+          title="Last Visited Module"
+          headline={nextUp ? `${nextUp.title} · ${nextUp.selectionTitle}` : "No module visited yet"}
+          sub={nextUp ? `Last Visited Activity: ${nextUp.activity}` : "Choose a module to start learning."}
+          progress={nextUp?.progress ?? 0}
+          progressLabel={nextUp?.progressLabel || "Module progress"}
+          button={nextUp ? "Resume" : "Browse Modules"}
+          imageSrc={nextUp?.selectionImage || "/PNG/module1.png"}
+          onClick={() => (nextUp ? openModule({ id: nextUp.resumeRoute, resume: true }) : setSection("Modules"))}
         />
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <StatCard title="Completed" value={`${stats.completed}`} hint="Modules finished" />
         <StatCard title="Overall" value={`${overall}%`} hint="Across all modules" />
-        <StatCard title="Next up" value={nextUp?.title || "None"} hint="Last visited module" />
+        <StatCard title="Last Visited Activity" value={nextUp?.activity || "No activity yet"} hint={nextUp?.title || "Choose a module to begin"} />
       </div>
 
       <div className="grid min-h-0 grid-cols-1 gap-6 xl:grid-cols-[1.6fr_0.9fr]">
@@ -1752,7 +1780,6 @@ function MobileStatusChip({ label, item, large = false }) {
 
 function ModulesSelection({ modules, onBack, onOpenModule }) {
   const reduce = useReducedMotion();
-  const [broken, setBroken] = useState({});
   const selectionModules = modules.filter((m) => m.selectionTitle && m.selectionImage);
 
   return (
@@ -1783,7 +1810,7 @@ function ModulesSelection({ modules, onBack, onOpenModule }) {
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     <span className="text-[12px] text-[#9fb0c9]">{m.selectionModuleNo}</span>
                     <span className="h-1 w-1 rounded-full bg-white/20" />
-                    <span className="text-[12px] text-[#7a8ba8]">{m.selectionProgressText}</span>
+                    <span className="text-[12px] text-[#7a8ba8]">{m.progress >= 100 ? "Completed" : m.progress > 0 ? `${m.progress}% complete` : "Not started"}</span>
                   </div>
 
                  <button
@@ -1801,15 +1828,7 @@ function ModulesSelection({ modules, onBack, onOpenModule }) {
                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(255,212,28,0.12),transparent_60%)]" />
                   <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent" />
 
-                  {!broken[m.id] ? (
-                    <img src={m.selectionImage} alt="" className="absolute inset-0 h-full w-full object-contain p-5" onError={() => setBroken((prev) => ({ ...prev, [m.id]: true }))} />
-                  ) : (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="rounded-xl border border-[#1a2438] bg-white/[0.03] px-3 py-2 text-[12px] text-[#7a8ba8]">
-                        Image not found (check {m.selectionImage})
-                      </div>
-                    </div>
-                  )}
+                  <ModuleImage src={m.selectionImage} title={m.selectionTitle} className="p-5" />
                 </div>
               </div>
             </motion.div>
@@ -1824,7 +1843,7 @@ function PracticalTestsList({ tests, onOpen }) {
   return (
     <AssessmentList
       title="Practice Tests"
-      subtitle="Assembly unlocks after finishing Module 2. Disassembly unlocks after finishing Module 3."
+      subtitle="Disassembly unlocks after finishing Module 2. Assembly unlocks after finishing Module 3."
       items={tests}
       onOpen={onOpen}
       openLabel="Open Test"
@@ -2141,8 +2160,8 @@ function ProfilePage({
 
                 <div className="col-span-2">
                   <MiniStat
-                    title="Current Focus"
-                    value={stats.nextUp?.title || "No module yet"}
+                    title="Last Visited Activity"
+                    value={stats.nextUp?.activity || "No activity yet"}
                   />
                 </div>
               </div>
@@ -2334,7 +2353,7 @@ function useCardMotion() {
   }, [reduce]);
 }
 
-function TopCardHero({ title, headline, sub, meta, button, imageSrc, onClick }) {
+function TopCardHero({ title, headline, sub, progress, progressLabel, button, imageSrc, onClick }) {
   const motionPreset = useCardMotion();
 
   return (
@@ -2353,7 +2372,10 @@ function TopCardHero({ title, headline, sub, meta, button, imageSrc, onClick }) 
           <div className="text-sm font-semibold text-[#9fdccb]">{title}</div>
           <div className="mt-3 text-[34px] font-extrabold leading-[1.04] tracking-tight text-[#e8ecf4] lg:text-[38px]">{headline}</div>
           <div className="mt-1 text-[14px] text-[#9fb0c9] lg:text-[15px]">{sub}</div>
-          <div className="mt-5 text-[12.5px] text-[#7a8ba8]">{meta}</div>
+          <div className="mt-5 text-xs text-[#7a8ba8]">{progressLabel}</div>
+          <div role="progressbar" aria-label={progressLabel} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress} className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
+            <div className="h-full rounded-full bg-[#FFD41C]" style={{ width: `${progress}%` }} />
+          </div>
 
           <div className="mt-6 inline-flex items-center gap-2 rounded-2xl border border-[#FFD41C]/30 bg-[#FFD41C]/12 px-12 py-4 text-[14px] font-semibold text-[#FFD41C] transition hover:bg-[#FFD41C]/18 lg:text-[15px]">
             {button}
@@ -2362,7 +2384,7 @@ function TopCardHero({ title, headline, sub, meta, button, imageSrc, onClick }) 
         </div>
 
         <div className="relative h-[200px] w-[320px] flex-shrink-0 overflow-hidden rounded-2xl border border-[#1a2438] bg-[#0a0e17] shadow-[inset_0_0_46px_rgba(0,0,0,0.50)] sm:h-[220px] sm:w-[360px] lg:h-[240px] lg:w-[420px]">
-          <img src={imageSrc} alt="" className="absolute inset-0 h-full w-full object-contain p-6 lg:p-7" />
+          <ModuleImage src={imageSrc} title={headline} className="p-6 lg:p-7" />
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 to-transparent" />
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_45%_35%,rgba(255,212,28,0.20),transparent_62%)]" />
         </div>

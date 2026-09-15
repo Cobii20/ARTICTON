@@ -26,8 +26,6 @@ export default function SettingsModal({
   };
 
   const updateSetting = (key, value) => {
-    // Prevent extreme font size that breaks layout: map extra-large to large
-    if (key === "fontSize" && value === "extra-large") value = "large";
 
     const nextSettings = saveUserSetting(key, value);
     const changeHandler = onChange || onSettingChange;
@@ -116,7 +114,7 @@ export default function SettingsModal({
                 icon={mergedSettings.darkMode ? Moon : Sun}
                 title="Dark Mode / Light Mode"
                 subtitle={mergedSettings.darkMode ? "Use dark interface theme" : "Use light interface theme"}
-                checked={mergedSettings.darkMode ?? true}
+                checked={mergedSettings.darkMode ?? false}
                 onChange={(value) => updateSetting("darkMode", value)}
               />
 

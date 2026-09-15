@@ -2,7 +2,7 @@ export const DEFAULT_USER_SETTINGS = {
   sound: true,
   animations: true,
   aiVoiceover: false,
-  darkMode: true,
+  darkMode: false,
   fontSize: "medium",
 };
 

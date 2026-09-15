@@ -1,0 +1,16 @@
+﻿# Prompt: remove mobile OTP while preserving shared Firebase compatibility
+
+Work in my mobile app repository and implement this change, not just a plan.
+
+My mobile and web apps share Firebase project `articton-57fd8`. The web app now uses Firebase email/password login without the custom email OTP step. The shared Firestore rules no longer require an OTP session. The web backend functions `askModuleTutor`, `deleteStudentAccount`, `startAssessment`, and `submitAssessment` have been updated to authenticate using Firebase Auth while retaining their authorization checks.
+
+1. Inspect the mobile authentication service, login/signup screens, navigation guards, startup/session restoration, logout, and profile-loading flow. Identify all custom OTP dependencies, including calls to `sendEmailOtp`, `verifyEmailOtp`, `endOtpSession`, reads of `otp_sessions` / `otp_challenges`, OTP timers, resend controls, cached verification flags, and email-verification gates added solely for this custom OTP flow.
+2. Keep Firebase email/password authentication. After successful sign-in, load `users/{currentUser.uid}` and route using the existing role rules. Do not grant access before authentication and the required profile load complete. Distinguish wrong-password, network, permission-denied, disabled-account, and missing-profile failures. Never create an admin/faculty profile or overwrite an existing profile as a login fallback.
+3. Preserve registration fields, student role, profile ownership, password-reset functionality, and Firebase's normal session persistence. Remove only custom OTP UI/services/state and dependencies used exclusively by that feature. Do not remove unrelated Firebase security features, App Check, or password-reset email handling.
+4. Logout must use Firebase Auth sign-out and clear account-specific in-memory state without calling `endOtpSession`. Startup and relogin must not depend on stale OTP flags. Cancel obsolete subscriptions/timers and prevent callbacks from a previous account from updating the next account's UI.
+5. Preserve shared collection paths, field names, UIDs, roles, quiz results, module progress, practical scores, and assessment callable payloads. Check mobile score reads/writes against the current shared rules. Report mismatches; do not broadly open permissions or rename the schema to get tests passing.
+6. Do not deploy a stale mobile copy of Firestore rules or Cloud Functions. Do not delete shared OTP endpoints, secrets, collections, users, or data: older mobile releases may still depend on them. Report a separate cleanup plan once all clients have migrated.
+7. Test signup, valid/invalid password login, missing-profile and permission failures, logout/relogin, app restart, profile editing, score saving, module access, and assessments. Confirm no OTP screen or network call remains in normal flows. Use emulator/demo accounts where possible; do not modify real users for testing.
+8. Run the project's formatter, analyzer/linter, relevant tests, and build. Fix introduced failures and report any remaining issues honestly. Summarize files changed, tested flows, and whether any backend changes are actually needed.
+
+Preserve unrelated changes already in the repository. Do not ask for passwords or put credentials in source code.

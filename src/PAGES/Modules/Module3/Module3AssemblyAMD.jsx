@@ -1,3 +1,6 @@
+import ModuleIntroCard from "../../../Components/ModuleIntroCard";
+import ModuleSceneBackground from "../../../Components/ModuleSceneBackground";
+import { getPracticeCheckpoint, recordModuleVisit } from "../../../utils/moduleVisits";
 import React, {
   Suspense,
   useCallback,
@@ -2206,7 +2209,7 @@ function ModelViewer({
         }}
         style={{ touchAction: "none" }}
       >
-        <color attach="background" args={["#070c14"]} />
+        <ModuleSceneBackground />
         <hemisphereLight args={["#ffffff", "#182338", 1.12]} />
         <ambientLight intensity={0.7} />
         <directionalLight
@@ -2415,6 +2418,8 @@ function Sidebar({
 
   return (
     <div
+      data-step-sidebar
+      data-collapsed={!open}
       className={[
         "absolute left-0 top-0 z-[200] h-full transition-all duration-300",
         open ? "w-[clamp(220px,22vw,280px)]" : "w-[64px]",
@@ -2439,7 +2444,8 @@ function Sidebar({
 
         <div
           className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-3 pr-2 [scrollbar-color:rgba(0,255,180,0.35)_rgba(255,255,255,0.05)] [scrollbar-width:thin]"
-          style={{ scrollbarGutter: "stable" }}
+          data-step-list
+          style={{ scrollbarGutter: open ? "stable" : "stable both-edges" }}
         >
           {steps.map((item, index) => {
             const done = !!completedSteps[item.key];
@@ -2453,6 +2459,9 @@ function Sidebar({
                 type="button"
                 onClick={() => onSelect(index)}
                 aria-disabled={!unlocked}
+                aria-label={item.name}
+                title={!open ? item.name : undefined}
+                data-step-button
                 className={[
                   "flex w-full scroll-m-3 items-center gap-3 rounded-2xl border px-3 py-3 text-left transition",
                   active
@@ -2531,62 +2540,6 @@ function Sidebar({
     </div>
   );
 }
-
-function ModuleIntroCard({ platform, moduleType, onStart }) {
-  return (
-    <div className="absolute inset-0 z-[750] flex items-center justify-center bg-[#050912]/78 p-5 backdrop-blur-md">
-      <div className="relative w-full max-w-2xl overflow-hidden rounded-[30px] border border-[#00ffb4]/30 bg-[#0b1220]/96 p-7 shadow-[0_40px_120px_rgba(0,0,0,0.7)] md:p-9">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(0,255,180,0.13),transparent_42%)]" />
-        <div className="relative">
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/8 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-[#00ffb4]">
-            Module 3 • {platform} Platform
-          </div>
-          <h2 className="mt-5 text-3xl font-black tracking-tight text-white md:text-4xl">
-            {moduleType} Guided Practice
-          </h2>
-          <p className="mt-3 max-w-xl text-sm leading-7 text-[#9fb0ca]">
-            Each task now begins with an instruction card covering the correct procedure, safety checks, expected result, and common mistakes. Follow CPU → first RAM → second RAM → SSD → populated motherboard → PSU → HDD → GPU. The case stays flat and open-side-up during installation, and magnetic capture uses a collision-safe lift-over-lower path before the completed chassis rotates upright.
-          </p>
-
-          <div className="mt-6 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4">
-              <div className="text-xs font-black uppercase tracking-[0.16em] text-[#00ffb4]">1. Identify</div>
-              <div className="mt-2 text-xs leading-5 text-[#9fb0ca]">
-                Read the step card first, then identify the highlighted component and its destination host: motherboard or flat case.
-              </div>
-            </div>
-            <div className="rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4">
-              <div className="text-xs font-black uppercase tracking-[0.16em] text-[#00ffb4]">2. Move</div>
-              <div className="mt-2 text-xs leading-5 text-[#9fb0ca]">
-                Perform the listed preparation and handling checks, then click-hold to lift and carry the component toward the host field.
-              </div>
-            </div>
-            <div className="rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4">
-              <div className="text-xs font-black uppercase tracking-[0.16em] text-[#00ffb4]">3. Complete</div>
-              <div className="mt-2 text-xs leading-5 text-[#9fb0ca]">
-                Verify the final seated position against the card’s checklist before continuing to the next instruction guide.
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-7 flex flex-wrap items-center justify-between gap-4">
-            <div className="text-xs text-[#7a8ba8]">
-              Left-drag moves • right-drag rotates • wheel zooms • Esc safely releases • R resets camera
-            </div>
-            <button
-              type="button"
-              onClick={onStart}
-              className="rounded-2xl bg-[#00ffb4] px-7 py-3 text-sm font-black text-[#07111d] shadow-[0_16px_45px_rgba(0,255,180,0.25)] transition hover:scale-[1.03]"
-            >
-              Start Guided Practice →
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 
 function StepInstructionCard({
   platform,
@@ -2782,7 +2735,7 @@ function CompletionCertificate({
   const alternatePlatform = platform === "AMD" ? "INTEL" : "AMD";
 
   return (
-    <div className="min-h-screen w-full overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased print:bg-white">
+    <div className="articton-module-theme min-h-screen w-full overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased print:bg-white">
       <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden px-5 py-8">
         <ModuleBackground />
         <div className="relative z-10 w-full max-w-4xl overflow-hidden rounded-[34px] border border-[#00ffb4]/35 bg-[#0d1220]/94 p-7 text-center shadow-[0_40px_120px_rgba(0,0,0,0.65)] backdrop-blur-xl md:p-12 print:border-black print:bg-white print:text-black print:shadow-none">
@@ -2864,9 +2817,10 @@ export default function Module3AssemblyAMD({
   onLogout,
   onSwitchPlatform,
 }) {
-  const [step, setStep] = useState(0);
-  const [completedParts, setCompletedParts] = useState([]);
-  const [finalRoundCompletedParts, setFinalRoundCompletedParts] = useState([]);
+  const [checkpoint] = useState(() => getPracticeCheckpoint(auth.currentUser?.uid, "module-3-amd", steps, ASSEMBLY_SEQUENCE));
+  const [step, setStep] = useState(checkpoint.step);
+  const [completedParts, setCompletedParts] = useState(checkpoint.completedParts);
+  const [finalRoundCompletedParts, setFinalRoundCompletedParts] = useState(checkpoint.finalRoundCompletedParts);
   const [sceneRevision, setSceneRevision] = useState(0);
   const [firebaseUser, setFirebaseUser] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -2876,9 +2830,9 @@ export default function Module3AssemblyAMD({
   const viewerLeftOffset = effectiveSidebarOpen ? "clamp(220px, 22vw, 280px)" : "64px";
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showCertificate, setShowCertificate] = useState(false);
-  const [showIntro, setShowIntro] = useState(true);
+  const [showIntro, setShowIntro] = useState(checkpoint.showIntro);
   const [showFinalCompletionCard, setShowFinalCompletionCard] = useState(false);
-  const [instructionStepIndex, setInstructionStepIndex] = useState(null);
+  const [instructionStepIndex, setInstructionStepIndex] = useState(checkpoint.showIntro ? null : checkpoint.step);
   const [validationMessage, setValidationMessage] = useState(
     "Begin with the CPU. Lift it from the table and move it toward the motherboard socket; the safe-path magnetic field will align and lower it vertically."
   );
@@ -2938,6 +2892,15 @@ export default function Module3AssemblyAMD({
       ),
     [completedParts, finalRoundComplete]
   );
+
+  useEffect(() => {
+    recordModuleVisit(firebaseUser?.uid, {
+      route: "module-3-amd",
+      activity: "AMD" + " · " + (showIntro ? "Assembly introduction" : currentStep.name),
+      progress: Math.round(Object.values(effectiveCompletedSteps).filter(Boolean).length / steps.length * 100),
+      snapshot: { step, completedParts, finalRoundCompletedParts, showIntro },
+    });
+  }, [firebaseUser?.uid, step, completedParts, finalRoundCompletedParts, showIntro, currentStep.name, effectiveCompletedSteps]);
 
   const currentStepCompleted = isFinalRound
     ? finalRoundComplete
@@ -3272,7 +3235,7 @@ export default function Module3AssemblyAMD({
   }
 
   return (
-      <div className="fixed inset-0 h-screen w-screen overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased">
+      <div className="articton-guided-module articton-module-theme fixed inset-0 h-screen w-screen overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased">
       <div className="relative h-full w-full overflow-hidden">
         <ModuleBackground />
         <AchievementToast achievement={achievementToast} onClose={() => setAchievementToast(null)} />

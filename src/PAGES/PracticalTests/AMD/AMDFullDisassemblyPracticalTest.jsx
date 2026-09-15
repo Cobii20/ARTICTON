@@ -1855,6 +1855,8 @@ function ModuleBackground() {
 function ChecklistSidebar({ open, onToggle, completedParts, checklistOrder, onResetScene }) {
   return (
     <div
+      data-step-sidebar
+      data-collapsed={!open}
       className={[
         "absolute left-0 top-0 z-[200] h-full transition-all duration-300",
         open ? "w-[clamp(220px,22vw,280px)]" : "w-[64px]",
@@ -1873,11 +1875,11 @@ function ChecklistSidebar({ open, onToggle, completedParts, checklistOrder, onRe
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-3 pr-2 [scrollbar-color:rgba(255,212,28,0.35)_rgba(255,255,255,0.05)] [scrollbar-width:thin]">
+        <div data-step-list style={{ scrollbarGutter: open ? "stable" : "stable both-edges" }} className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-3 pr-2 [scrollbar-color:rgba(255,212,28,0.35)_rgba(255,255,255,0.05)] [scrollbar-width:thin]">
           {(checklistOrder || REMOVAL_SEQUENCE).map((key, index) => {
             const done = completedParts.includes(key);
             return (
-              <div key={key} className={["flex w-full items-center gap-3 rounded-2xl border px-3 py-3 text-left transition", done ? "border-[#FFD41C]/25 bg-[#FFD41C]/10" : "border-[#1a2438] bg-white/[0.03]"].join(" ")}>
+              <div key={key} data-step-button title={!open ? `Step ${index + 1}` : undefined} className={["flex w-full items-center gap-3 rounded-2xl border px-3 py-3 text-left transition", done ? "border-[#FFD41C]/25 bg-[#FFD41C]/10" : "border-[#1a2438] bg-white/[0.03]"].join(" ")}>
                 <span className={["flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold transition", done ? "bg-[#FFD41C] text-[#0a0e17]" : "border border-[#1a2438] bg-[#0d1220] text-[#7a8ba8]"].join(" ")}>{index + 1}</span>
                 {open ? (
                   <div className="min-w-0">

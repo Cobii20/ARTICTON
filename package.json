@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --test tests/authentication.cjs tests/settings.mjs tests/module-visits.mjs",
+    "test:rules": "node --test tests/firestore-rules.mjs tests/storage-rules.mjs"
   },
   "dependencies": {
     "@emailjs/browser": "^4.4.1",
@@ -23,6 +25,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@tailwindcss/vite": "^4.2.2",
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",

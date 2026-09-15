@@ -1,7 +1,7 @@
+import { getModuleVisit, recordModuleVisit } from "./utils/moduleVisits";
 import { useCallback, useEffect, useState } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { httpsCallable } from "firebase/functions";
-import { auth, functions } from "./firebase";
+import { auth } from "./firebase";
 
 // Main pages
 import ArtictonLandingPage from "./PAGES/LandingPage";
@@ -30,6 +30,7 @@ import {
 } from "./utils/userSettings";
 
 export default function App() {
+  const [resumeVisit, setResumeVisit] = useState(null);
   const [page, setPage] = useState("landing");
   const [userProfile, setUserProfile] = useState(null);
   const [dashboardSection, setDashboardSection] = useState("Dashboard");
@@ -67,20 +68,12 @@ export default function App() {
 
   const resetApplicationState = useCallback(() => {
     setUserProfile(null);
+    setProfileEditRequestId(0);
     setDashboardSection("Dashboard");
     setPage("landing");
   }, []);
 
   const handleLogout = async () => {
-    try {
-      if (auth.currentUser) {
-        const endOtpSession = httpsCallable(functions, "endOtpSession");
-        await endOtpSession({});
-      }
-    } catch (error) {
-      console.warn("Could not delete OTP session:", error);
-    }
-
     try {
       await signOut(auth);
     } catch (error) {
@@ -99,6 +92,12 @@ export default function App() {
 
     return unsubscribe;
   }, [resetApplicationState]);
+
+  useEffect(() => {
+    if (page === "module-2" || page === "module-3") {
+      recordModuleVisit(auth.currentUser?.uid, { route: page, activity: "Platform selection" });
+    }
+  }, [page]);
 
   const handleModuleBack = (target = "Dashboard") => {
     if (target === "logout") {
@@ -136,6 +135,7 @@ export default function App() {
   if (page === "module-1") {
     return (
       <Module1Page
+        resumeVisit={resumeVisit}
         onBack={handleModuleBack}
         onLogout={handleLogout}
       />
@@ -226,6 +226,7 @@ export default function App() {
     <Dashboard
       initialSection={dashboardSection}
       profileEditRequestId={profileEditRequestId}
+      onProfileEditRequestHandled={() => setProfileEditRequestId(0)}
       onLogout={handleLogout}
       onOpenModule={(module) => {
         const id = typeof module === "object" ? module.id : module;
@@ -241,6 +242,7 @@ export default function App() {
           "module-4": "module-4",
         };
 
+        setResumeVisit(typeof module === "object" && module.resume ? getModuleVisit(auth.currentUser?.uid, id) : null);
         const nextPage = pageByModuleId[id];
         if (nextPage) setPage(nextPage);
       }}
