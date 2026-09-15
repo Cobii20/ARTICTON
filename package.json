@@ -8,8 +8,9 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "node --test tests/authentication.cjs tests/settings.mjs tests/module-visits.mjs",
-    "test:rules": "node --test tests/firestore-rules.mjs tests/storage-rules.mjs"
+    "test": "node --test tests/authentication.cjs tests/settings.mjs tests/module-visits.mjs tests/question-banks.mjs",
+    "test:rules": "node --test tests/firestore-rules.mjs tests/storage-rules.mjs tests/question-bank-rules.mjs",
+    "sync:questions": "node scripts/import-mobile-question-defaults.mjs"
   },
   "dependencies": {
     "@emailjs/browser": "^4.4.1",

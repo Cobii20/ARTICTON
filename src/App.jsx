@@ -58,7 +58,7 @@ export default function App() {
 
     if (role === "admin") {
       setPage("admin");
-    } else if (role === "faculty") {
+    } else if (role === "faculty" || role === "staff") {
       setPage("faculty");
     } else {
       setDashboardSection("Dashboard");
@@ -219,7 +219,7 @@ export default function App() {
   }
 
   if (page === "faculty") {
-    return <FacultyPage onLogout={handleLogout} />;
+    return <FacultyPage questionEditorOnly={String(userProfile?.role || "").trim().toLowerCase() === "staff"} onLogout={handleLogout} />;
   }
 
   return (

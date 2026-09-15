@@ -1,3 +1,4 @@
+import QuestionWorkspace from "../Components/QuestionWorkspace";
 import React, { useEffect, useMemo, useState } from "react";
 import { ChevronDown, LogOut, Settings as SettingsIcon } from "lucide-react";
 import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
@@ -261,7 +262,7 @@ function StatusPill({ status, passed }) {
   );
 }
 
-export default function FacultyPage({ onLogout }) {
+export default function FacultyPage({ onLogout, questionEditorOnly = false }) {
   const [students, setStudents] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStudentId, setSelectedStudentId] = useState(null);
@@ -273,7 +274,7 @@ export default function FacultyPage({ onLogout }) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [settings, setSettings] = useState(getUserSettings);
-  const [activeTab, setActiveTab] = useState("progress");
+  const [activeTab, setActiveTab] = useState(questionEditorOnly ? "questions" : "progress");
 
   const handleSettingChange = (key, value) => {
     setSettings((previous) => ({ ...previous, [key]: value }));
@@ -295,7 +296,8 @@ export default function FacultyPage({ onLogout }) {
           console.error("Error loading faculty profile:", profileError);
           setFacultyProfile({ uid: currentUser.uid, email: currentUser.email, role: "faculty" });
         }
-        fetchStudents();
+        if (!questionEditorOnly) fetchStudents();
+        else setLoading(false);
       } else {
         setStudents([]);
         setSelectedStudentId(null);
@@ -305,7 +307,7 @@ export default function FacultyPage({ onLogout }) {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [questionEditorOnly]);
 
   const fetchStudents = async () => {
     try {
@@ -385,13 +387,13 @@ export default function FacultyPage({ onLogout }) {
         <div className="mb-8 flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
           <div>
             <div className="text-sm uppercase tracking-[0.25em] text-[#FFD41C]/70">
-              Faculty Dashboard
+              {questionEditorOnly ? "Staff Dashboard" : "Faculty Dashboard"}
             </div>
             <h1 className="mt-4 text-4xl font-black tracking-tight">
-              {activeTab === "progress" ? "Class progress overview" : "Mobile module editor"}
+              {activeTab === "questions" ? "Question Editor" : activeTab === "progress" ? "Class progress overview" : "Mobile module editor"}
             </h1>
             <p className="mt-4 max-w-2xl text-sm leading-7 text-[#9fb0c9]">
-              {activeTab === "progress"
+              {activeTab === "questions" ? "Propose question updates and track administrator review." : activeTab === "progress"
                 ? "Review student performance, open profiles, check completion status, and stay on top of class progress."
                 : "Create Firestore module content edits for the Flutter app and send them to admin approval."}
             </p>
@@ -399,6 +401,7 @@ export default function FacultyPage({ onLogout }) {
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <div className="flex rounded-2xl border border-[#1a2438] bg-[#0b1220] p-1">
+              {!questionEditorOnly && <>
               <button
                 type="button"
                 onClick={() => setActiveTab("progress")}
@@ -423,6 +426,8 @@ export default function FacultyPage({ onLogout }) {
               >
                 Module Content
               </button>
+              </>}
+              <button type="button" onClick={() => setActiveTab("questions")} className={["rounded-xl px-4 py-2 text-sm font-semibold transition", activeTab === "questions" ? "bg-[#FFD41C] text-[#0a0e17]" : "text-[#9fb0c9] hover:text-white"].join(" ")}>Question Editor</button>
             </div>
             <div className="relative z-[1010]">
               <button
@@ -483,7 +488,9 @@ export default function FacultyPage({ onLogout }) {
           </div>
         </div>
 
-        {activeTab === "content" ? (
+        {activeTab === "questions" ? (
+          <QuestionWorkspace user={user} />
+        ) : activeTab === "content" ? (
           <ModuleContentWorkspace mode="faculty" user={user} />
         ) : (
         <div className="grid gap-4 xl:grid-cols-[1.45fr_0.9fr]">

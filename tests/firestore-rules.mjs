@@ -50,5 +50,12 @@ test('answer keys and obsolete OTP documents remain private',async()=>{
  for(const path of ['assessment_answer_keys/test','otp_sessions/student','otp_challenges/student']) await assertFails(getDoc(doc(db('student'),path)));
 });
 test('support request accepts authenticated user payload',async()=>{
- await assertSucceeds(setDoc(doc(collection(db('student'),'supportTickets')),{name:'Student Test',email:'student@example.com',subject:'Test',message:'Test message',screenshotURL:'',status:'open',createdAt:serverTimestamp()}));
+ const ticket = doc(db('student'),'supportTickets/test-ticket');
+ await assertSucceeds(setDoc(ticket,{name:'Student Test',email:'student@example.com',subject:'Test',message:'Test message',screenshotURL:'',status:'open',createdAt:serverTimestamp()}));
+ await assertFails(getDoc(ticket));
+ await assertFails(updateDoc(ticket,{status:'resolved'}));
+ await assertSucceeds(getDoc(doc(db('admin'),'supportTickets/test-ticket')));
+ await assertSucceeds(updateDoc(doc(db('admin'),'supportTickets/test-ticket'),{status:'in_progress'}));
+ await assertSucceeds(updateDoc(doc(db('admin'),'supportTickets/test-ticket'),{status:'resolved'}));
+ await assertFails(updateDoc(doc(db('admin'),'supportTickets/test-ticket'),{subject:'Changed'}));
 });

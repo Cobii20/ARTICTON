@@ -407,30 +407,32 @@ exports.startAssessment = onCall(async (request) => {
     .doc(`assessment_definitions/${activityId}`)
     .get();
 
-  if (!definitionSnapshot.exists || definitionSnapshot.data().active !== true) {
+  const knownAssessment = /^(module_[1-4]_(pre|post)_test|practice_exam_[12])$/.test(activityId);
+  if ((!definitionSnapshot.exists && !knownAssessment) || (definitionSnapshot.exists && definitionSnapshot.data().active !== true)) {
     throw new HttpsError("not-found", "Assessment not found or unavailable.");
   }
+  const definition = definitionSnapshot.data() || {};
 
-  const questionsSnapshot = await db
-    .collection(`assessment_questions/${activityId}/questions`)
-    .orderBy("order")
-    .get();
-
-  if (questionsSnapshot.empty) {
-    throw new HttpsError(
-      "failed-precondition",
-      "This assessment has no questions."
-    );
+  const bankSnapshot = await db.doc(`published_question_banks/${activityId}`).get();
+  const bank = bankSnapshot.data();
+  if (!bankSnapshot.exists || !Array.isArray(bank.questions) || !bank.questions.length || !Number.isInteger(bank.revision)) {
+    throw new HttpsError("failed-precondition", "This assessment has no published questions.");
   }
-
-  const questions = questionsSnapshot.docs.map((questionDocument) => ({
-    id: questionDocument.id,
-    ...questionDocument.data(),
-  }));
+  const questionSnapshot = bank.questions.map((question, index) => {
+    if (typeof question.text !== "string" || !question.text.trim() || !Array.isArray(question.options)
+      || question.options.length < 2 || question.options.length > 4
+      || question.options.some((option) => typeof option !== "string" || !option.trim())
+      || !Number.isInteger(question.correctAnswerIndex) || question.correctAnswerIndex < 0
+      || question.correctAnswerIndex >= question.options.length || typeof question.explanation !== "string") {
+      throw new HttpsError("failed-precondition", "The published question bank needs correction.");
+    }
+    return { ...question, id: String(index) };
+  });
+  const questions = questionSnapshot.map(({ id, text, options }) => ({ id, text, options }));
 
   const attemptRef = db.collection(`users/${uid}/assessment_attempts`).doc();
   const durationMinutes = Number(
-    definitionSnapshot.data().durationMinutes || 30
+    definition.durationMinutes || 30
   );
 
   await attemptRef.set({
@@ -439,6 +441,13 @@ exports.startAssessment = onCall(async (request) => {
     activityId,
     status: "in_progress",
     questionIds: questions.map((question) => question.id),
+    questionSnapshot,
+    bankRevision: bank.revision,
+    passingPercentage: Number(definition.passingPercentage || 75),
+    scoreCollection:
+      definition.scoreCollection === "practice_scores" || activityId.startsWith("practice_exam_")
+        ? "practice_scores"
+        : "module_scores",
     startedAt: admin.firestore.FieldValue.serverTimestamp(),
     expiresAt: admin.firestore.Timestamp.fromMillis(
       Date.now() + durationMinutes * 60 * 1000
@@ -448,6 +457,7 @@ exports.startAssessment = onCall(async (request) => {
   return {
     attemptId: attemptRef.id,
     activityId,
+    revision: bank.revision,
     questions,
   };
 });
@@ -502,29 +512,22 @@ exports.submitAssessment = onCall(async (request) => {
 
   const activityId = attempt.activityId;
   const questionIds = attempt.questionIds || [];
-  const answerKeySnapshots = await Promise.all(
-    questionIds.map((questionId) =>
-      db.doc(`assessment_answer_keys/${activityId}/questions/${questionId}`).get()
-    )
-  );
-
   let correctCount = 0;
-
-  answerKeySnapshots.forEach((answerKeySnapshot, index) => {
-    if (!answerKeySnapshot.exists) {
-      throw new HttpsError(
-        "failed-precondition",
-        "An assessment answer key is missing."
-      );
-    }
-
-    const questionId = questionIds[index];
-    const correctAnswer = answerKeySnapshot.data().correctAnswer;
-
-    if (submittedAnswers[questionId] === correctAnswer) {
-      correctCount += 1;
-    }
-  });
+  if (Array.isArray(attempt.questionSnapshot)) {
+    // Grade against this attempt's immutable snapshot, never the latest bank.
+    correctCount = attempt.questionSnapshot.filter((question) =>
+      submittedAnswers[question.id] === question.correctAnswerIndex
+    ).length;
+  } else {
+    // Preserve attempts started before published-bank snapshots were introduced.
+    const answerKeySnapshots = await Promise.all(questionIds.map((questionId) =>
+      db.doc(`assessment_answer_keys/${activityId}/questions/${questionId}`).get()
+    ));
+    answerKeySnapshots.forEach((answerKeySnapshot, index) => {
+      if (!answerKeySnapshot.exists) throw new HttpsError("failed-precondition", "An assessment answer key is missing.");
+      if (submittedAnswers[questionIds[index]] === answerKeySnapshot.data().correctAnswer) correctCount += 1;
+    });
+  }
 
   const totalQuestions = questionIds.length;
   const scorePercentage =
@@ -533,7 +536,7 @@ exports.submitAssessment = onCall(async (request) => {
     .doc(`assessment_definitions/${activityId}`)
     .get();
   const definition = definitionSnapshot.data() || {};
-  const passingPercentage = Number(definition.passingPercentage || 75);
+  const passingPercentage = Number(attempt.passingPercentage ?? definition.passingPercentage ?? 75);
   const result = {
     correctCount,
     totalQuestions,
@@ -541,7 +544,9 @@ exports.submitAssessment = onCall(async (request) => {
     passed: scorePercentage >= passingPercentage,
   };
   const scoreCollection =
-    definition.scoreCollection === "practice_scores"
+    attempt.scoreCollection === "practice_scores" ||
+    definition.scoreCollection === "practice_scores" ||
+    activityId.startsWith("practice_exam_")
       ? "practice_scores"
       : "module_scores";
   const scoreRef = db.doc(`users/${uid}/${scoreCollection}/${attemptId}`);

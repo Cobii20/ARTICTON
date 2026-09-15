@@ -121,6 +121,12 @@ service cloud.firestore {
         && request.resource.data.createdAt == request.time;
     }
 
+    function isValidSupportTicketUpdate() {
+      return isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status"])
+        && request.resource.data.status in ["open", "in_progress", "resolved"];
+    }
+
     function isValidModuleChangeRequest() {
       return isFaculty()
         && request.resource.data.keys().hasOnly([
@@ -182,6 +188,94 @@ service cloud.firestore {
         && request.resource.data.createdAt == request.time;
     }
 
+    // Question requests contain complete proposed banks; only admin review publishes them.
+    function isQuestionEditor() {
+      return signedIn() && userRole() in ["faculty", "Faculty", "FACULTY", "staff", "Staff", "STAFF"];
+    }
+
+    function validAssessmentId(id) {
+      return id in ["module_1_pre_test", "module_1_post_test", "module_2_pre_test", "module_2_post_test",
+        "module_3_pre_test", "module_3_post_test", "module_4_pre_test", "module_4_post_test",
+        "practice_exam_1", "practice_exam_2"];
+    }
+
+    function publishedRevision(id) {
+      let path = /databases/$(database)/documents/published_question_banks/$(id);
+      return exists(path) ? get(path).data.revision : 0;
+    }
+
+    function validQuestionRequest(data) {
+      return data.keys().hasOnly(["assessmentId", "baseRevision", "questionCount", "before", "questions",
+          "summary", "status", "requestedBy", "createdAt", "reviewedBy", "reviewedAt"])
+        && validAssessmentId(data.assessmentId)
+        && data.baseRevision is int && data.baseRevision >= 0
+        && data.questions is list && data.questions.size() > 0 && data.questions.size() <= 100
+        && data.questionCount is int && data.questionCount == data.questions.size()
+        && data.before is list && data.before.size() == data.questionCount
+        && data.summary is string && data.summary.matches('(?s).*[^ \t\r\n].*') && data.summary.size() <= 5000
+        && data.requestedBy is string && data.createdAt is timestamp
+        && data.status in ["pending", "approved", "rejected"];
+    }
+
+    function validNewQuestionRequest() {
+      let data = request.resource.data;
+      let path = /databases/$(database)/documents/published_question_banks/$(data.assessmentId);
+      return isQuestionEditor() && validQuestionRequest(data)
+        && data.status == "pending" && data.requestedBy == request.auth.uid
+        && data.createdAt == request.time
+        && data.get("reviewedBy", null) == null && data.get("reviewedAt", null) == null
+        && data.baseRevision == publishedRevision(data.assessmentId)
+        && (!exists(path) || data.before == get(path).data.questions);
+    }
+
+    function validQuestionReview(requestId) {
+      let data = request.resource.data;
+      let bank = /databases/$(database)/documents/published_question_banks/$(data.assessmentId);
+      return isAdmin() && validQuestionRequest(data)
+        && data.diff(resource.data).affectedKeys().hasOnly(["status", "reviewedBy", "reviewedAt"])
+        && resource.data.status == "pending" && data.status in ["approved", "rejected"]
+        && data.reviewedBy == request.auth.uid && data.reviewedAt == request.time
+        && (data.status == "rejected" || (
+          data.baseRevision == publishedRevision(data.assessmentId)
+          && getAfter(bank).data.revision == data.baseRevision + 1
+          && getAfter(bank).data.sourceRequestId == requestId
+          && getAfter(bank).data.questions == data.questions
+          && getAfter(bank).data.approvedBy == request.auth.uid
+          && getAfter(bank).data.approvedAt == request.time
+        ));
+    }
+
+    function validPublishedBank(assessmentId) {
+      let data = request.resource.data;
+      let change = /databases/$(database)/documents/question_change_requests/$(data.sourceRequestId);
+      return isAdmin() && validAssessmentId(assessmentId)
+        && data.keys().hasOnly(["questions", "revision", "sourceRequestId", "approvedBy", "approvedAt"])
+        && data.questions is list && data.questions.size() > 0 && data.questions.size() <= 100
+        && data.revision is int && data.revision == publishedRevision(assessmentId) + 1
+        && data.sourceRequestId is string
+        && data.approvedBy == request.auth.uid && data.approvedAt == request.time
+        && get(change).data.status == "pending"
+        && get(change).data.assessmentId == assessmentId
+        && get(change).data.baseRevision == data.revision - 1
+        && getAfter(change).data.status == "approved"
+        && getAfter(change).data.reviewedBy == request.auth.uid
+        && getAfter(change).data.reviewedAt == request.time
+        && getAfter(change).data.questions == data.questions;
+    }
+
+    match /question_change_requests/{requestId} {
+      allow read: if isAdmin() || (isQuestionEditor() && resource.data.requestedBy == request.auth.uid);
+      allow create: if validNewQuestionRequest();
+      allow update: if validQuestionReview(requestId);
+      allow delete: if false;
+    }
+
+    match /published_question_banks/{assessmentId} {
+      allow read: if signedIn();
+      allow create, update: if validPublishedBank(assessmentId);
+      allow delete: if false;
+    }
+
     match /otp_challenges/{uid} {
       allow read, write: if false;
     }
@@ -195,7 +289,9 @@ service cloud.firestore {
     }
 
     match /assessment_questions/{document=**} {
-      allow read: if signedIn();
+      // Legacy source data is not student-facing. New attempts use only the
+      // approved published_question_banks document for their assessment.
+      allow read: if isAdmin() || isQuestionEditor();
       allow write: if isAdmin();
     }
 
@@ -269,7 +365,9 @@ service cloud.firestore {
 
     match /supportTickets/{ticketId} {
       allow create: if isValidSupportTicket();
-      allow read, update, delete: if isAdmin();
+      allow read: if isAdmin();
+      allow update: if isValidSupportTicketUpdate();
+      allow delete: if isAdmin();
     }
 
     match /{document=**} {

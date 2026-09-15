@@ -1,3 +1,5 @@
+import QuestionWorkspace from "../Components/QuestionWorkspace";
+import AdminSupportTickets from "../Components/AdminSupportTickets";
 import React, { useEffect, useMemo, useState } from "react";
 import { db, functions } from "../firebase";
 import {
@@ -8,6 +10,7 @@ import {
   RefreshCw,
   Settings as SettingsIcon,
   ShieldCheck,
+  LifeBuoy,
   UserCog,
 } from "lucide-react";
 import {
@@ -719,6 +722,20 @@ export default function AdminPage({ adminUser, onLogout }) {
               active={activeTab === "content"}
               onClick={() => setActiveTab("content")}
             />
+
+            <AdminNavButton
+              icon={FileText}
+              label="Question Approvals"
+              active={activeTab === "questions"}
+              onClick={() => setActiveTab("questions")}
+            />
+
+            <AdminNavButton
+              icon={LifeBuoy}
+              label="Support Tickets"
+              active={activeTab === "support"}
+              onClick={() => setActiveTab("support")}
+            />
           </div>
         </div>
 
@@ -757,17 +774,25 @@ export default function AdminPage({ adminUser, onLogout }) {
                 ? "Account Management"
                 : activeTab === "analytics"
                 ? "Analytics"
+                : activeTab === "support"
+                ? "Support Tickets"
+                : activeTab === "questions"
+                ? "Question Approvals"
                 : "Module Approvals"}
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-[#9fb0c9]">
-              {activeTab === "content"
-                ? "Review Faculty content requests and publish approved cards to the Flutter mobile app."
+              {activeTab === "support"
+                ? "Review student concerns, open attached screenshots, and update each ticket's status."
+                : activeTab === "questions"
+                ? "Compare faculty question changes with the published bank, then approve or reject each request."
+                : activeTab === "content"
+                ? "Review faculty module content requests and publish approved changes to the mobile app."
                 : "Scores are fetched live from Firebase user documents."}
             </p>
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <div className="flex rounded-2xl border border-[#1a2438] bg-[#0b1220] p-1 lg:hidden">
+            <div className="flex flex-wrap rounded-2xl border border-[#1a2438] bg-[#0b1220] p-1 lg:hidden">
               <button
                 type="button"
                 onClick={() => setActiveTab("accounts")}
@@ -802,7 +827,31 @@ export default function AdminPage({ adminUser, onLogout }) {
                     : "text-[#9fb0c9] hover:text-white",
                 ].join(" ")}
               >
-                Content
+                Modules
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("questions")}
+                className={[
+                  "rounded-xl px-4 py-2 text-sm font-semibold transition",
+                  activeTab === "questions"
+                    ? "bg-[#FFD41C] text-[#0a0e17]"
+                    : "text-[#9fb0c9] hover:text-white",
+                ].join(" ")}
+              >
+                Questions
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("support")}
+                className={[
+                  "rounded-xl px-4 py-2 text-sm font-semibold transition",
+                  activeTab === "support"
+                    ? "bg-[#FFD41C] text-[#0a0e17]"
+                    : "text-[#9fb0c9] hover:text-white",
+                ].join(" ")}
+              >
+                Support
               </button>
             </div>
             <button
@@ -1133,6 +1182,10 @@ export default function AdminPage({ adminUser, onLogout }) {
         {activeTab === "content" && (
           <ModuleContentWorkspace mode="admin" user={adminUser} />
         )}
+
+        {activeTab === "questions" && <QuestionWorkspace mode="admin" user={adminUser} />}
+
+        {activeTab === "support" && <AdminSupportTickets />}
       </main>
     </div>
     </div>
