@@ -1,5 +1,9 @@
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "../firebase";
+import {
+  PRACTICAL_PASSING_PERCENT,
+  normalizePracticalResult,
+} from "./practicalScoring";
 
 export const MOBILE_SCORE_SUBCOLLECTIONS = [
   "module_scores",
@@ -50,18 +54,18 @@ function getScorePercent(data) {
 
   const directNumber = Number(direct);
   if (Number.isFinite(directNumber)) {
-    return Math.max(0, Math.min(100, Math.round(directNumber)));
+    return Math.max(0, Math.min(100, directNumber));
   }
 
   const score = Number(data.score ?? data.latestScore ?? data.finalScore);
   const total = Number(data.total ?? data.latestTotal ?? data.maxScore);
 
   if (Number.isFinite(score) && Number.isFinite(total) && total > 0) {
-    return Math.max(0, Math.min(100, Math.round((score / total) * 100)));
+    return Math.max(0, Math.min(100, (score / total) * 100));
   }
 
   if (Number.isFinite(score) && score >= 0 && score <= 100) {
-    return Math.round(score);
+    return score;
   }
 
   return null;
@@ -145,20 +149,31 @@ function toProgressPayload(data) {
     total: data.total ?? data.latestTotal ?? data.maxScore ?? 100,
     percent: data.percent ?? scorePercent,
     scorePercent,
-    passed: data.passed ?? (scorePercent !== null ? scorePercent >= 60 : false),
+    passed: scorePercent !== null ? scorePercent >= PRACTICAL_PASSING_PERCENT : data.passed === true,
+    status:
+      scorePercent !== null
+        ? scorePercent >= PRACTICAL_PASSING_PERCENT
+          ? "Passed"
+          : "Failed"
+        : data.status,
   };
 }
 
 function toPracticalTestPayload(data) {
-  const scorePercent = getScorePercent(data);
+  const normalized = normalizePracticalResult({
+    ...data,
+    score: data.score ?? data.latestScore ?? data.finalScore ?? getScorePercent(data) ?? 0,
+  });
 
   return {
-    ...data,
-    score: data.score ?? data.latestScore ?? data.finalScore ?? scorePercent ?? 0,
-    grade: data.grade || data.letterGrade || "-",
-    elapsedSeconds: Number(data.elapsedSeconds ?? data.durationSeconds ?? data.timeSeconds ?? 0),
-    wrongOrderCount: Number(data.wrongOrderCount ?? data.wrongOrder ?? 0),
-    fumbleCount: Number(data.fumbleCount ?? data.fumbles ?? 0),
+    ...normalized,
+    grade: normalized.grade || normalized.letterGrade || "-",
+    sequenceDeduction: Number(normalized.sequenceDeduction ?? 0),
+    timeDeduction: Number(normalized.timeDeduction ?? 0),
+    totalDeduction: Number(
+      normalized.totalDeduction ??
+        (Number(normalized.sequenceDeduction ?? 0) + Number(normalized.timeDeduction ?? 0))
+    ),
   };
 }
 

@@ -28,7 +28,7 @@ export const PROCEDURE_DETAILS = {
     {
       title: "Remove storage and memory",
       text:
-        "For SSD (Solid State Drive), remove the M.2 screw or SATA data/power cables depending on the drive type. For HDD (Hard Disk Drive), unplug SATA data and SATA power, remove tray screws, and slide it out. Release RAM (Random Access Memory) by opening DIMM clips and lifting modules straight up.",
+        "Remove the case-mounted HDD (Hard Disk Drive) before lifting the motherboard. For SSD (Solid State Drive), remove the M.2 screw or SATA data/power cables depending on the drive type after the board is on the table. Release RAM (Random Access Memory) by opening DIMM clips and lifting modules straight up.",
     },
     {
       title: "Remove CPU (Central Processing Unit)",
@@ -38,7 +38,7 @@ export const PROCEDURE_DETAILS = {
     {
       title: "Remove PSU and motherboard",
       text:
-        "Unplug the 24-pin ATX motherboard cable, 8-pin EPS CPU cable, SATA power, and any case/front-panel cables. Remove PSU mounting screws, slide the PSU out, then remove motherboard standoff screws and lift the board from the case.",
+        "Unplug the 24-pin ATX motherboard cable, 8-pin EPS CPU cable, SATA power, and any case/front-panel cables. Remove motherboard standoff screws and lift the board from the case before removing the PSU mounting screws and sliding the PSU out.",
     },
   ],
   assembly: [
@@ -60,12 +60,12 @@ export const PROCEDURE_DETAILS = {
     {
       title: "Mount motherboard in the case",
       text:
-        "Check standoff positions, align the rear I/O and screw holes, lower the motherboard into place, then tighten screws evenly without overtightening.",
+        "After the PSU is secured in the case, check standoff positions, align the rear I/O and screw holes, lower the motherboard into place, then tighten screws evenly without overtightening.",
     },
     {
       title: "Install PSU and drives",
       text:
-        "Slide the PSU (Power Supply Unit) into its bay with the fan facing the correct ventilation side. Connect the 24-pin ATX cable, 8-pin EPS CPU cable, SATA power, and storage data cables. Mount the HDD (Hard Disk Drive) in its tray if used.",
+        "Slide the PSU (Power Supply Unit) into its bay with the fan facing the correct ventilation side before mounting the populated motherboard. After the motherboard is installed, mount the HDD (Hard Disk Drive), then connect the 24-pin ATX cable, 8-pin EPS CPU cable, SATA power, and storage data cables.",
     },
     {
       title: "Install GPU and final cables",

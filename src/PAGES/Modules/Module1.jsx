@@ -89,6 +89,11 @@ const COMPONENT_PARTS = {
       definition:
         "High-speed memory inside the CPU that stores frequently used data to reduce processing delays.",
     },
+    {
+      part: "AM4 vs AM5 Package",
+      definition:
+        "AM4 AMD CPUs use visible pins on the processor, while AM5 CPUs use flat contact pads and the socket contains the pins. AM5 also pairs with DDR5 memory.",
+    },
   ],
   motherboard: [
     {
@@ -110,6 +115,16 @@ const COMPONENT_PARTS = {
       part: "Chipset",
       definition:
         "A controller that manages communication between the CPU, storage, USB devices, and expansion components.",
+    },
+    {
+      part: "Form Factor",
+      definition:
+        "Motherboards come in sizes such as ATX, Micro-ATX, and Mini-ITX. Mini-ITX boards are compact, usually with one PCIe x16 slot and two RAM slots.",
+    },
+    {
+      part: "Socket Platform",
+      definition:
+        "AM5 boards use an AMD LGA socket with pins in the socket and DDR5 support. AM4 boards use a PGA socket with holes for CPU pins and DDR4 support.",
     },
   ],
   ram: [
@@ -133,6 +148,16 @@ const COMPONENT_PARTS = {
       definition:
         "A protective cover that helps distribute heat away from memory chips.",
     },
+    {
+      part: "DDR4 / DDR5 Type",
+      definition:
+        "DDR4 and DDR5 modules are not interchangeable. Their notches are in different positions, DDR4 commonly runs around 2133-3200 MT/s, and DDR5 commonly starts around 4800 MT/s.",
+    },
+    {
+      part: "Frequency and Speed",
+      definition:
+        "RAM speed is usually shown as MT/s, such as DDR4-3200 or DDR5-5600. Higher transfer rates can move more data per second, while latency also affects response time.",
+    },
   ],
   ssd: [
     {
@@ -154,6 +179,11 @@ const COMPONENT_PARTS = {
       part: "PCB",
       definition:
         "The printed circuit board connecting all SSD electronic components.",
+    },
+    {
+      part: "SSD Form Factors",
+      definition:
+        "This module uses an M.2 SSD. Other SSD varieties include 2.5-inch SATA drives, mSATA drives, U.2 enterprise drives, and PCIe add-in card SSDs.",
     },
   ],
   hdd: [
@@ -177,6 +207,11 @@ const COMPONENT_PARTS = {
       definition:
         "A mechanism that moves the read/write head across the platter surface.",
     },
+    {
+      part: "HDD Size and Speed",
+      definition:
+        "Desktop HDDs are commonly 3.5-inch drives, while laptops often use 2.5-inch drives. Common spindle speeds include 5400 RPM and 7200 RPM.",
+    },
   ],
   gpu: [
     {
@@ -198,6 +233,16 @@ const COMPONENT_PARTS = {
       part: "PCIe Connector",
       definition:
         "The interface that connects the graphics card to the motherboard.",
+    },
+    {
+      part: "Integrated GPU",
+      definition:
+        "An integrated GPU is built into the CPU or processor package and uses system memory. It is common for basic display output and light workloads.",
+    },
+    {
+      part: "Dedicated GPU",
+      definition:
+        "A dedicated or discrete GPU is a separate graphics card installed in a PCIe slot. It has its own VRAM and is used for gaming, rendering, and GPU-heavy tasks.",
     },
   ],
   psu: [
@@ -221,6 +266,11 @@ const COMPONENT_PARTS = {
       definition:
         "Cables that deliver power to the motherboard, GPU, and storage devices.",
     },
+    {
+      part: "Modularity Types",
+      definition:
+        "Non-modular PSUs have fixed cables, semi-modular PSUs have some fixed and some removable cables, and fully modular PSUs let most or all cables detach.",
+    },
   ],
   case: [
     {
@@ -242,6 +292,11 @@ const COMPONENT_PARTS = {
       part: "Expansion Slots",
       definition:
         "Rear openings that allow installation of expansion cards.",
+    },
+    {
+      part: "Case Size Support",
+      definition:
+        "Cases are matched to motherboard sizes such as ATX, Micro-ATX, and Mini-ITX. A Mini-ITX case is compact and needs a matching board, cooler clearance, and PSU size.",
     },
   ],
 };

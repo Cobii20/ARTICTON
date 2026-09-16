@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import Settings from "../../Components/Settings";
+import ProcedureAssistantBubble from "../../Components/ProcedureAssistantBubble";
 import PlatformChoicePanel from "../../Components/PlatformChoicePanel";
 import { getUserSettings } from "../../utils/userSettings";
 import DisassemblyRAM from "./module3-scenes/DisassemblyRAM";
@@ -1003,7 +1004,20 @@ const askAI = async () => {
                       left: sidebarOpen ? 280 : 64,
                     }}
                   >
-                    <div className="absolute right-5 top-5 z-[500] flex flex-col items-end">
+                    <ProcedureAssistantBubble
+                      mode="disassembly"
+                      platform="General"
+                      currentStep={module3Steps[step]?.name}
+                      open={aiOpen}
+                      messages={aiMessages}
+                      input={aiInput}
+                      loading={aiLoading}
+                      onToggle={() => setAiOpen((value) => !value)}
+                      onInputChange={setAiInput}
+                      onSend={askAI}
+                    />
+
+                    <div className="hidden">
   {!aiOpen && (
     <button
       type="button"

@@ -252,14 +252,14 @@ function Scene({
 
       <OrbitControls
         makeDefault
-        enablePan={false}
+        enablePan={true}
         minDistance={14}
-        maxDistance={80}
+        maxDistance={200}
         target={CONTROL_TARGET}
         maxPolarAngle={Math.PI / 2}
         mouseButtons={{
           LEFT: null,
-          MIDDLE: THREE.MOUSE.DOLLY,
+          MIDDLE: THREE.MOUSE.PAN,
           RIGHT: THREE.MOUSE.ROTATE,
         }}
       />
@@ -780,6 +780,9 @@ export default function PSUtoCase({
   return (
     <Canvas
       shadows
+      dpr={[1, 1.5]}
+      performance={{ min: 0.55 }}
+      gl={{ antialias: true, powerPreference: "high-performance", alpha: false, stencil: false }}
       style={{ width: "100%", height: "100%" }}
       camera={{ position: CAMERA_POSITION, fov: 50 }}
     >

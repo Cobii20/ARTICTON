@@ -5,12 +5,16 @@ import { collection, doc, getDoc, getDocs, query, where } from "firebase/firesto
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "../firebase";
 import { fetchMobileScoreDocs, mergeMobileScoresIntoProfile } from "../utils/mobileScores";
+import {
+  PRACTICAL_PASSING_PERCENT,
+  normalizePracticalResult,
+} from "../utils/practicalScoring";
 import ModuleContentWorkspace from "../Components/ModuleContentWorkspace";
 import AccountProfileModal from "../Components/AccountProfileModal";
 import SettingsModal from "../Components/Settings";
 import { getUserSettings } from "../utils/userSettings";
 
-const PASSING_PERCENT = 60;
+const PASSING_PERCENT = PRACTICAL_PASSING_PERCENT;
 const MODULE_ACTIVITY_GROUPS = [
   { key: "module1", label: "Module 1" },
   { key: "module2", label: "Module 2" },
@@ -21,7 +25,7 @@ const MODULE_ACTIVITY_GROUPS = [
 function clampPercent(value) {
   const number = Number(value);
   if (!Number.isFinite(number)) return null;
-  return Math.max(0, Math.min(100, Math.round(number)));
+  return Math.max(0, Math.min(100, number));
 }
 
 function getQuizStatus(quizProgress, moduleKey) {
@@ -50,9 +54,9 @@ function getQuizStatus(quizProgress, moduleKey) {
     clampPercent(progress.scorePercent ?? progress.percent) ??
     clampPercent(calculatedPercent);
 
-  const passed =
-    progress.passed === true ||
-    (completed && scorePercent !== null && scorePercent >= PASSING_PERCENT);
+  const passed = scorePercent !== null
+    ? scorePercent >= PASSING_PERCENT
+    : progress.passed === true;
 
   return {
     type: "quiz",
@@ -60,7 +64,7 @@ function getQuizStatus(quizProgress, moduleKey) {
     passed,
     scorePercent,
     completionPercent: completed ? 100 : 0,
-    status: completed ? (passed ? "Passed" : "Completed") : "In progress",
+    status: completed ? (passed ? "Passed" : scorePercent !== null ? "Failed" : "Completed") : "In progress",
   };
 }
 
@@ -79,14 +83,13 @@ function getPracticalStatus(practicalProgress, practicalKey) {
     };
   }
 
-  const completed = !!progress.completed;
-  const scorePercent =
-    clampPercent(progress.scorePercent ?? progress.percent) ??
-    (completed ? 100 : null);
+  const normalized = normalizePracticalResult(progress);
+  const completed = !!progress.completed || !!progress.finished || Number.isFinite(Number(normalized.scorePercent));
+  const scorePercent = clampPercent(normalized.scorePercent) ?? (completed ? 100 : null);
 
-  const passed =
-    progress.passed === true ||
-    (completed && scorePercent !== null && scorePercent >= PASSING_PERCENT);
+  const passed = scorePercent !== null
+    ? scorePercent >= PASSING_PERCENT
+    : progress.passed === true;
 
   return {
     type: "practical",
@@ -95,7 +98,12 @@ function getPracticalStatus(practicalProgress, practicalKey) {
     scorePercent,
     progressPercent: completed ? 100 : 0,
     completionPercent: completed ? 100 : 0,
-    status: completed ? (passed ? "Passed" : "Completed") : "In progress",
+    status: completed ? (passed ? "Passed" : scorePercent !== null ? "Failed" : "Completed") : "In progress",
+    elapsedSeconds: Number(normalized.elapsedSeconds ?? 0),
+    wrongOrderCount: Number(normalized.wrongOrderCount ?? 0),
+    sequenceDeduction: Number(normalized.sequenceDeduction ?? 0),
+    timeDeduction: Number(normalized.timeDeduction ?? 0),
+    totalDeduction: Number(normalized.totalDeduction ?? 0),
   };
 }
 
@@ -125,16 +133,25 @@ function getScoreStatus(progress, passingPercent = PASSING_PERCENT) {
     !!progress.completedAt ||
     !!progress.timestamp ||
     scorePercent !== null;
-  const passed =
-    progress.passed === true ||
-    (completed && scorePercent !== null && scorePercent >= passingPercent);
+  const passed = scorePercent !== null
+    ? scorePercent >= passingPercent
+    : progress.passed === true;
 
   return {
     completed,
     passed,
     scorePercent,
     completionPercent: completed ? 100 : 0,
-    status: completed ? (passed ? "Passed" : "Completed") : "In progress",
+    status: completed ? (passed ? "Passed" : scorePercent !== null ? "Failed" : "Completed") : "In progress",
+    elapsedSeconds: Number(progress.elapsedSeconds ?? progress.durationSeconds ?? progress.timeSeconds ?? 0),
+    wrongOrderCount: Number(progress.wrongOrderCount ?? progress.wrongOrder ?? 0),
+    sequenceDeduction: Number(progress.sequenceDeduction ?? progress.orderPenaltyPoints ?? 0),
+    timeDeduction: Number(progress.timeDeduction ?? progress.timePenaltyPoints ?? 0),
+    totalDeduction: Number(
+      progress.totalDeduction ??
+        (Number(progress.sequenceDeduction ?? progress.orderPenaltyPoints ?? 0) +
+          Number(progress.timeDeduction ?? progress.timePenaltyPoints ?? 0))
+    ),
   };
 }
 

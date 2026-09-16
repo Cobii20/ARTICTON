@@ -23,6 +23,7 @@ import { formatTutorReply } from "../../../utils/tutorReply.js";
 import { getUserSettings } from "../../../utils/userSettings";
 import { PDF_BASED_ASSEMBLY_GUIDES } from "../../../utils/pdfBasedInstructionGuides";
 import { useCompactWorkspace } from "../../../hooks/useCompactWorkspace";
+import { ASSEMBLY_STEPS } from "../../../utils/hardwareSequences";
 import {
   GUIDED_ASSEMBLY_CAMERA_PRESET,
   GUIDED_ASSEMBLY_ORBIT_PROPS,
@@ -46,33 +47,7 @@ import {
  * Either RAM module may be selected first; the other RAM module becomes
  * the next required step automatically.
  */
-const steps = [
-  { key: "cpu", name: "Install CPU on Motherboard", partKeys: ["cpu"] },
-  {
-    key: "ramFirst",
-    name: "Install First RAM Module",
-    partKeys: ["ram1", "ram2"],
-    requiredCount: 1,
-    unordered: true,
-  },
-  {
-    key: "ramSecond",
-    name: "Install Second RAM Module",
-    partKeys: ["ram1", "ram2"],
-    requiredCount: 2,
-    unordered: true,
-  },
-  { key: "ssd", name: "Install SSD on Motherboard", partKeys: ["ssd"] },
-  {
-    key: "motherboard",
-    name: "Install Populated Motherboard in Case",
-    partKeys: ["motherboard"],
-  },
-  { key: "psu", name: "Install PSU in Case", partKeys: ["psu"] },
-  { key: "hdd", name: "Install HDD in Case", partKeys: ["hdd"] },
-  { key: "gpu", name: "Install GPU in Case", partKeys: ["gpu"] },
-  { key: "final", name: "Full Assembly", partKeys: [] },
-];
+const steps = ASSEMBLY_STEPS;
 
 const PART_MODELS = [
   { key: "table", path: "/models/AMDtable.glb" },
@@ -121,8 +96,8 @@ const TABLE_STARTS = Object.freeze({
 
 const DEFAULT_SNAP_DISTANCE = 1;
 const DEFAULT_MAGNET_DISTANCE = 7;
-const MAGNETIC_SNAP_MIN_DURATION_MS = 620;
-const MAGNETIC_SNAP_MAX_DURATION_MS = 1800;
+const MAGNETIC_SNAP_MIN_DURATION_MS = 1000;
+const MAGNETIC_SNAP_MAX_DURATION_MS = 2600;
 const MAGNETIC_FIELD_CAPTURE_THRESHOLD = 0.12;
 const MAGNETIC_FIELD_AUTO_CAPTURE_THRESHOLD = 0.46;
 const MAGNETIC_FIELD_MIN_POINTER_TRAVEL_PX = 12;
@@ -131,11 +106,11 @@ const MAGNETIC_FIELD_MAX_PULL = 0.72;
 const MAGNETIC_ROUTE_CAPTURE_RATIO = 0.42;
 const HOST_FIELD_PADDING_RATIO = 0.3;
 const HOST_FIELD_FEATHER_RATIO = 0.58;
-const DRAG_FOLLOW_SPEED = 22;
-const ROTATION_FOLLOW_SPEED = 10;
+const DRAG_FOLLOW_SPEED = 16;
+const ROTATION_FOLLOW_SPEED = 7;
 const TELEMETRY_FRAME_INTERVAL = 3;
 const TELEMETRY_IDLE_FRAME_INTERVAL = 16;
-const CAMERA_FOCUS_DURATION_MS = 760;
+const CAMERA_FOCUS_DURATION_MS = 1100;
 const CASE_GROUND_CLEARANCE = 0.025;
 const CASE_COMPONENT_CLEARANCE_MIN = 0.75;
 const BOARD_COMPONENT_CLEARANCE_MIN = 0.28;
@@ -1366,7 +1341,7 @@ function InteractiveCenteredObject({
 
   const handlePointerDown = useCallback(
     (event) => {
-      if (!isMovablePart) return;
+      if (event.button !== 0 || !isMovablePart) return;
       event.stopPropagation();
       if (!canInteract) {
         if (isCompleted || phaseRef.current === "installed") {
@@ -1394,7 +1369,7 @@ function InteractiveCenteredObject({
 
   const handlePointerOver = useCallback(
     (event) => {
-      if (!isMovablePart) return;
+      if (event.button !== 0 || !isMovablePart) return;
       event.stopPropagation();
       document.body.style.cursor = canInteract ? "grab" : "not-allowed";
     },
@@ -2079,6 +2054,7 @@ function FullTableBirdEyeCamera({
         size: { width: size.width, height: size.height },
         preset: focus.preset || GUIDED_ASSEMBLY_CAMERA_PRESET,
         minDistance: focus.minDistance ?? 12,
+        durationMs: isInitial ? 0 : CAMERA_FOCUS_DURATION_MS,
       });
 
       if (framed) {
@@ -2252,7 +2228,7 @@ function ModelViewer({
           {...GUIDED_ASSEMBLY_ORBIT_PROPS}
           mouseButtons={{
             LEFT: null,
-            MIDDLE: THREE.MOUSE.DOLLY,
+            MIDDLE: THREE.MOUSE.PAN,
             RIGHT: THREE.MOUSE.ROTATE,
           }}
         />
@@ -2689,7 +2665,7 @@ function FullAssemblyCompletionCard({ platform, onReview, onCertificate }) {
                 Your PC Is Fully Assembled
               </h2>
               <p className="mt-3 text-sm leading-7 text-[#9fb0ca]">
-                You completed CPU → both RAM modules → SSD → motherboard → PSU → HDD → GPU without target highlights. Every component used the collision-free lift-over-lower seating path, the required dependencies were enforced, and the completed case animated upright.
+                You completed CPU → both RAM modules → SSD → PSU → motherboard → HDD → GPU without target highlights. Every component used the collision-free lift-over-lower seating path, the required dependencies were enforced, and the completed case animated upright.
               </p>
             </div>
           </div>
@@ -2923,7 +2899,7 @@ export default function Module3AssemblyAMD({
     setShowFinalCompletionCard(false);
     setInstructionStepIndex(null);
     setValidationMessage(
-      "Scene restarted. Follow CPU → either RAM module → the remaining RAM module → SSD → motherboard → PSU → HDD → GPU."
+      "Scene restarted. Follow CPU → either RAM module → the remaining RAM module → SSD → PSU → motherboard → HDD → GPU."
     );
   }, [clearCompletionTimers]);
 
@@ -3116,7 +3092,7 @@ export default function Module3AssemblyAMD({
 
     if (instructionStep?.key === "final") {
       setValidationMessage(
-        "Final round active: install CPU → either RAM → remaining RAM → SSD → populated motherboard → PSU → HDD → GPU. Target highlights are disabled."
+        "Final round active: install CPU → either RAM → remaining RAM → SSD → PSU → populated motherboard → HDD → GPU. Target highlights are disabled."
       );
       return;
     }
@@ -3223,7 +3199,7 @@ export default function Module3AssemblyAMD({
         platform="AMD"
         moduleNumber="3"
         moduleType="Assembly"
-        description="You completed the validated assembly order: CPU, both RAM modules in either order, SSD, motherboard, PSU, HDD, and GPU — including a full unguided repeat pass with collision-free animated magnetic seating and an upright case transition."
+        description="You completed the validated assembly order: CPU, both RAM modules in either order, SSD, PSU, motherboard, HDD, and GPU — including a full unguided repeat pass with collision-free animated magnetic seating and an upright case transition."
         userName={user.name}
         onBack={handleBackToDashboard}
         onSwitchPlatform={() => {

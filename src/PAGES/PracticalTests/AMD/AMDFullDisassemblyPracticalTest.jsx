@@ -15,6 +15,14 @@ import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { AchievementToast, unlockAchievement } from "../../../utils/achievements.jsx";
 import { getUserSettings } from "../../../utils/userSettings";
+import { DISASSEMBLY_PREREQUISITES, DISASSEMBLY_SEQUENCE } from "../../../utils/hardwareSequences";
+import {
+  SEQUENCE_ERROR_PENALTY,
+  TIME_GRACE_SECONDS,
+  calculatePracticalScore,
+  computePracticalGrade,
+  formatDuration,
+} from "../../../utils/practicalScoring";
 import {
   GUIDED_DISASSEMBLY_CAMERA_PRESET,
   GUIDED_DISASSEMBLY_ORBIT_PROPS,
@@ -27,19 +35,19 @@ import {
 /* Differences from the guided Module 2:                              */
 /*   - No instructor-selected one-part prompt. The learner may choose */
 /*     any currently reachable component, while physical dependencies */
-/*     are enforced: GPU first, then the populated motherboard; once  */
-/*     it is on the table, its CPU/SSD/two RAM sticks and the remaining*/
-/*     case parts may be removed in any physically valid order.       */
+/*     are enforced from the PDF-adapted order: PSU first, then HDD,  */
+/*     RAM, GPU, and motherboard. Once it is on the table, the        */
+/*     app-modeled CPU/SSD removals finish the sequence.              */
 /*   - No amber X-ray "click me" highlight, no green ghost target,    */
 /*     no pulsing capture ring, no floating callout label. Only a     */
 /*     neutral cursor change on hover.                                */
 /*   - Only meaningful failed placement attempts are counted live.      */
-/*     Sequence errors and confirmed placement errors reduce the grade. */
+/*     Sequence errors and elapsed time after the grace period reduce the grade. */
 /*   - A results screen replaces the certificate, showing a grade,    */
 /*     total time, and a breakdown of mistakes.                       */
 /* ================================================================== */
 
-const REMOVAL_SEQUENCE = ["gpu", "motherboard", "ssd", "ram1", "ram2", "cpu", "hdd", "psu"];
+const REMOVAL_SEQUENCE = DISASSEMBLY_SEQUENCE;
 const MOTHERBOARD_MOUNTED_PARTS = new Set(["cpu", "ssd", "ram1", "ram2"]);
 
 const PART_MODELS = [
@@ -68,22 +76,11 @@ const COMPONENT_LABELS = {
   motherboard: "Motherboard",
 };
 
-/* Physical dependency map for the practical test. The GPU is removed
-   first so the populated motherboard has a clear extraction path. The
-   motherboard is then transferred intact to the worktable. Only after it
-   is seated there do CPU, SSD, RAM 1, and RAM 2 become independently
-   removable. HDD and PSU also become available at that stage, preserving
-   the test's free-choice rule wherever more than one order is valid. */
-const PREREQUISITES = Object.freeze({
-  gpu: [],
-  motherboard: ["gpu"],
-  cpu: ["motherboard"],
-  ram1: ["motherboard"],
-  ram2: ["motherboard"],
-  ssd: ["motherboard"],
-  hdd: ["motherboard"],
-  psu: ["motherboard"],
-});
+/* Physical dependency map for the practical test. The PDF desktop
+   sequence removes the PSU before drives, RAM, expansion cards, and the
+   motherboard. ARTICTON keeps app-modeled SSD/CPU removals after the
+   motherboard reaches the worktable. */
+const PREREQUISITES = DISASSEMBLY_PREREQUISITES;
 
 /* Final AMD table seats — identical physical targets to the guided module,
    since the test still measures whether the learner can physically dock
@@ -169,11 +166,11 @@ const MAX_LANDING_PULL = 0.94;
 const MAGNETIC_CAPTURE_RATIO = 1.08;
 const RELEASED_MAGNET_SPEED = 8.5;
 const RELEASED_ROTATION_SPEED = 10;
-const MAGNETIC_SNAP_MIN_DURATION_MS = 440;
-const MAGNETIC_SNAP_MAX_DURATION_MS = 1150;
-const DRAG_FOLLOW_SPEED = 26;
-const ROTATION_FOLLOW_SPEED = 10.5;
-const SETTLE_SPEED = 10;
+const MAGNETIC_SNAP_MIN_DURATION_MS = 900;
+const MAGNETIC_SNAP_MAX_DURATION_MS = 2200;
+const DRAG_FOLLOW_SPEED = 18;
+const ROTATION_FOLLOW_SPEED = 7.5;
+const SETTLE_SPEED = 6;
 const WORKSPACE_PADDING_MULTIPLIER = 1.5;
 const TELEMETRY_FRAME_INTERVAL = 3;
 const TELEMETRY_IDLE_FRAME_INTERVAL = 16;
@@ -188,51 +185,15 @@ const MAGNETIC_FIELD_MAX_PULL = 0.76;
 const MAGNETIC_ROUTE_CAPTURE_RATIO = 0.55;
 
 /* -------------------------- Grading rubric ------------------------- */
-/* A fresh test starts at 100. Each mistake type deducts points. The
-   deductions are calibrated so a careful first-time user who reads
-   component names but has no hand-holding can realistically land a B,
-   while a user who genuinely knows the disassembly order and is gentle
-   with placements can reach an A without needing pixel-perfect drags. */
-const PENALTY_WRONG_ORDER_CLICK = 6; // clicked a part that isn't valid yet
-const PENALTY_FUMBLE = 3; // released far from any valid target
+const PENALTY_WRONG_ORDER_CLICK = SEQUENCE_ERROR_PENALTY;
 const ORDER_MISTAKE_DEBOUNCE_MS = 650;
-const TIME_PAR_SECONDS = 480; // 8 minutes "par" time, mirrors a technician SLA
-const PENALTY_PER_OVER_PAR_MINUTE = 2;
 
 function computeGrade(score) {
-  if (score >= 93) return { letter: "A", tone: "Excellent" };
-  if (score >= 85) return { letter: "B", tone: "Solid" };
-  if (score >= 75) return { letter: "C", tone: "Passing" };
-  if (score >= 65) return { letter: "D", tone: "Needs Review" };
-  return { letter: "F", tone: "Retry Recommended" };
+  return computePracticalGrade(score);
 }
 
-function formatDuration(totalSeconds) {
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = Math.floor(totalSeconds % 60);
-  return `${minutes}:${String(seconds).padStart(2, "0")}`;
-}
-
-function calculateScore(wrongOrderCount, fumbleCount, elapsedSeconds) {
-  const safeElapsedSeconds = Math.max(0, Number(elapsedSeconds) || 0);
-  const overParMinutes = Math.max(
-    0,
-    Math.ceil((safeElapsedSeconds - TIME_PAR_SECONDS) / 60)
-  );
-  const orderPenaltyPoints = Math.max(0, wrongOrderCount) * PENALTY_WRONG_ORDER_CLICK;
-  const fumblePenaltyPoints = Math.max(0, fumbleCount) * PENALTY_FUMBLE;
-  const timePenaltyPoints = overParMinutes * PENALTY_PER_OVER_PAR_MINUTE;
-  const totalPenaltyPoints =
-    orderPenaltyPoints + fumblePenaltyPoints + timePenaltyPoints;
-
-  return {
-    score: Math.max(0, Math.min(100, Math.round(100 - totalPenaltyPoints))),
-    overParMinutes,
-    orderPenaltyPoints,
-    fumblePenaltyPoints,
-    timePenaltyPoints,
-    totalPenaltyPoints,
-  };
+function calculateScore(wrongOrderCount, elapsedSeconds) {
+  return calculatePracticalScore({ wrongOrderCount, elapsedSeconds });
 }
 
 
@@ -380,7 +341,7 @@ function PartModel({
   const grabbingRef = useRef(false);
   const completionReportedRef = useRef(false);
   const frameCounterRef = useRef(0);
-  const fumbleCountRef = useRef(0);
+
   const initialDistanceRef = useRef(1);
   const magnetStateRef = useRef("Detach first");
   const magnetNoticeRef = useRef(false);
@@ -901,15 +862,13 @@ function PartModel({
       setPhaseSafely("released");
       magnetStateRef.current = "Released without placement attempt";
       onInteractionMessage(
-        `${COMPONENT_LABELS[part.key]} was released without a meaningful drag. No placement error was recorded.`
+        `${COMPONENT_LABELS[part.key]} was released without a meaningful drag. No score was deducted.`
       );
       publishTelemetry();
       return;
     }
 
-    const nextFumbleCount = fumbleCountRef.current + 1;
-    fumbleCountRef.current = nextFumbleCount;
-    onFumble?.(part.key, { attempt: nextFumbleCount });
+    onFumble?.(part.key, { feedbackOnly: true });
 
     setPhaseSafely("released");
     magnetStateRef.current = "Move toward table field";
@@ -986,7 +945,7 @@ function PartModel({
     const rotationAlpha = 1 - Math.exp(-ROTATION_FOLLOW_SPEED * safeDelta);
     const settleAlpha = 1 - Math.exp(-SETTLE_SPEED * safeDelta);
 
-    // CPU, SSD, and both RAM modules remain physically attached to the
+    // Board-mounted components remain physically attached to the
     // motherboard until their own stage starts. The motherboard publishes its
     // live rigid transform, and mounted parts inherit it around the exact
     // motherboard model pivot. This prevents them from being left floating in
@@ -1367,7 +1326,7 @@ function PartModel({
 
   const handlePointerDown = useCallback(
     (event) => {
-      if (!isMovablePart || !testActive) return;
+      if (event.button !== 0 || !isMovablePart || !testActive) return;
 
       // A populated motherboard and its mounted components overlap in the
       // raycast. Pass-through parts must never stop the event: while the board
@@ -1421,7 +1380,7 @@ function PartModel({
 
   const handlePointerOver = useCallback(
     (event) => {
-      if (!isMovablePart || allowPointerThrough) return;
+      if (event.button !== 0 || !isMovablePart || allowPointerThrough) return;
       event.stopPropagation();
 
       if (!canInteract) {
@@ -1441,6 +1400,8 @@ function PartModel({
     if (!grabbingRef.current) document.body.style.cursor = "default";
   }, []);
 
+  const isRamPart = part.key === "ram1" || part.key === "ram2";
+
   return (
     <>
       <group
@@ -1455,9 +1416,9 @@ function PartModel({
               <mesh>
                 <boxGeometry
                   args={[
-                    Math.max(modelSize.x * 1.12, 0.35),
-                    Math.max(modelSize.y * 1.18, 0.35),
-                    Math.max(modelSize.z * 1.12, 0.35),
+                    Math.max(modelSize.x * (isRamPart ? 2.1 : 1.12), isRamPart ? 1.8 : 0.35),
+                    Math.max(modelSize.y * (isRamPart ? 2.6 : 1.18), isRamPart ? 1.2 : 0.35),
+                    Math.max(modelSize.z * (isRamPart ? 2.0 : 1.12), isRamPart ? 3.8 : 0.35),
                   ]}
                 />
                 <meshBasicMaterial
@@ -1763,7 +1724,7 @@ function ModelViewer({
           makeDefault
           enabled={!isDraggingPart}
           {...GUIDED_DISASSEMBLY_ORBIT_PROPS}
-          mouseButtons={{ LEFT: null, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE }}
+          mouseButtons={{ LEFT: null, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.ROTATE }}
         />
       </Canvas>
 
@@ -1801,25 +1762,14 @@ function HeaderDropdown({ onBack, setIsSettingsOpen, profile }) {
     ? `${profile.firstName || ""} ${profile.lastName || ""}`.trim() || "Profile"
     : "Profile";
   const avatarUrl = profile?.avatarUrl || "";
+  const email = profile?.email || "No email";
+
   const handleBack = () => {
     if (typeof onBack === "function") onBack("Modules");
   };
 
   return (
     <div className="flex flex-wrap items-center justify-end gap-3">
-      <div className="flex max-w-[230px] items-center gap-3 rounded-2xl border border-[#1a2438] bg-[#0d1220]/95 px-3 py-2.5">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[#FFD41C]/25 bg-[#FFD41C]/10 text-sm font-bold uppercase text-[#FFD41C]">
-          {avatarUrl ? (
-            <img src={avatarUrl} alt="Profile" className="h-full w-full object-cover" />
-          ) : (
-            displayName.charAt(0).toUpperCase()
-          )}
-        </span>
-        <span className="min-w-0 leading-tight text-left">
-          <span className="block truncate text-sm font-semibold text-white">{displayName}</span>
-          <span className="block text-[11px] text-[#7a8ba8]">Profile</span>
-        </span>
-      </div>
       <button
         type="button"
         onClick={handleBack}
@@ -1827,13 +1777,39 @@ function HeaderDropdown({ onBack, setIsSettingsOpen, profile }) {
       >
         Go back to Dashboard
       </button>
-      <button
-        type="button"
-        onClick={() => setIsSettingsOpen(true)}
-        className="rounded-2xl border border-[#1a2438] bg-white/[0.03] px-4 py-2.5 text-[13px] font-semibold text-[#dbe6f5] transition hover:bg-white/[0.06]"
-      >
-        Settings
-      </button>
+
+      <details className="articton-profile-menu group relative z-50">
+        <summary className="articton-profile-summary list-none cursor-pointer rounded-2xl border border-[#1a2438] bg-[#0d1220]/95 px-3 py-2.5 transition hover:bg-[#111b2f]">
+          <div className="flex max-w-[230px] items-center justify-end gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[#FFD41C]/25 bg-[#FFD41C]/10 text-sm font-bold uppercase text-[#FFD41C]">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="Profile" className="h-full w-full object-cover" />
+              ) : (
+                displayName.charAt(0).toUpperCase()
+              )}
+            </span>
+            <span className="min-w-0 leading-tight text-left">
+              <span className="block truncate text-sm font-semibold text-white">{displayName}</span>
+              <span className="block text-[11px] text-[#7a8ba8]">Profile</span>
+            </span>
+            <span className="text-sm text-[#7a8ba8] transition group-open:rotate-180">v</span>
+          </div>
+        </summary>
+
+        <div className="absolute right-0 top-full mt-2 z-[220] w-52 rounded-2xl border border-[#1a2438] bg-[#0d1220]/98 p-2 shadow-[0_18px_50px_rgba(0,0,0,0.35)] backdrop-blur-xl">
+          <div className="mb-1 border-b border-[#1a2438] px-4 py-2 text-[11px] leading-5 text-[#7a8ba8]">
+            <div className="truncate font-semibold text-white">{displayName}</div>
+            <div className="truncate">{email}</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsSettingsOpen(true)}
+            className="w-full rounded-xl px-4 py-2 text-left text-sm text-[#dbe6f5] transition hover:bg-white/5"
+          >
+            Settings
+          </button>
+        </div>
+      </details>
     </div>
   );
 }
@@ -1960,7 +1936,7 @@ function TestIntroCard({ onStart }) {
 
 function ResultsCard({ result, onRetry, onBackToDashboard }) {
   const grade = computeGrade(result.score);
-  const isPass = result.score >= 75;
+  const isPass = result.passed;
 
   return (
     <div
@@ -1987,7 +1963,10 @@ function ResultsCard({ result, onRetry, onBackToDashboard }) {
             </div>
             <div className="min-w-0">
               <div className="text-[11px] font-black uppercase tracking-[0.24em] text-[#FFD41C]">{grade.tone}</div>
-              <h2 className="mt-2 text-3xl font-black leading-tight text-white">{result.score} / 100</h2>
+              <h2 className="mt-2 text-3xl font-black leading-tight text-white">{result.score} / {result.startingScore}</h2>
+              <div className="mt-1 text-xs font-bold uppercase tracking-[0.16em] text-[#7a8ba8]">
+                {result.scorePercent.toFixed(1)}% - {result.status}
+              </div>
               <p className="mt-2 text-sm leading-6 text-[#9fb0ca]">
                 {isPass
                   ? "You met the disassembly standard without any step-by-step guidance."
@@ -1996,7 +1975,7 @@ function ResultsCard({ result, onRetry, onBackToDashboard }) {
             </div>
           </div>
 
-          <div className="mt-7 grid gap-3 sm:grid-cols-4">
+          <div className="mt-7 grid gap-3 sm:grid-cols-5">
             <div className="rounded-2xl border border-[#1a2438] bg-white/[0.035] p-4">
               <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#FFD41C]">Time</div>
               <div className="mt-2 text-sm font-bold text-white">{formatDuration(result.elapsedSeconds)}</div>
@@ -2006,20 +1985,21 @@ function ResultsCard({ result, onRetry, onBackToDashboard }) {
               <div className="mt-2 text-sm font-bold text-white">{result.partsCompleted} / {REMOVAL_SEQUENCE.length}</div>
             </div>
             <div className="rounded-2xl border border-[#1a2438] bg-white/[0.035] p-4">
-              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#ff9f7d]">Order Mistakes</div>
-              <div className="mt-2 text-sm font-bold text-white">{result.wrongOrderCount}</div>
+              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#ff9f7d]">Sequence Deduction</div>
+              <div className="mt-2 text-sm font-bold text-white">-{result.sequenceDeduction}</div>
             </div>
             <div className="rounded-2xl border border-[#1a2438] bg-white/[0.035] p-4">
-              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#ffd27d]">Placement Errors</div>
-              <div className="mt-2 text-sm font-bold text-white">{result.fumbleCount}</div>
-              <div className="mt-1 text-[10px] text-[#7a8ba8]">-{result.fumbleCount * PENALTY_FUMBLE} points</div>
+              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#8ec5ff]">Time Deduction</div>
+              <div className="mt-2 text-sm font-bold text-white">-{result.timeDeduction}</div>
+            </div>
+            <div className="rounded-2xl border border-[#1a2438] bg-white/[0.035] p-4">
+              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#FFD41C]">Final Percentage</div>
+              <div className="mt-2 text-sm font-bold text-white">{result.scorePercent.toFixed(1)}%</div>
             </div>
           </div>
 
           <div className="mt-7 rounded-2xl border border-[#FFD41C]/18 bg-[#FFD41C]/6 px-4 py-3 text-xs leading-6 text-[#b7c6dd]">
-            Score starts at 100. Each confirmed sequence error costs {PENALTY_WRONG_ORDER_CLICK} points, each
-            meaningful failed placement costs {PENALTY_FUMBLE} points, and time beyond {Math.round(TIME_PAR_SECONDS / 60)}{" "}
-            minutes costs {PENALTY_PER_OVER_PAR_MINUTE} points per extra minute. Click-release actions without a real drag are ignored. 75+ is a pass.
+            Score starts at {result.startingScore}. Sequence errors deduct {PENALTY_WRONG_ORDER_CLICK} points each, capped at 25 points. Timing has a {formatDuration(TIME_GRACE_SECONDS)} grace period, then deducts 1 point per completed second, capped at 25 points. Placement misses block completion but do not deduct points. 75% or higher is PASSED.
           </div>
 
           <div className="mt-7 flex flex-wrap justify-end gap-3">
@@ -2059,11 +2039,12 @@ export default function AMDFullDisassemblyPracticalTest({ onFinish, onBack }) {
   const [completedParts, setCompletedParts] = useState([]);
   const checklistOrder = REMOVAL_SEQUENCE;
   const [wrongOrderCount, setWrongOrderCount] = useState(0);
-  const [fumbleCount, setFumbleCount] = useState(0);
+
   const completedPartsRef = useRef([]);
   const wrongOrderCountRef = useRef(0);
-  const fumbleCountRef = useRef(0);
+
   const lastOrderMistakeRef = useRef({ partKey: null, timestamp: 0 });
+
   const startedAtRef = useRef(null);
   const finalizationTimerRef = useRef(null);
   const [startedAt, setStartedAt] = useState(null);
@@ -2088,12 +2069,6 @@ export default function AMDFullDisassemblyPracticalTest({ onFinish, onBack }) {
 
   const allComponentsRemoved = completedParts.length === REMOVAL_SEQUENCE.length;
 
-  const liveScoring = calculateScore(
-    wrongOrderCount,
-    fumbleCount,
-    elapsedSeconds
-  );
-
   const handleSettingChange = (key, value) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
   };
@@ -2101,10 +2076,8 @@ export default function AMDFullDisassemblyPracticalTest({ onFinish, onBack }) {
   const resetTest = useCallback(() => {
     setCompletedParts([]);
     setWrongOrderCount(0);
-    setFumbleCount(0);
     completedPartsRef.current = [];
     wrongOrderCountRef.current = 0;
-    fumbleCountRef.current = 0;
     lastOrderMistakeRef.current = { partKey: null, timestamp: 0 };
     startedAtRef.current = null;
     setElapsedSeconds(0);
@@ -2172,11 +2145,21 @@ export default function AMDFullDisassemblyPracticalTest({ onFinish, onBack }) {
             practicalTests: {
               amdDisassembly: {
                 score: finalResult.score,
+                finalScore: finalResult.finalScore,
+                startingScore: finalResult.startingScore,
+                scorePercent: finalResult.scorePercent,
+                percent: finalResult.scorePercent,
+                percentage: finalResult.scorePercent,
+                passed: finalResult.passed,
+                status: finalResult.status,
                 grade: computeGrade(finalResult.score).letter,
                 elapsedSeconds: finalResult.elapsedSeconds,
                 wrongOrderCount: finalResult.wrongOrderCount,
-                fumbleCount: finalResult.fumbleCount,
-                penalizedFumbleCount: finalResult.penalizedFumbleCount,
+                sequenceDeduction: finalResult.sequenceDeduction,
+                orderPenaltyPoints: finalResult.orderPenaltyPoints,
+                timeDeduction: finalResult.timeDeduction,
+                timePenaltyPoints: finalResult.timePenaltyPoints,
+                totalDeduction: finalResult.totalDeduction,
                 completedAt: serverTimestamp(),
               },
             },
@@ -2196,26 +2179,21 @@ export default function AMDFullDisassemblyPracticalTest({ onFinish, onBack }) {
   const finishTest = useCallback(
     (
       finalCompletedParts = completedPartsRef.current,
-      finalWrongOrder = wrongOrderCountRef.current,
-      finalFumbles = fumbleCountRef.current
+      finalWrongOrder = wrongOrderCountRef.current
     ) => {
       const startTimestamp = startedAtRef.current ?? startedAt;
       const finalElapsedSeconds = startTimestamp
         ? (Date.now() - startTimestamp) / 1000
         : 0;
-      const scoring = calculateScore(
-        finalWrongOrder,
-        finalFumbles,
-        finalElapsedSeconds
-      );
+      const scoring = calculateScore(finalWrongOrder, finalElapsedSeconds);
       const score = scoring.score;
       const finalResult = {
+        ...scoring,
         score,
+        finalScore: score,
         elapsedSeconds: finalElapsedSeconds,
         partsCompleted: finalCompletedParts.length,
         wrongOrderCount: finalWrongOrder,
-        fumbleCount: finalFumbles,
-        penalizedFumbleCount: finalFumbles,
       };
 
       setResult(finalResult);
@@ -2260,24 +2238,19 @@ export default function AMDFullDisassemblyPracticalTest({ onFinish, onBack }) {
       setWrongOrderCount(nextCount);
       playMistakeSound(settings.sound);
       setValidationMessage(
-        `${COMPONENT_LABELS[partKey]} is not accessible yet — a prerequisite component must be completed first. (Sequence error ${nextCount}: -${PENALTY_WRONG_ORDER_CLICK} points.)`
+        `${COMPONENT_LABELS[partKey]} is not accessible yet. A prerequisite component is missing.`
       );
     },
     [settings.sound]
   );
 
   const handleFumble = useCallback(
-    (partKey, { attempt = 1 } = {}) => {
-      const nextTotal = fumbleCountRef.current + 1;
-      fumbleCountRef.current = nextTotal;
-      setFumbleCount(nextTotal);
-      playMistakeSound(settings.sound);
-
+    (partKey) => {
       setValidationMessage(
-        `${COMPONENT_LABELS[partKey]} was released outside the magnetic capture field. Placement error ${nextTotal} (attempt ${attempt} for this part): -${PENALTY_FUMBLE} points.`
+        `${COMPONENT_LABELS[partKey]} was released outside the magnetic capture field. Move it closer and try again. No score was deducted.`
       );
     },
-    [settings.sound]
+    []
   );
 
   const handleStartTest = useCallback(() => {
@@ -2342,15 +2315,6 @@ export default function AMDFullDisassemblyPracticalTest({ onFinish, onBack }) {
                       {validationMessage}
                     </div>
                   ) : null}
-
-                  <button
-                    type="button"
-                    onClick={resetTest}
-                    className="rounded-2xl border border-[#1a2438] bg-white/[0.03] px-4 py-2.5 text-sm font-semibold text-[#dbe6f5] transition hover:bg-white/[0.07]"
-                  >
-                    Restart Test
-                  </button>
-
                   <HeaderDropdown onBack={onBack} setIsSettingsOpen={setIsSettingsOpen} profile={profile} />
                 </div>
               </div>
@@ -2368,15 +2332,7 @@ export default function AMDFullDisassemblyPracticalTest({ onFinish, onBack }) {
                 </div>
                 <div className="flex flex-wrap items-center gap-4 text-[11px] font-bold">
                   <span className="text-[#FFD41C]">{completedParts.length} / {REMOVAL_SEQUENCE.length} removed</span>
-                  <span className="text-[#ff9f7d]">
-                    {wrongOrderCount} sequence {wrongOrderCount === 1 ? "error" : "errors"}{liveScoring.orderPenaltyPoints > 0 ? ` (-${liveScoring.orderPenaltyPoints} pts)` : ""}
-                  </span>
-                  <span className="text-[#ffd27d]">
-                    {fumbleCount} placement {fumbleCount === 1 ? "error" : "errors"}{liveScoring.fumblePenaltyPoints > 0 ? ` (-${liveScoring.fumblePenaltyPoints} pts)` : ""}
-                  </span>
-                  <span className="text-[#8ec5ff]">
-                    {formatDuration(elapsedSeconds)} • Score {liveScoring.score} / 100
-                  </span>
+                  <span className="text-[#8ec5ff]">{formatDuration(elapsedSeconds)}</span>
                 </div>
               </div>
             </div>

@@ -21,6 +21,10 @@ import {
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { fetchMobileScoreDocs, mergeMobileScoresIntoProfile } from "../utils/mobileScores";
+import {
+  PRACTICAL_PASSING_PERCENT,
+  normalizePracticalResult,
+} from "../utils/practicalScoring";
 import ModuleContentWorkspace from "../Components/ModuleContentWorkspace";
 import AccountProfileModal from "../Components/AccountProfileModal";
 import SettingsModal from "../Components/Settings";
@@ -59,12 +63,12 @@ const SCORE_ITEMS = [
   { key: "intelAssembly", label: "Intel Asm", field: "intelAssembly" },
 ];
 
-const PASSING_PERCENT = 60;
+const PASSING_PERCENT = PRACTICAL_PASSING_PERCENT;
 
 function clampPercent(value) {
   const number = Number(value);
   if (!Number.isFinite(number)) return null;
-  return Math.max(0, Math.min(100, Math.round(number)));
+  return Math.max(0, Math.min(100, number));
 }
 
 function average(values) {
@@ -150,9 +154,9 @@ function getQuizStatus(quizProgress, moduleKey) {
     clampPercent(progress.scorePercent ?? progress.percent) ??
     clampPercent(calculatedPercent);
 
-  const passed =
-    progress.passed === true ||
-    (completed && scorePercent !== null && scorePercent >= PASSING_PERCENT);
+  const passed = scorePercent !== null
+    ? scorePercent >= PASSING_PERCENT
+    : progress.passed === true;
 
   return {
     type: "quiz",
@@ -163,7 +167,7 @@ function getQuizStatus(quizProgress, moduleKey) {
     total,
     scorePercent,
     completionPercent: completed ? 100 : 0,
-    status: completed ? (passed ? "Passed" : "Completed") : "In progress",
+    status: completed ? (passed ? "Passed" : scorePercent !== null ? "Failed" : "Completed") : "In progress",
     updatedAt: progress.updatedAt ?? null,
     raw: progress,
   };
@@ -187,14 +191,13 @@ function getPracticalStatus(practicalProgress, practicalKey) {
     };
   }
 
-  const completed = !!progress.completed;
+  const normalized = normalizePracticalResult(progress);
+  const completed = !!progress.completed || !!progress.finished || Number.isFinite(Number(normalized.scorePercent));
   const progressPercent =
     clampPercent(progress.progressPercent) ??
     (completed ? 100 : clampPercent(progress.percent) ?? 0);
 
-  const scorePercent =
-    clampPercent(progress.scorePercent ?? progress.percent) ??
-    progressPercent;
+  const scorePercent = clampPercent(normalized.scorePercent) ?? progressPercent;
 
   const mistakes = Number(progress.mistakes || 0);
   const deductionPercent =
@@ -202,9 +205,9 @@ function getPracticalStatus(practicalProgress, practicalKey) {
     clampPercent(mistakes * Number(progress.wrongClickDeduction || 5)) ??
     0;
 
-  const passed =
-    progress.passed === true ||
-    (completed && scorePercent !== null && scorePercent >= PASSING_PERCENT);
+  const passed = scorePercent !== null
+    ? scorePercent >= PASSING_PERCENT
+    : progress.passed === true;
 
   return {
     type: "practical",
@@ -216,9 +219,14 @@ function getPracticalStatus(practicalProgress, practicalKey) {
     completionPercent: progressPercent,
     deductionPercent,
     mistakes,
-    status: completed ? (passed ? "Passed" : "Completed") : "In progress",
+    status: completed ? (passed ? "Passed" : scorePercent !== null ? "Failed" : "Completed") : "In progress",
     updatedAt: progress.updatedAt ?? null,
-    raw: progress,
+    elapsedSeconds: Number(normalized.elapsedSeconds ?? 0),
+    wrongOrderCount: Number(normalized.wrongOrderCount ?? 0),
+    sequenceDeduction: Number(normalized.sequenceDeduction ?? 0),
+    timeDeduction: Number(normalized.timeDeduction ?? 0),
+    totalDeduction: Number(normalized.totalDeduction ?? 0),
+    raw: normalized,
   };
 }
 
@@ -249,9 +257,9 @@ function getScoreStatus(progress, passingPercent = PASSING_PERCENT) {
     !!progress.completedAt ||
     !!progress.timestamp ||
     scorePercent !== null;
-  const passed =
-    progress.passed === true ||
-    (completed && scorePercent !== null && scorePercent >= passingPercent);
+  const passed = scorePercent !== null
+    ? scorePercent >= passingPercent
+    : progress.passed === true;
 
   return {
     exists: true,
@@ -259,7 +267,16 @@ function getScoreStatus(progress, passingPercent = PASSING_PERCENT) {
     passed,
     scorePercent,
     completionPercent: completed ? 100 : 0,
-    status: completed ? (passed ? "Passed" : "Completed") : "In progress",
+    status: completed ? (passed ? "Passed" : scorePercent !== null ? "Failed" : "Completed") : "In progress",
+    elapsedSeconds: Number(progress.elapsedSeconds ?? progress.durationSeconds ?? progress.timeSeconds ?? 0),
+    wrongOrderCount: Number(progress.wrongOrderCount ?? progress.wrongOrder ?? 0),
+    sequenceDeduction: Number(progress.sequenceDeduction ?? progress.orderPenaltyPoints ?? 0),
+    timeDeduction: Number(progress.timeDeduction ?? progress.timePenaltyPoints ?? 0),
+    totalDeduction: Number(
+      progress.totalDeduction ??
+        (Number(progress.sequenceDeduction ?? progress.orderPenaltyPoints ?? 0) +
+          Number(progress.timeDeduction ?? progress.timePenaltyPoints ?? 0))
+    ),
     raw: progress,
   };
 }

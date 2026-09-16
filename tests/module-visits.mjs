@@ -4,6 +4,7 @@ import { Group, Quaternion, Vector3, Euler } from "three";
 import { readFileSync } from "node:fs";
 import { restoreDisassemblyPlacement } from "../src/utils/disassemblyPlacement.js";
 import { recordModuleVisit, getLastModuleVisit, getPracticeCheckpoint } from "../src/utils/moduleVisits.js";
+import { DISASSEMBLY_SEQUENCE, DISASSEMBLY_STEPS } from "../src/utils/hardwareSequences.js";
 
 const storage = new Map();
 globalThis.localStorage = {
@@ -19,20 +20,15 @@ const sequence = ["cpu", "ram1", "ram2"];
 const route = "module-3-amd";
 
 for (const platform of ["AMD", "INTEL"]) {
-  test(`${platform}: resume at SSD keeps GPU and motherboard on the table`, () => {
-    const disassemblySteps = [
-      { key: "gpu", partKeys: ["gpu"] },
-      { key: "motherboard", partKeys: ["motherboard"] },
-      { key: "ssd", partKeys: ["ssd"] },
-      { key: "final", partKeys: [] },
-    ];
+  test(`${platform}: resume at motherboard keeps earlier PDF-order parts on the table`, () => {
     const route = `module-2-${platform.toLowerCase()}`;
-    recordModuleVisit("disassembly-user", { route, activity: "SSD Disassembly", snapshot: {
-      step: 2, completedParts: ["gpu", "motherboard"], finalRoundCompletedParts: [], showIntro: false,
+    const completedParts = ["psu", "hdd", "ram1", "ram2", "gpu"];
+    recordModuleVisit("disassembly-user", { route, activity: "Motherboard Disassembly", snapshot: {
+      step: 4, completedParts, finalRoundCompletedParts: [], showIntro: false,
     } });
-    const checkpoint = getPracticeCheckpoint("disassembly-user", route, disassemblySteps, ["gpu", "motherboard", "ssd"]);
-    assert.equal(checkpoint.step, 2);
-    assert.deepEqual(checkpoint.completedParts, ["gpu", "motherboard"]);
+    const checkpoint = getPracticeCheckpoint("disassembly-user", route, DISASSEMBLY_STEPS, DISASSEMBLY_SEQUENCE);
+    assert.equal(checkpoint.step, 4);
+    assert.deepEqual(checkpoint.completedParts, completedParts);
     const source = readFileSync(new URL(`../src/PAGES/Modules/Module2/Module2Disassmbly${platform}.jsx`, import.meta.url), "utf8");
     for (const part of checkpoint.completedParts) {
       // Exercise actual platform-specific table coordinates with real Three.js transforms.
@@ -47,7 +43,7 @@ for (const platform of ["AMD", "INTEL"]) {
       assert.ok(rotation.quaternion.angleTo(orientation) < 1e-7);
       assert.deepEqual(group.getWorldPosition(new Vector3()).toArray(), coordinates);
     }
-    assert.equal(checkpoint.completedParts.includes("ssd"), false);
+    assert.equal(checkpoint.completedParts.includes("motherboard"), false);
     assert.deepEqual(checkpoint.finalRoundCompletedParts, []);
   });
 }

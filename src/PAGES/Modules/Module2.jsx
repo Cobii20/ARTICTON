@@ -8,6 +8,7 @@ import FullAssemblyScene from "./module2-scenes/FullAssembly";
 import React, { useEffect, useState } from "react";
 import Settings from "../../Components/Settings";
 import PlatformChoicePanel from "../../Components/PlatformChoicePanel";
+import ProcedureAssistantBubble from "../../Components/ProcedureAssistantBubble";
 import { getUserSettings } from "../../utils/userSettings";
 import { auth, db, functions } from "../../firebase.js";
 import { onAuthStateChanged } from "firebase/auth";
@@ -816,7 +817,20 @@ const askAI = async () => {
                       left: sidebarOpen ? 280 : 64,
                     }}
                   >
-                    <div className="absolute right-5 top-5 z-[500] flex flex-col items-end">
+                    <ProcedureAssistantBubble
+                      mode="assembly"
+                      platform="General"
+                      currentStep={module2Steps[step]?.name}
+                      open={aiOpen}
+                      messages={aiMessages}
+                      input={aiInput}
+                      loading={aiLoading}
+                      onToggle={() => setAiOpen((value) => !value)}
+                      onInputChange={setAiInput}
+                      onSend={askAI}
+                    />
+
+                    <div className="hidden">
   {!aiOpen && (
     <button
       type="button"

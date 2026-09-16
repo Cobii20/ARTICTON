@@ -61,6 +61,7 @@ const assemblyBase = {
     summary:
       "The motherboard, also called the system board, is the main printed circuit board. It contains sockets and slots that accept other computer parts.",
     procedure: [
+      "Confirm the PSU is already secured so the case power bay is not blocked later.",
       "Check that the case standoffs match the motherboard mounting holes.",
       "Hold the motherboard by strong edges and align the rear ports with the case opening.",
       "Lower the board onto the standoffs without dragging mounted parts across the case.",
@@ -73,7 +74,7 @@ const assemblyBase = {
     avoid:
       "Forcing rear ports into place, leaving an extra standoff under the board, or tightening one screw before the others start.",
     simulation:
-      "Bring the populated motherboard into the case field. It will lift clear, travel above the chassis, lower vertically, and seat without clipping through case walls.",
+      "After the PSU is installed, bring the populated motherboard into the case field. It will lift clear, travel above the chassis, lower vertically, and seat without clipping through case walls.",
   },
   psu: {
     title: "Prepare to Install the PSU",
@@ -92,7 +93,7 @@ const assemblyBase = {
     avoid:
       "Blocking the intake, trapping cables under the PSU, or letting the unit hang from one screw.",
     simulation:
-      "Move the PSU into the case field. The safe-path animation lifts, clears the chassis edge, lowers into the bay, and preserves the correct orientation.",
+      "Install the PSU before moving the populated motherboard into the case. The safe-path animation lifts, clears the chassis edge, lowers into the bay, and preserves the correct orientation.",
   },
   hdd: {
     title: "Prepare to Install the HDD",
@@ -111,7 +112,7 @@ const assemblyBase = {
     avoid:
       "Forcing a reversed SATA plug, leaving the drive loose, or sharply bending cables at the connectors.",
     simulation:
-      "Guide the HDD into the case field. The animation carries it over obstructions and lowers it into the drive bay.",
+      "Guide the HDD into the case field after the populated motherboard is mounted. The animation carries it over obstructions and lowers it into the drive bay.",
   },
   gpu: {
     title: "Prepare to Install the GPU",
@@ -199,7 +200,7 @@ const disassemblyBase = {
     avoid:
       "Leaving one hidden screw attached or resting the soldered underside on metal.",
     simulation:
-      "Move the whole populated motherboard toward the table. The mounted CPU, SSD, and RAM travel with it and become clickable only after the board is seated.",
+      "Move the motherboard toward the table after the PSU, HDD, RAM, and GPU are already removed. The mounted CPU and SSD travel with it and become clickable only after the board is seated.",
   },
   ssd: {
     title: "Prepare to Remove the SSD",
@@ -318,17 +319,17 @@ export const PDF_BASED_ASSEMBLY_GUIDES = Object.freeze({
       procedure: [
         "Install the CPU and remember the fan and heatsink are needed to reduce processor heat.",
         "Install both RAM modules in the motherboard memory holders, then install solid state storage.",
-        "Install the motherboard, PSU, hard disk drive, and video card in the case.",
+        "Install the PSU, populated motherboard, hard disk drive, and video card in the case.",
         "Before finishing, verify power, storage, expansion-card, and cooling connections.",
       ],
       safety:
         "A correct sequence does not replace inspection. Stop whenever alignment, connector state, or clearance is uncertain.",
       verify:
-        "CPU, both RAM modules, SSD, motherboard, PSU, HDD, and GPU are fully seated; the completed chassis then transitions upright.",
+        "CPU, both RAM modules, SSD, PSU, motherboard, HDD, and GPU are fully seated; the completed chassis then transitions upright.",
       avoid:
         "Using force, skipping a socket or slot check, or forgetting that the PSU powers the computer's internal parts.",
-      simulation:
-        "Complete CPU -> both RAM modules (either first) -> SSD -> motherboard -> PSU -> HDD -> GPU. No target highlights are shown.",
+    simulation:
+      "Complete CPU -> both RAM modules (either first) -> SSD -> PSU -> motherboard -> HDD -> GPU. No target highlights are shown.",
     },
   }),
   intel: Object.freeze({
@@ -341,17 +342,17 @@ export const PDF_BASED_ASSEMBLY_GUIDES = Object.freeze({
       procedure: [
         "Install the CPU and remember the fan and heatsink are needed to reduce processor heat.",
         "Install both RAM modules in the motherboard memory holders, then install solid state storage.",
-        "Install the motherboard, PSU, hard disk drive, and video card in the case.",
+        "Install the PSU, populated motherboard, hard disk drive, and video card in the case.",
         "Before finishing, verify power, storage, expansion-card, and cooling connections.",
       ],
       safety:
         "A correct sequence does not replace inspection. Stop whenever alignment, connector state, or clearance is uncertain.",
       verify:
-        "CPU, both RAM modules, SSD, motherboard, PSU, HDD, and GPU are fully seated; the completed chassis then transitions upright.",
+        "CPU, both RAM modules, SSD, PSU, motherboard, HDD, and GPU are fully seated; the completed chassis then transitions upright.",
       avoid:
         "Using force, skipping a socket or slot check, or forgetting that the PSU powers the computer's internal parts.",
-      simulation:
-        "Complete CPU -> both RAM modules (either first) -> SSD -> motherboard -> PSU -> HDD -> GPU. No target highlights are shown.",
+    simulation:
+      "Complete CPU -> both RAM modules (either first) -> SSD -> PSU -> motherboard -> HDD -> GPU. No target highlights are shown.",
     },
   }),
 });
@@ -365,9 +366,10 @@ export const PDF_BASED_DISASSEMBLY_GUIDES = Object.freeze({
       summary:
         "Disassemble the major hardware components described in the PDF while protecting sockets, slots, storage, power connections, and expansion cards.",
       procedure: [
-        "Remove the video card first, then move the motherboard assembly to the table.",
-        "Remove solid state storage, both RAM modules, and the CPU from the motherboard.",
-        "Finish with the hard disk drive and the power supply unit.",
+        "After the PDF prep actions are complete, remove the power supply unit first.",
+        "Remove the hard disk drive, then remove both RAM modules from the motherboard.",
+        "Remove the expansion card/GPU, then move the motherboard assembly to the table.",
+        "Remove the app-modeled SSD and CPU from the seated motherboard.",
         "Pause before every movement to verify cables, screws, latches, support, and a clear travel path.",
       ],
       safety:
@@ -375,9 +377,9 @@ export const PDF_BASED_DISASSEMBLY_GUIDES = Object.freeze({
       verify:
         "All eight components are safely seated on the table and the validated order has been followed from start to finish.",
       avoid:
-        "Guessing, skipping a latch or cable check, or servicing board-mounted parts before the motherboard is seated.",
+        "Guessing, skipping a latch or cable check, or lifting the motherboard before the PDF-listed case components are removed.",
       simulation:
-        "Complete GPU -> motherboard -> SSD -> both RAM modules (either order) -> CPU -> HDD -> PSU. Magnetic seating remains active, but guide highlights are hidden.",
+        "Complete PSU -> HDD -> both RAM modules (either order) -> GPU -> motherboard -> SSD -> CPU. Magnetic seating remains active, but guide highlights are hidden.",
     },
   }),
   intel: Object.freeze({
@@ -388,9 +390,10 @@ export const PDF_BASED_DISASSEMBLY_GUIDES = Object.freeze({
       summary:
         "Disassemble the major hardware components described in the PDF while protecting sockets, slots, storage, power connections, and expansion cards.",
       procedure: [
-        "Remove the video card first, then move the motherboard assembly to the table.",
-        "Remove solid state storage, both RAM modules, and the CPU from the motherboard.",
-        "Finish with the hard disk drive and the power supply unit.",
+        "After the PDF prep actions are complete, remove the power supply unit first.",
+        "Remove the hard disk drive, then remove both RAM modules from the motherboard.",
+        "Remove the expansion card/GPU, then move the motherboard assembly to the table.",
+        "Remove the app-modeled SSD and CPU from the seated motherboard.",
         "Pause before every movement to verify cables, screws, latches, support, and a clear travel path.",
       ],
       safety:
@@ -398,9 +401,9 @@ export const PDF_BASED_DISASSEMBLY_GUIDES = Object.freeze({
       verify:
         "All eight components are safely seated on the table and the validated order has been followed from start to finish.",
       avoid:
-        "Guessing, skipping a latch or cable check, or servicing board-mounted parts before the motherboard is seated.",
+        "Guessing, skipping a latch or cable check, or lifting the motherboard before the PDF-listed case components are removed.",
       simulation:
-        "Complete GPU -> motherboard -> SSD -> both RAM modules (either order) -> CPU -> HDD -> PSU. Magnetic seating remains active, but guide highlights are hidden.",
+        "Complete PSU -> HDD -> both RAM modules (either order) -> GPU -> motherboard -> SSD -> CPU. Magnetic seating remains active, but guide highlights are hidden.",
     },
   }),
 });

@@ -23,6 +23,10 @@ import {
   getDownloadURL,
 } from "firebase/storage";
 import { fetchMobileScoreDocs, mergeMobileScoresIntoProfile } from "../utils/mobileScores";
+import {
+  PRACTICAL_PASSING_PERCENT,
+  normalizePracticalResult,
+} from "../utils/practicalScoring";
 import { ACHIEVEMENTS } from "../utils/achievements.jsx";
 import { getUserSettings } from "../utils/userSettings";
 import { createProfileImageDataUrl, validateProfileImage } from "../utils/profileImages";
@@ -84,7 +88,7 @@ function formatAchievementScore(result) {
   return Number.isFinite(scorePercent) ? `${Math.round(scorePercent)}%` : "";
 }
 
-function getAchievementStatus(result, passingPercent = 60) {
+function getAchievementStatus(result, passingPercent = PRACTICAL_PASSING_PERCENT) {
   const scorePercent = Number(result?.scorePercent ?? result?.percent ?? result?.percentage ?? result?.score);
   const completed =
     !!result?.completed ||
@@ -93,19 +97,18 @@ function getAchievementStatus(result, passingPercent = 60) {
     !!result?.completedAt ||
     !!result?.timestamp ||
     Number.isFinite(scorePercent);
-  const passed =
-    result?.passed === true ||
-    (completed && Number.isFinite(scorePercent) && scorePercent >= passingPercent);
+  const hasScore = Number.isFinite(scorePercent);
+  const passed = hasScore ? scorePercent >= passingPercent : result?.passed === true;
 
   return {
     completed,
     passed,
     scoreText: Number.isFinite(scorePercent) ? `${Math.round(scorePercent)}%` : "",
-    statusText: passed ? "Passed" : completed ? "Completed" : "Not started",
+    statusText: passed ? "Passed" : completed && hasScore ? "Failed" : completed ? "Completed" : "Not started",
   };
 }
 
-function makeAchievement({ id, icon = "badge", title, subtitle, result, category = "Achievement", passingPercent = 60 }) {
+function makeAchievement({ id, icon = "badge", title, subtitle, result, category = "Achievement", passingPercent = PRACTICAL_PASSING_PERCENT }) {
   const status = getAchievementStatus(result, passingPercent);
   if (result && !status.completed) return null;
 
@@ -461,17 +464,17 @@ const mobileSpecificAssessments = profile?.mobileSpecificAssessments || {};
 const getScorePercent = (result) => {
   if (!result) return null;
   const direct = Number(result.scorePercent ?? result.percent ?? result.percentage);
-  if (Number.isFinite(direct)) return Math.max(0, Math.min(100, Math.round(direct)));
+  if (Number.isFinite(direct)) return Math.max(0, Math.min(100, direct));
 
   const score = Number(result.score ?? result.latestScore ?? result.finalScore);
   const total = Number(result.total ?? result.latestTotal ?? result.maxScore);
   if (Number.isFinite(score) && Number.isFinite(total) && total > 0) {
-    return Math.max(0, Math.min(100, Math.round((score / total) * 100)));
+    return Math.max(0, Math.min(100, (score / total) * 100));
   }
   return null;
 };
 
-const createMobileStatus = (result, passingPercent = 60) => {
+const createMobileStatus = (result, passingPercent = PRACTICAL_PASSING_PERCENT) => {
   const scorePercent = getScorePercent(result);
   const completed =
     !!result?.completed ||
@@ -479,15 +482,13 @@ const createMobileStatus = (result, passingPercent = 60) => {
     !!result?.completedAt ||
     !!result?.timestamp ||
     scorePercent !== null;
-  const passed =
-    result?.passed === true ||
-    (completed && scorePercent !== null && scorePercent >= passingPercent);
+  const passed = scorePercent !== null ? scorePercent >= passingPercent : result?.passed === true;
 
   return {
     completed,
     passed,
     scorePercent,
-    status: completed ? (passed ? "Passed" : "Completed") : "Not started",
+    status: completed ? (passed ? "Passed" : scorePercent !== null ? "Failed" : "Completed") : "Not started",
   };
 };
 
@@ -516,27 +517,30 @@ const mobileLearning = {
 const createTestProgress = (result) => {
   if (!result) return null;
 
-  const score = Number(result.score ?? 0);
+  const normalized = normalizePracticalResult(result);
+  const score = Number(normalized.score ?? 0);
+  const scorePercent = Number(normalized.scorePercent ?? score);
 
   return {
     score,
     total: 100,
-    percent: score,
-    scorePercent: score,
+    percent: scorePercent,
+    scorePercent,
     completionPercent: 100,
-    passed: score >= 75,
-    grade: result.grade || "-",
-    elapsedSeconds: Number(result.elapsedSeconds ?? 0),
-    wrongOrderCount: Number(result.wrongOrderCount ?? 0),
-    fumbleCount: Number(result.fumbleCount ?? 0),
+    passed: normalized.passed,
+    status: normalized.status,
+    grade: normalized.grade || "-",
+    elapsedSeconds: Number(normalized.elapsedSeconds ?? 0),
+    wrongOrderCount: Number(normalized.wrongOrderCount ?? 0),
+    sequenceDeduction: Number(normalized.sequenceDeduction ?? 0),
+    timeDeduction: Number(normalized.timeDeduction ?? 0),
+    totalDeduction: Number(normalized.totalDeduction ?? 0),
   };
 };
 
 const getTestStatus = (result, unlocked) => {
   if (result) {
-    return Number(result.score ?? 0) >= 75
-      ? "Passed"
-      : "Completed";
+    return normalizePracticalResult(result).passed ? "Passed" : "Failed";
   }
 
   return unlocked ? "Ready" : "Locked";
@@ -916,14 +920,22 @@ const assemblyPracticalUnlocked =
             <div
               className={[
                 "articton-sidebar-backdrop fixed inset-0 z-[70] bg-black/45 backdrop-blur-sm transition lg:hidden",
-                isSidebarOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0",
+                isSidebarOpen && !isFullPracticalSection ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0",
               ].join(" ")}
               onClick={() => setIsSidebarOpen(false)}
             />
 
             {/* small-screen close button is inside the sidebar (shown only when sidebar is open) */}
 
-            <div className="articton-dashboard-layout relative grid h-full grid-cols-1 overflow-hidden lg:grid-cols-[290px_minmax(0,1fr)] xl:grid-cols-[310px_minmax(0,1fr)]">
+            <div
+              className={[
+                "articton-dashboard-layout relative grid h-full min-w-0 grid-cols-1 overflow-hidden",
+                isFullPracticalSection
+                  ? "articton-dashboard-layout--practical"
+                  : "lg:grid-cols-[290px_minmax(0,1fr)] xl:grid-cols-[310px_minmax(0,1fr)]",
+              ].join(" ")}
+            >
+              {isFullPracticalSection ? null : (
               <aside
                 className={[
                   "articton-dashboard-sidebar h-full min-h-0 lg:sticky lg:top-3 overflow-auto border-r border-[#1a2438] bg-[#0b1220]/86 backdrop-blur-xl",
@@ -984,12 +996,15 @@ const assemblyPracticalUnlocked =
                   </div>
                 </div>
               </aside>
+              )}
 
-              <main className="h-full overflow-hidden">
+              <main className="h-full min-w-0 overflow-hidden">
                 <div
                   className={[
-                    "articton-dashboard-content grid h-full gap-4 overflow-hidden p-6 lg:p-8",
-                    isFullPracticalSection ? "grid-rows-[1fr]" : "grid-rows-[auto_1fr]",
+                    "articton-dashboard-content grid h-full min-w-0 overflow-hidden",
+                    isFullPracticalSection
+                      ? "articton-dashboard-content--practical grid-rows-[1fr]"
+                      : "grid-rows-[auto_1fr] gap-4 p-6 lg:p-8",
                   ].join(" ")}
                 >
                   {isFullPracticalSection ? null : (
@@ -998,7 +1013,7 @@ const assemblyPracticalUnlocked =
 
                   <div
                     className={[
-                      "scrollArea min-h-0 overflow-auto pr-1",
+                      "scrollArea min-h-0 min-w-0 max-w-none overflow-auto pr-1",
                       isFullPracticalSection ? "h-full overflow-hidden pr-0" : "",
                     ].join(" ")}
                   >
@@ -1050,25 +1065,25 @@ const assemblyPracticalUnlocked =
                         ) : null}
 
                         {section === "AMD Full Assembly Practical" ? (
-                          <PageMotion keyName="amd-full-assembly" reduce={reduce} className="relative h-full min-h-[680px] overflow-hidden">
+                          <PageMotion keyName="amd-full-assembly" reduce={reduce} className="relative h-full min-h-[680px] w-full min-w-0 max-w-none overflow-hidden">
                             <AMDFullAssemblyPracticalTest onBack={backToPracticeTests} />
                           </PageMotion>
                         ) : null}
 
                         {section === "AMD Full Disassembly Practical" ? (
-                          <PageMotion keyName="amd-full-disassembly" reduce={reduce} className="relative h-full min-h-[680px] overflow-hidden">
+                          <PageMotion keyName="amd-full-disassembly" reduce={reduce} className="relative h-full min-h-[680px] w-full min-w-0 max-w-none overflow-hidden">
                             <AMDFullDisassemblyPracticalTest onBack={backToPracticeTests} />
                           </PageMotion>
                         ) : null}
 
                         {section === "INTEL Full Assembly Practical" ? (
-                          <PageMotion keyName="intel-full-assembly" reduce={reduce} className="relative h-full min-h-[680px] overflow-hidden">
+                          <PageMotion keyName="intel-full-assembly" reduce={reduce} className="relative h-full min-h-[680px] w-full min-w-0 max-w-none overflow-hidden">
                             <INTELFullAssemblyPracticalTest onBack={backToPracticeTests} />
                           </PageMotion>
                         ) : null}
 
                         {section === "INTEL Full Disassembly Practical" ? (
-                          <PageMotion keyName="intel-full-disassembly" reduce={reduce} className="relative h-full min-h-[680px] overflow-hidden">
+                          <PageMotion keyName="intel-full-disassembly" reduce={reduce} className="relative h-full min-h-[680px] w-full min-w-0 max-w-none overflow-hidden">
                             <INTELFullDisassemblyPracticalTest onBack={backToPracticeTests} />
                           </PageMotion>
                         ) : null}
@@ -1596,7 +1611,8 @@ function PracticalScoresCard({ tests = [], onViewAll }) {
         <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {completedTests.map((test) => {
             const score = Number(test.progress?.score ?? 0);
-            const passed = score >= 75;
+            const scorePercent = Number(test.progress?.scorePercent ?? score);
+            const passed = scorePercent >= PRACTICAL_PASSING_PERCENT;
 
             return (
               <div
@@ -1629,7 +1645,7 @@ function PracticalScoresCard({ tests = [], onViewAll }) {
                         : "text-yellow-300"
                     }
                   >
-                    {passed ? "Passed" : "Needs Retry"}
+                    {passed ? "Passed" : "Failed"}
                   </span>
                 </div>
 
@@ -1637,7 +1653,7 @@ function PracticalScoresCard({ tests = [], onViewAll }) {
                   <div
                     className="h-full rounded-full bg-[#FFD41C]"
                     style={{
-                      width: `${Math.min(100, Math.max(0, score))}%`,
+                      width: `${Math.min(100, Math.max(0, scorePercent))}%`,
                     }}
                   />
                 </div>
@@ -1681,7 +1697,7 @@ function MobileLearningSummaryCard({ mobileLearning }) {
             <SummaryPill key={module.key} label={module.label.replace("Module ", "M")} status={module.status} passed={module.passed} />
           ))}
           {exams.map((exam, index) => (
-            <SummaryPill key={exam.key} label={`Exam ${index + 1}`} status={exam.passed ? "Passed" : exam.completed ? "Completed" : "Not started"} passed={exam.passed} />
+            <SummaryPill key={exam.key} label={`Exam ${index + 1}`} status={exam.passed ? "Passed" : exam.completed ? "Failed" : "Not started"} passed={exam.passed} />
           ))}
         </div>
       </div>
@@ -1874,6 +1890,10 @@ function AssessmentList({ title, subtitle, items, onOpen, openLabel, retakeLabel
             hasProgress &&
             item.progress.percent !== null &&
             item.progress.percent !== undefined;
+          const hasPracticalDeductions =
+            hasProgress &&
+            (item.progress.sequenceDeduction !== undefined ||
+              item.progress.timeDeduction !== undefined);
 
           const scoreText = hasScore ? `${item.progress.score}/${item.progress.total}` : "—";
           const scorePercentText = hasPercent
@@ -1911,8 +1931,16 @@ function AssessmentList({ title, subtitle, items, onOpen, openLabel, retakeLabel
                       <span>{completionText}</span>
                       <span className="text-[#FFD41C]/65">•</span>
                       <span>{scorePercentText}</span>
+                      {hasPracticalDeductions ? (
+                        <>
+                          <span className="text-[#FFD41C]/65">â€¢</span>
+                          <span>Seq -{Number(item.progress.sequenceDeduction ?? 0)}</span>
+                          <span className="text-[#FFD41C]/65">â€¢</span>
+                          <span>Time -{Number(item.progress.timeDeduction ?? 0)}</span>
+                        </>
+                      ) : null}
                       <span className={item.progress?.passed ? "text-[#b7fff0]" : "text-yellow-100"}>
-                        {item.progress?.passed ? "Passed" : "Completed"}
+                        {item.progress?.passed ? "Passed" : "Failed"}
                       </span>
                     </div>
                   ) : locked ? (

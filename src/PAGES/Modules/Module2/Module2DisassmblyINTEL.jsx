@@ -24,6 +24,7 @@ import { AchievementToast, unlockAchievement } from "../../../utils/achievements
 import { formatTutorReply } from "../../../utils/tutorReply.js";
 import { getUserSettings } from "../../../utils/userSettings";
 import { PDF_BASED_DISASSEMBLY_GUIDES } from "../../../utils/pdfBasedInstructionGuides";
+import { DISASSEMBLY_STEPS } from "../../../utils/hardwareSequences";
 import {
   GUIDED_DISASSEMBLY_CAMERA_PRESET,
   GUIDED_DISASSEMBLY_ORBIT_PROPS,
@@ -36,34 +37,15 @@ import {
 
 /*
  * Validated training order:
- * 1) remove the GPU so it cannot obstruct the board,
- * 2) remove the motherboard with the CPU, M.2 SSD, and both RAM sticks still
- *    mounted,
- * 3) service the board-mounted parts on the table,
- * 4) finish with the case-mounted HDD and PSU.
+ * 1) follow the PDF prep actions, then remove the PSU,
+ * 2) remove storage, RAM, and the GPU before lifting the motherboard,
+ * 3) move the motherboard to the table with app-modeled CPU/SSD still mounted,
+ * 4) finish those board-mounted parts after the board is safely seated.
  *
  * RAM is intentionally represented as one unordered stage. Either stick can
  * be removed first, but both must be seated before the learner may continue.
  */
-const steps = [
-  { key: "gpu", name: "GPU Disassembly", partKeys: ["gpu"] },
-  {
-    key: "motherboard",
-    name: "Motherboard Disassembly",
-    partKeys: ["motherboard"],
-  },
-  { key: "ssd", name: "SSD Disassembly", partKeys: ["ssd"] },
-  {
-    key: "ram",
-    name: "RAM Disassembly (2 Modules)",
-    partKeys: ["ram1", "ram2"],
-    unordered: true,
-  },
-  { key: "cpu", name: "CPU Disassembly", partKeys: ["cpu"] },
-  { key: "hdd", name: "HDD Disassembly", partKeys: ["hdd"] },
-  { key: "psu", name: "PSU Disassembly", partKeys: ["psu"] },
-  { key: "final", name: "Full Disassembly", partKeys: [] },
-];
+const steps = DISASSEMBLY_STEPS;
 
 const PART_MODELS = [
   { key: "table", path: "/models/INTELtable.glb" },
@@ -214,11 +196,11 @@ const MAX_LANDING_PULL = 0.94;
 const MAGNETIC_CAPTURE_RATIO = 1.08;
 const RELEASED_MAGNET_SPEED = 8.5;
 const RELEASED_ROTATION_SPEED = 10;
-const MAGNETIC_SNAP_MIN_DURATION_MS = 440;
-const MAGNETIC_SNAP_MAX_DURATION_MS = 1150;
-const DRAG_FOLLOW_SPEED = 26;
-const ROTATION_FOLLOW_SPEED = 10.5;
-const SETTLE_SPEED = 10;
+const MAGNETIC_SNAP_MIN_DURATION_MS = 900;
+const MAGNETIC_SNAP_MAX_DURATION_MS = 2200;
+const DRAG_FOLLOW_SPEED = 18;
+const ROTATION_FOLLOW_SPEED = 7.5;
+const SETTLE_SPEED = 6;
 const WORKSPACE_PADDING_MULTIPLIER = 1.5;
 const TELEMETRY_FRAME_INTERVAL = 3;
 const TELEMETRY_IDLE_FRAME_INTERVAL = 16;
@@ -977,7 +959,7 @@ function PartModel({
     const rotationAlpha = 1 - Math.exp(-ROTATION_FOLLOW_SPEED * safeDelta);
     const settleAlpha = 1 - Math.exp(-SETTLE_SPEED * safeDelta);
 
-    // CPU, SSD, and both RAM modules remain physically attached to the
+    // Board-mounted components remain physically attached to the
     // motherboard until their own stage starts. The motherboard publishes its
     // live rigid transform, and mounted parts inherit it around the exact
     // motherboard model pivot. This prevents them from being left floating in
@@ -1358,7 +1340,7 @@ function PartModel({
 
   const handlePointerDown = useCallback(
     (event) => {
-      if (!isMovablePart) return;
+      if (event.button !== 0 || !isMovablePart) return;
 
       // A populated motherboard and its mounted components overlap in the
       // raycast. Pass-through parts must never stop the event: while the board
@@ -1411,7 +1393,7 @@ function PartModel({
 
   const handlePointerOver = useCallback(
     (event) => {
-      if (!isMovablePart || allowPointerThrough) return;
+      if (event.button !== 0 || !isMovablePart || allowPointerThrough) return;
       event.stopPropagation();
 
       if (!canInteract) {
@@ -1431,6 +1413,8 @@ function PartModel({
     if (!grabbingRef.current) document.body.style.cursor = "default";
   }, []);
 
+  const isRamPart = part.key === "ram1" || part.key === "ram2";
+
   return (
     <>
       <group
@@ -1445,9 +1429,9 @@ function PartModel({
               <mesh>
                 <boxGeometry
                   args={[
-                    Math.max(modelSize.x * 1.12, 0.35),
-                    Math.max(modelSize.y * 1.18, 0.35),
-                    Math.max(modelSize.z * 1.12, 0.35),
+                    Math.max(modelSize.x * (isRamPart ? 2.1 : 1.12), isRamPart ? 1.8 : 0.35),
+                    Math.max(modelSize.y * (isRamPart ? 2.6 : 1.18), isRamPart ? 1.2 : 0.35),
+                    Math.max(modelSize.z * (isRamPart ? 2.0 : 1.12), isRamPart ? 3.8 : 0.35),
                   ]}
                 />
                 <meshBasicMaterial
@@ -2207,7 +2191,7 @@ function ModelViewer({
           {...GUIDED_DISASSEMBLY_ORBIT_PROPS}
           mouseButtons={{
             LEFT: null,
-            MIDDLE: THREE.MOUSE.DOLLY,
+            MIDDLE: THREE.MOUSE.PAN,
             RIGHT: THREE.MOUSE.ROTATE,
           }}
         />
@@ -2724,7 +2708,7 @@ export default function Module2DisassemblyINTEL({ onFinish, onBack, onLogout, on
   const [showIntro, setShowIntro] = useState(checkpoint.showIntro);
   const [instructionStepIndex, setInstructionStepIndex] = useState(checkpoint.showIntro ? null : checkpoint.step);
   const [validationMessage, setValidationMessage] = useState(
-    "Begin with the GPU. Detach it, then move it into the open table workspace; the magnetic field will animate it into the highlighted seat."
+    "Begin with the PSU. Detach it, then move it into the open table workspace; the magnetic field will animate it into the highlighted seat."
   );
   const [achievementToast, setAchievementToast] = useState(null);
 
@@ -2805,7 +2789,7 @@ export default function Module2DisassemblyINTEL({ onFinish, onBack, onLogout, on
     setShowIntro(true);
     setInstructionStepIndex(null);
     setValidationMessage(
-      "Scene restarted. Begin with the GPU, then remove the motherboard with its CPU, SSD, and both RAM modules still attached."
+      "Scene restarted. Follow the PDF order: PSU, HDD, both RAM modules, GPU, motherboard, SSD, then CPU."
     );
   }, []);
 
@@ -2988,7 +2972,7 @@ export default function Module2DisassemblyINTEL({ onFinish, onBack, onLogout, on
 
     if (instructionStep?.key === "final") {
       setValidationMessage(
-        "Final round active: remove GPU → populated motherboard → SSD → both RAM modules (either order) → CPU → HDD → PSU. Guide highlights are disabled."
+        "Final round active: remove PSU -> HDD -> both RAM modules (either order) -> GPU -> motherboard -> SSD -> CPU. Guide highlights are disabled."
       );
       return;
     }
@@ -3004,7 +2988,7 @@ export default function Module2DisassemblyINTEL({ onFinish, onBack, onLogout, on
     setStep(0);
     setInstructionStepIndex(0);
     setValidationMessage(
-      "Read the GPU instruction card before interacting with the first component."
+      "Read the PSU instruction card before interacting with the first component."
     );
   }, []);
 
@@ -3095,7 +3079,7 @@ export default function Module2DisassemblyINTEL({ onFinish, onBack, onLogout, on
         platform="INTEL"
         moduleNumber="2"
         moduleType="Disassembly"
-        description="You completed the validated board-first removal order: GPU, motherboard with mounted parts, SSD, both RAM modules in either order, CPU, HDD, and PSU — including a full unguided repeat pass."
+        description="You completed the PDF-based removal order: PSU, HDD, both RAM modules in either order, GPU, motherboard, SSD, and CPU — including a full unguided repeat pass."
         userName={user.name}
         onBack={handleBackToDashboard}
         onSwitchPlatform={() => {

@@ -141,11 +141,11 @@ function DefaultScene() {
         makeDefault
         enablePan
         minDistance={1}
-        maxDistance={150}
+        maxDistance={200}
         target={[0, 0, 0]}
         mouseButtons={{
           LEFT: THREE.MOUSE.ROTATE,
-          MIDDLE: THREE.MOUSE.DOLLY,
+          MIDDLE: THREE.MOUSE.PAN,
           RIGHT: THREE.MOUSE.PAN,
         }}
       />
@@ -162,6 +162,9 @@ export default function DefaultModule3ModelViewer({ onComplete }) {
     <DefaultModelErrorBoundary>
       <Canvas
         shadows
+        dpr={[1, 1.5]}
+        performance={{ min: 0.55 }}
+        gl={{ antialias: true, powerPreference: "high-performance", alpha: false, stencil: false }}
         style={{ width: "100%", height: "100%" }}
         camera={{ position: [70, 14, -20], fov: 50 }}
       >

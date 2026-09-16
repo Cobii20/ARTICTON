@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Square, Volume2, VolumeX } from "lucide-react";
+import { MessageCircle, Minus, Square, Volume2, VolumeX, X } from "lucide-react";
 import { getComponentProcedureNote } from "../utils/procedureNotes";
 
 export default function ProcedureAssistantBubble({
@@ -17,6 +17,7 @@ export default function ProcedureAssistantBubble({
 }) {
   const note = getComponentProcedureNote(mode, activeComponent || currentStep);
   const [autoRead, setAutoRead] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
   const [speakingKey, setSpeakingKey] = useState(null);
   const lastAutoReadIndexRef = useRef(-1);
 
@@ -65,6 +66,25 @@ export default function ProcedureAssistantBubble({
     setSpeakingKey(null);
   }, [speechSupported]);
 
+  const openAssistant = useCallback(() => {
+    setDismissed(false);
+    if (!open) onToggle?.();
+  }, [onToggle, open]);
+
+  const collapseAssistant = useCallback(() => {
+    if (open) onToggle?.();
+  }, [onToggle, open]);
+
+  const dismissAssistant = useCallback(
+    (event) => {
+      event?.stopPropagation();
+      setDismissed(true);
+      if (open) onToggle?.();
+      stopSpeech();
+    },
+    [onToggle, open, stopSpeech]
+  );
+
   useEffect(() => {
     if (
       !open ||
@@ -94,6 +114,20 @@ export default function ProcedureAssistantBubble({
 
   if (!note) return null;
 
+  if (dismissed) {
+    return (
+      <button
+        type="button"
+        onClick={openAssistant}
+        aria-label={`Open ${title}`}
+        title={`Open ${title}`}
+        className="articton-assistant-launcher absolute right-3 top-32 z-[110] grid h-12 w-12 place-items-center rounded-full border border-[#00ffb4]/30 bg-[#07111d]/94 text-[#00ffb4] shadow-[0_18px_50px_rgba(0,0,0,0.45)] backdrop-blur-xl transition hover:scale-105 hover:border-[#00ffb4]/55 sm:right-5 sm:top-5"
+      >
+        <MessageCircle size={21} />
+      </button>
+    );
+  }
+
   if (open) {
     return (
       <div className="articton-assistant-open absolute right-3 top-32 z-[110] flex h-[min(560px,calc(100%-8.5rem))] w-[min(380px,calc(100%-1.5rem))] flex-col overflow-hidden rounded-[24px] border border-[#1a2438] bg-[#0b1220]/95 shadow-[0_30px_80px_rgba(0,0,0,0.45)] backdrop-blur-xl sm:right-5 sm:top-5 sm:h-[min(560px,calc(100%-2.5rem))] sm:w-[min(380px,calc(100%-2.5rem))]">
@@ -103,6 +137,15 @@ export default function ProcedureAssistantBubble({
             <div className="text-[11px] text-[#7a8ba8]">{subtitle}</div>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={collapseAssistant}
+              aria-label={`Collapse ${title}`}
+              title={`Collapse ${title}`}
+              className="grid h-8 w-8 place-items-center rounded-lg border border-white/10 bg-white/5 text-[#7a8ba8] transition hover:text-white"
+            >
+              <Minus size={16} />
+            </button>
             {speechSupported ? (
               <>
                 <button
@@ -131,10 +174,12 @@ export default function ProcedureAssistantBubble({
             ) : null}
             <button
               type="button"
-              onClick={onToggle}
-              className="rounded-lg px-2 py-1 text-sm text-[#7a8ba8] transition hover:bg-white/5 hover:text-white"
+              onClick={dismissAssistant}
+              aria-label={`Close ${title}`}
+              title={`Close ${title}`}
+              className="grid h-8 w-8 place-items-center rounded-lg border border-white/10 bg-white/5 text-[#7a8ba8] transition hover:text-white"
             >
-              X
+              <X size={16} />
             </button>
           </div>
         </div>
@@ -210,27 +255,40 @@ export default function ProcedureAssistantBubble({
   }
 
   return (
-    <button
-      type="button"
-      onClick={onToggle}
-      className="articton-assistant-collapsed absolute right-3 top-32 z-[110] w-[min(320px,calc(100%-1.5rem))] rounded-[18px] border border-[#00ffb4]/25 bg-[#07111d]/92 p-3 text-left shadow-[0_24px_70px_rgba(0,0,0,0.48)] backdrop-blur-xl transition hover:scale-[1.01] hover:border-[#00ffb4]/45 sm:right-5 sm:top-5 sm:w-[min(390px,calc(100%-2.5rem))] sm:rounded-[22px] sm:p-4"
-    >
-      <div className="mb-2 flex items-center gap-2">
-        <span className="h-2 w-2 rounded-full bg-[#00ffb4]" />
-        <div>
-          <div className="text-[11px] font-black uppercase tracking-[0.18em] text-[#00ffb4]">
-            AI Procedure Guide
-          </div>
-          <div className="text-[11px] text-[#7a8ba8]">
-            {platform} {mode} - {currentStep}
+    <div className="articton-assistant-collapsed absolute right-3 top-32 z-[110] w-[min(320px,calc(100%-1.5rem))] rounded-[18px] border border-[#00ffb4]/25 bg-[#07111d]/92 text-left shadow-[0_24px_70px_rgba(0,0,0,0.48)] backdrop-blur-xl transition hover:border-[#00ffb4]/45 sm:right-5 sm:top-5 sm:w-[min(390px,calc(100%-2.5rem))] sm:rounded-[22px]">
+      <button
+        type="button"
+        onClick={openAssistant}
+        aria-label={`Open ${title}`}
+        title={`Open ${title}`}
+        className="block w-full rounded-[inherit] p-3 text-left transition hover:scale-[1.01] sm:p-4"
+      >
+        <div className="mb-2 flex items-center gap-2 pr-8">
+          <span className="h-2 w-2 rounded-full bg-[#00ffb4]" />
+          <div>
+            <div className="text-[11px] font-black uppercase tracking-[0.18em] text-[#00ffb4]">
+              AI Procedure Guide
+            </div>
+            <div className="text-[11px] text-[#7a8ba8]">
+              {platform} {mode} - {currentStep}
+            </div>
           </div>
         </div>
-      </div>
-      <div className="text-sm font-bold text-white">{note.title}</div>
-      <p className="articton-assistant-note mt-2 hidden text-xs leading-5 text-[#c8d4e6] sm:block">{note.text}</p>
-      <div className="articton-assistant-ask mt-3 hidden rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/10 px-3 py-1.5 text-[11px] font-bold text-[#b7fff0] sm:inline-flex">
-        Ask a question
-      </div>
-    </button>
+        <div className="text-sm font-bold text-white">{note.title}</div>
+        <p className="articton-assistant-note mt-2 hidden text-xs leading-5 text-[#c8d4e6] sm:block">{note.text}</p>
+        <div className="articton-assistant-ask mt-3 hidden rounded-full border border-[#00ffb4]/25 bg-[#00ffb4]/10 px-3 py-1.5 text-[11px] font-bold text-[#b7fff0] sm:inline-flex">
+          Ask a question
+        </div>
+      </button>
+      <button
+        type="button"
+        onClick={dismissAssistant}
+        aria-label={`Close ${title}`}
+        title={`Close ${title}`}
+        className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-lg border border-white/10 bg-white/5 text-[#7a8ba8] transition hover:text-white"
+      >
+        <X size={16} />
+      </button>
+    </div>
   );
 }

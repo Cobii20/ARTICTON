@@ -2928,6 +2928,21 @@ html .articton-platform-choice-panel :focus-visible {
 }
 /* Dashboard uses a width breakpoint, independent of browser chrome height. */
 .articton-dashboard-layout > main { min-height: 0; min-width: 0; }
+.articton-dashboard-layout.articton-dashboard-layout--practical {
+  grid-template-columns: minmax(0, 1fr);
+}
+.articton-dashboard-content--practical {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  gap: 0;
+  padding: 0;
+}
+.articton-dashboard-content--practical > .scrollArea {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+}
 .articton-dashboard-sidebar > div { height: auto; min-height: 100%; overflow: visible; }
 
 /* Collapsed step rails need their own padding: expanded rows plus a fixed
