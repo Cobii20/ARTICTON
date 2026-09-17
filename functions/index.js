@@ -11,6 +11,74 @@ const authAdmin = admin.auth();
 
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 const GEMINI_TUTOR_ENABLED = process.env.GEMINI_TUTOR_ENABLED === "true";
+const ENFORCE_APP_CHECK = process.env.ENFORCE_APP_CHECK === "true";
+
+const callableOptions = Object.freeze({
+  region: "us-central1",
+  enforceAppCheck: ENFORCE_APP_CHECK,
+  consumeAppCheckToken: ENFORCE_APP_CHECK,
+  minInstances: 0,
+  maxInstances: 5,
+  concurrency: 10,
+  memory: "256MiB",
+  timeoutSeconds: 30,
+});
+
+const tutorOptions = Object.freeze({
+  ...callableOptions,
+  secrets: ["GEMINI_API_KEY"],
+  maxInstances: 2,
+  concurrency: 5,
+  timeoutSeconds: 20,
+});
+
+function requirePlainObject(value, fieldName, allowedKeys) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new HttpsError("invalid-argument", `${fieldName} must be an object.`);
+  }
+  const unexpected = Object.keys(value).filter((key) => !allowedKeys.includes(key));
+  if (unexpected.length) {
+    throw new HttpsError("invalid-argument", `${fieldName} contains unsupported fields.`);
+  }
+  return value;
+}
+
+function requireBoundedString(value, fieldName, maxLength, pattern) {
+  if (typeof value !== "string") {
+    throw new HttpsError("invalid-argument", `${fieldName} must be text.`);
+  }
+  const cleanValue = value.trim();
+  if (!cleanValue || cleanValue.length > maxLength || (pattern && !pattern.test(cleanValue))) {
+    throw new HttpsError("invalid-argument", `${fieldName} is invalid.`);
+  }
+  return cleanValue;
+}
+
+async function enforceRateLimit(uid, action, { windowMs, windowMax, dailyMax }) {
+  const now = Date.now();
+  const day = new Date(now).toISOString().slice(0, 10);
+  const ref = db.doc(`function_rate_limits/${uid}_${action}`);
+  await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(ref);
+    const previous = snapshot.data() || {};
+    const sameWindow = Number(previous.windowStartedAt || 0) + windowMs > now;
+    const windowCount = sameWindow ? Number(previous.windowCount || 0) : 0;
+    const dayCount = previous.day === day ? Number(previous.dayCount || 0) : 0;
+    if (windowCount >= windowMax || dayCount >= dailyMax) {
+      throw new HttpsError("resource-exhausted", "Request limit reached. Please try again later.");
+    }
+    transaction.set(ref, {
+      uid,
+      action,
+      day,
+      dayCount: dayCount + 1,
+      windowStartedAt: sameWindow ? Number(previous.windowStartedAt) : now,
+      windowCount: windowCount + 1,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      expiresAt: admin.firestore.Timestamp.fromMillis(now + 2 * 24 * 60 * 60 * 1000),
+    });
+  });
+}
 
 function requireAuthenticatedUser(request) {
   if (!request.auth) {
@@ -56,16 +124,6 @@ async function assertAdmin(request) {
   }
 
   return authContext;
-}
-
-function requireNonEmptyString(value, fieldName) {
-  const cleanValue = String(value || "").trim();
-
-  if (!cleanValue) {
-    throw new HttpsError("invalid-argument", `${fieldName} is required.`);
-  }
-
-  return cleanValue;
 }
 
 function cleanTutorMode(value) {
@@ -275,9 +333,10 @@ async function generateTutorReply({ message, context, procedureText }) {
           ],
           generationConfig: {
             temperature: 0.25,
-            maxOutputTokens: 320,
+            maxOutputTokens: 240,
           },
         }),
+        signal: AbortSignal.timeout(12000),
       }
     );
   } catch (error) {
@@ -316,25 +375,29 @@ async function generateTutorReply({ message, context, procedureText }) {
 }
 
 exports.askModuleTutor = onCall(
-  { secrets: ["GEMINI_API_KEY"] },
+  tutorOptions,
   async (request) => {
-    if (process.env.FUNCTIONS_EMULATOR !== "true") {
-      await requireAuthenticatedUser(request);
-    }
-
-    const message = requireNonEmptyString(request.data?.message, "message");
-    const rawContext = request.data?.context || {};
+    const { uid } = await requireAuthenticatedUser(request);
+    requirePlainObject(request.data, "request", ["message", "context"]);
+    const message = requireBoundedString(request.data.message, "message", 800);
+    const rawContext = requirePlainObject(request.data.context || {}, "context", [
+      "mode", "module", "moduleNumber", "platform", "currentStep", "activeComponent", "completedParts",
+    ]);
     const mode = cleanTutorMode(rawContext.mode || rawContext.module);
+    if (rawContext.completedParts !== undefined && (!Array.isArray(rawContext.completedParts) || rawContext.completedParts.length > 12)) {
+      throw new HttpsError("invalid-argument", "completedParts must contain at most 12 items.");
+    }
     const context = {
       mode,
-      moduleNumber: rawContext.moduleNumber,
-      platform: String(rawContext.platform || "").trim(),
-      currentStep: String(rawContext.currentStep || "").trim(),
-      activeComponent: String(rawContext.activeComponent || "").trim(),
+      moduleNumber: String(rawContext.moduleNumber || "").slice(0, 20),
+      platform: String(rawContext.platform || "").trim().slice(0, 30),
+      currentStep: String(rawContext.currentStep || "").trim().slice(0, 120),
+      activeComponent: String(rawContext.activeComponent || "").trim().slice(0, 80),
       completedParts: Array.isArray(rawContext.completedParts)
-        ? rawContext.completedParts.map((part) => String(part)).slice(0, 12)
+        ? rawContext.completedParts.map((part) => requireBoundedString(part, "completed part", 60)).slice(0, 12)
         : [],
     };
+    await enforceRateLimit(uid, "tutor", { windowMs: 60_000, windowMax: 5, dailyMax: 50 });
     const procedureText = getProcedureText(mode);
 
     if (!procedureText) {
@@ -347,9 +410,10 @@ exports.askModuleTutor = onCall(
   }
 );
 
-exports.deleteStudentAccount = onCall(async (request) => {
+exports.deleteStudentAccount = onCall(callableOptions, async (request) => {
   const administrator = await assertAdmin(request);
-  const targetUid = String(request.data?.uid || "").trim();
+  requirePlainObject(request.data, "request", ["uid"]);
+  const targetUid = requireBoundedString(request.data.uid, "uid", 128, /^[A-Za-z0-9_-]+$/);
 
   if (!targetUid) {
     throw new HttpsError("invalid-argument", "The student UID is required.");
@@ -361,6 +425,7 @@ exports.deleteStudentAccount = onCall(async (request) => {
       "You cannot delete your own account using the student-deletion function."
     );
   }
+  await enforceRateLimit(administrator.uid, "delete_student", { windowMs: 60_000, windowMax: 3, dailyMax: 20 });
 
   const studentRef = db.doc(`users/${targetUid}`);
   const studentSnapshot = await studentRef.get();
@@ -400,9 +465,10 @@ exports.deleteStudentAccount = onCall(async (request) => {
   return { deleted: true, uid: targetUid };
 });
 
-exports.startAssessment = onCall(async (request) => {
+exports.startAssessment = onCall(callableOptions, async (request) => {
   const { uid, authTime } = await requireAuthenticatedUser(request);
-  const activityId = requireNonEmptyString(request.data?.activityId, "activityId");
+  requirePlainObject(request.data, "request", ["activityId"]);
+  const activityId = requireBoundedString(request.data.activityId, "activityId", 80, /^[a-z0-9_-]+$/);
   const definitionSnapshot = await db
     .doc(`assessment_definitions/${activityId}`)
     .get();
@@ -411,6 +477,7 @@ exports.startAssessment = onCall(async (request) => {
   if ((!definitionSnapshot.exists && !knownAssessment) || (definitionSnapshot.exists && definitionSnapshot.data().active !== true)) {
     throw new HttpsError("not-found", "Assessment not found or unavailable.");
   }
+  await enforceRateLimit(uid, "start_assessment", { windowMs: 60_000, windowMax: 6, dailyMax: 40 });
   const definition = definitionSnapshot.data() || {};
 
   const bankSnapshot = await db.doc(`published_question_banks/${activityId}`).get();
@@ -462,9 +529,10 @@ exports.startAssessment = onCall(async (request) => {
   };
 });
 
-exports.submitAssessment = onCall(async (request) => {
+exports.submitAssessment = onCall(callableOptions, async (request) => {
   const { uid, authTime } = await requireAuthenticatedUser(request);
-  const attemptId = requireNonEmptyString(request.data?.attemptId, "attemptId");
+  requirePlainObject(request.data, "request", ["attemptId", "answers"]);
+  const attemptId = requireBoundedString(request.data.attemptId, "attemptId", 128, /^[A-Za-z0-9_-]+$/);
   const submittedAnswers = request.data?.answers;
 
   if (
@@ -477,6 +545,11 @@ exports.submitAssessment = onCall(async (request) => {
       "Answers must be provided as an object."
     );
   }
+  const answerEntries = Object.entries(submittedAnswers);
+  if (answerEntries.length > 100 || answerEntries.some(([key, value]) => key.length > 20 || !Number.isInteger(value) || value < 0 || value > 3)) {
+    throw new HttpsError("invalid-argument", "Answers contain invalid question identifiers or choices.");
+  }
+  await enforceRateLimit(uid, "submit_assessment", { windowMs: 60_000, windowMax: 8, dailyMax: 50 });
 
   const attemptRef = db.doc(`users/${uid}/assessment_attempts/${attemptId}`);
   const attemptSnapshot = await attemptRef.get();
@@ -592,4 +665,118 @@ exports.submitAssessment = onCall(async (request) => {
   });
 
   return result;
+});
+
+const PRACTICAL_IDS = Object.freeze({
+  amdAssembly: { mode: "assembly", platform: "amd" },
+  intelAssembly: { mode: "assembly", platform: "intel" },
+  amdDisassembly: { mode: "disassembly", platform: "amd" },
+  intelDisassembly: { mode: "disassembly", platform: "intel" },
+});
+
+function practicalScore(wrongOrderCount, elapsedSeconds) {
+  const sequenceDeduction = Math.min(25, wrongOrderCount * 6);
+  const timeDeduction = Math.min(25, Math.max(0, Math.floor(elapsedSeconds) - 120));
+  const score = Math.max(0, 100 - sequenceDeduction - timeDeduction);
+  return {
+    startingScore: 100,
+    score,
+    finalScore: score,
+    scorePercent: score,
+    percent: score,
+    percentage: score,
+    passed: score >= 75,
+    status: score >= 75 ? "Passed" : "Failed",
+    wrongOrderCount,
+    sequenceDeduction,
+    orderPenaltyPoints: sequenceDeduction,
+    timeDeduction,
+    timePenaltyPoints: timeDeduction,
+    totalDeduction: sequenceDeduction + timeDeduction,
+    elapsedSeconds,
+  };
+}
+
+exports.startPracticalAttempt = onCall(callableOptions, async (request) => {
+  const { uid, authTime } = await requireAuthenticatedUser(request);
+  requirePlainObject(request.data, "request", ["practicalId"]);
+  const practicalId = requireBoundedString(request.data.practicalId, "practicalId", 40, /^[A-Za-z]+$/);
+  if (!PRACTICAL_IDS[practicalId]) {
+    throw new HttpsError("invalid-argument", "Unknown practical test.");
+  }
+  await enforceRateLimit(uid, "start_practical", { windowMs: 60_000, windowMax: 5, dailyMax: 30 });
+  const attemptRef = db.collection(`users/${uid}/practical_attempts`).doc();
+  await attemptRef.set({
+    uid,
+    authTime,
+    practicalId,
+    status: "in_progress",
+    startedAt: admin.firestore.FieldValue.serverTimestamp(),
+    expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + 2 * 60 * 60 * 1000),
+  });
+  return { attemptId: attemptRef.id, practicalId };
+});
+
+exports.finishPracticalAttempt = onCall(callableOptions, async (request) => {
+  const { uid, authTime } = await requireAuthenticatedUser(request);
+  requirePlainObject(request.data, "request", ["attemptId", "practicalId", "wrongOrderCount", "completedParts"]);
+  const attemptId = requireBoundedString(request.data.attemptId, "attemptId", 128, /^[A-Za-z0-9_-]+$/);
+  const practicalId = requireBoundedString(request.data.practicalId, "practicalId", 40, /^[A-Za-z]+$/);
+  const wrongOrderCount = request.data.wrongOrderCount;
+  const completedParts = request.data.completedParts;
+  if (!PRACTICAL_IDS[practicalId] || !Number.isInteger(wrongOrderCount) || wrongOrderCount < 0 || wrongOrderCount > 100) {
+    throw new HttpsError("invalid-argument", "Practical result fields are invalid.");
+  }
+  if (!Array.isArray(completedParts) || completedParts.length < 6 || completedParts.length > 20 ||
+      completedParts.some((part) => typeof part !== "string" || !part.trim() || part.length > 60) ||
+      new Set(completedParts).size !== completedParts.length) {
+    throw new HttpsError("invalid-argument", "The completed component list is invalid.");
+  }
+  await enforceRateLimit(uid, "finish_practical", { windowMs: 60_000, windowMax: 6, dailyMax: 30 });
+  const attemptRef = db.doc(`users/${uid}/practical_attempts/${attemptId}`);
+  let responseResult;
+  await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(attemptRef);
+    if (!snapshot.exists) throw new HttpsError("not-found", "Practical attempt not found.");
+    const attempt = snapshot.data();
+    if (attempt.uid !== uid || Number(attempt.authTime) !== authTime || attempt.practicalId !== practicalId) {
+      throw new HttpsError("permission-denied", "This practical attempt does not belong to this session.");
+    }
+    if (attempt.status === "submitted") {
+      responseResult = attempt.result;
+      return;
+    }
+    if (attempt.status !== "in_progress" || !attempt.startedAt || attempt.expiresAt.toMillis() <= Date.now()) {
+      throw new HttpsError("failed-precondition", "This practical attempt is not active.");
+    }
+    const elapsedSeconds = Math.max(0, Math.floor((Date.now() - attempt.startedAt.toMillis()) / 1000));
+    const result = practicalScore(wrongOrderCount, elapsedSeconds);
+    responseResult = result;
+    transaction.update(attemptRef, {
+      status: "submitted",
+      result,
+      completedParts,
+      trustLevel: "client-reported-actions-server-timed",
+      submittedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    transaction.set(db.doc(`users/${uid}/practical_results/${practicalId}`), {
+      ...result,
+      uid,
+      practicalId,
+      attemptId,
+      source: "server",
+      schemaVersion: 1,
+      trustLevel: "client-reported-actions-server-timed",
+      completedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    transaction.set(db.doc(`users/${uid}/achievements/${practicalId}`), {
+      uid,
+      achievementId: practicalId,
+      earned: result.passed,
+      score: result.score,
+      source: "server",
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  });
+  return responseResult;
 });

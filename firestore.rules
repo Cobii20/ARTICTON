@@ -31,8 +31,6 @@ service cloud.firestore {
         && request.resource.data.role == resource.data.role;
     }
 
-    // Compatibility for the current web client. These progress/result fields
-    // are written directly by the browser and are therefore not tamper-proof.
     function editableUserFieldsOnly() {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
         "firstName",
@@ -43,12 +41,17 @@ service cloud.firestore {
         "birthday",
         "program",
         "contactNumber",
-        "avatarUrl",
-        "moduleProgress",
-        "practicalTests",
-        "accountAchievements",
         "updatedAt"
-      ]);
+      ])
+      && request.resource.data.firstName is string && request.resource.data.firstName.size() <= 80
+      && request.resource.data.lastName is string && request.resource.data.lastName.size() <= 80
+      && request.resource.data.get("middleName", "") is string && request.resource.data.get("middleName", "").size() <= 80
+      && request.resource.data.get("middleInitial", "") is string && request.resource.data.get("middleInitial", "").size() <= 5
+      && request.resource.data.get("gender", "") is string && request.resource.data.get("gender", "").size() <= 30
+      && request.resource.data.get("birthday", "") is string && request.resource.data.get("birthday", "").size() <= 20
+      && request.resource.data.get("program", "") is string && request.resource.data.get("program", "").size() <= 100
+      && request.resource.data.get("contactNumber", "") is string && request.resource.data.get("contactNumber", "").size() <= 30
+      && request.resource.data.updatedAt == request.time;
     }
 
     // Compatibility for the current mobile quiz/practice payload.
@@ -91,16 +94,6 @@ service cloud.firestore {
       ]);
     }
 
-    function isValidNewScorePayload(uid) {
-      return isOwnUser(uid) && scoreFieldsAreAllowed();
-    }
-
-    function isValidUpdatedScorePayload(uid) {
-      return isOwnUser(uid)
-        && scoreFieldsAreAllowed()
-        && scoreChangedFieldsAreAllowed();
-    }
-
     function isValidSupportTicket() {
       return signedIn()
         && request.resource.data.keys().hasOnly([
@@ -113,10 +106,14 @@ service cloud.firestore {
           "createdAt"
         ])
         && request.resource.data.name is string
+        && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 120
         && request.resource.data.email == request.auth.token.email
         && request.resource.data.subject is string
+        && request.resource.data.subject.size() > 0 && request.resource.data.subject.size() <= 160
         && request.resource.data.message is string
+        && request.resource.data.message.size() > 0 && request.resource.data.message.size() <= 5000
         && request.resource.data.screenshotURL is string
+        && request.resource.data.screenshotURL.size() <= 1000
         && request.resource.data.status == "open"
         && request.resource.data.createdAt == request.time;
     }
@@ -302,10 +299,20 @@ service cloud.firestore {
     match /users/{uid} {
       allow create: if signedIn()
         && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(["uid", "email", "role", "firstName", "lastName", "middleName", "gender", "birthday", "program", "contactNumber", "updatedAt", "createdAt"])
         && request.resource.data.uid == uid
-        && request.resource.data.role == "student";
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.role == "student"
+        && request.resource.data.firstName is string && request.resource.data.firstName.size() > 0 && request.resource.data.firstName.size() <= 80
+        && request.resource.data.lastName is string && request.resource.data.lastName.size() > 0 && request.resource.data.lastName.size() <= 80
+        && request.resource.data.get("middleName", "") is string && request.resource.data.get("middleName", "").size() <= 80
+        && request.resource.data.get("gender", "") is string && request.resource.data.get("gender", "").size() <= 30
+        && request.resource.data.get("birthday", "") is string && request.resource.data.get("birthday", "").size() <= 20
+        && request.resource.data.get("program", "") is string && request.resource.data.get("program", "").size() <= 100
+        && request.resource.data.get("contactNumber", "") is string && request.resource.data.get("contactNumber", "").size() <= 30
+        && request.resource.data.updatedAt == request.time && request.resource.data.createdAt == request.time;
 
-      allow read: if isAdmin() || isFaculty() || isOwnUser(uid);
+      allow read: if isAdmin() || isOwnUser(uid);
 
       allow update: if (isAdmin() || isOwnUser(uid))
         && immutableUserFieldsUnchanged()
@@ -315,16 +322,12 @@ service cloud.firestore {
 
       match /module_scores/{scoreId} {
         allow read: if isAdmin() || isFaculty() || isOwnUser(uid);
-        allow create: if isValidNewScorePayload(uid);
-        allow update: if isValidUpdatedScorePayload(uid);
-        allow delete: if false;
+        allow write: if false;
       }
 
       match /practice_scores/{scoreId} {
         allow read: if isAdmin() || isFaculty() || isOwnUser(uid);
-        allow create: if isValidNewScorePayload(uid);
-        allow update: if isValidUpdatedScorePayload(uid);
-        allow delete: if false;
+        allow write: if false;
       }
 
       // Legacy mobile score collections consumed by the score dashboard.
@@ -337,6 +340,30 @@ service cloud.firestore {
         allow read: if isAdmin() || isFaculty() || isOwnUser(uid);
         allow create, update, delete: if false;
       }
+
+      match /practical_attempts/{attemptId} {
+        allow read: if isAdmin() || isFaculty() || isOwnUser(uid);
+        allow write: if false;
+      }
+
+      match /practical_results/{resultId} {
+        allow read: if isAdmin() || isFaculty() || isOwnUser(uid);
+        allow write: if false;
+      }
+
+      match /achievements/{achievementId} {
+        allow read: if isAdmin() || isFaculty() || isOwnUser(uid);
+        allow write: if false;
+      }
+    }
+
+    match /student_summaries/{uid} {
+      allow read: if isAdmin() || isFaculty() || isOwnUser(uid);
+      allow write: if false;
+    }
+
+    match /function_rate_limits/{limitId} {
+      allow read, write: if false;
     }
 
     match /userActivities/{activityId} {

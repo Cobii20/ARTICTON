@@ -9,6 +9,7 @@ before(async () => {
   for (const role of ['student','faculty','admin']) await setDoc(doc(c.firestore(),'users',role),{uid:role,email:`${role}@example.com`,role,firstName:role,lastName:'Test'});
   await setDoc(doc(c.firestore(),'users/student/quizScores/legacy'),{score:8,total:10});
   await setDoc(doc(c.firestore(),'module_content_cards/card'),{moduleId:'module_1',title:'Test'});
+  await setDoc(doc(c.firestore(),'student_summaries/student'),{uid:'student',displayName:'student Test',program:'',status:'active'});
  });
 });
 after(async () => { await env?.cleanup(); });
@@ -19,8 +20,10 @@ test('student cannot read another profile or list users',async()=>{
  await assertFails(getDoc(doc(db('student'),'users/faculty')));
  await assertFails(getDocs(collection(db('student'),'users')));
 });
-test('faculty and administrator can load student lists',async()=>{
- for(const role of ['faculty','admin']) await assertSucceeds(getDocs(collection(db(role),'users')));
+test('faculty uses minimal summaries while administrators can load private profiles',async()=>{
+ await assertFails(getDocs(collection(db('faculty'),'users')));
+ await assertSucceeds(getDocs(collection(db('faculty'),'student_summaries')));
+ await assertSucceeds(getDocs(collection(db('admin'),'users')));
 });
 test('signup creates only an owned student profile',async()=>{
  const fresh=env.authenticatedContext('new',{email:'new@example.com'}).firestore();
@@ -32,9 +35,13 @@ test('profile edits work but role escalation is denied',async()=>{
  await assertSucceeds(updateDoc(doc(db('student'),'users/student'),{firstName:'Updated',updatedAt:serverTimestamp()}));
  await assertFails(updateDoc(doc(db('student'),'users/student'),{role:'admin'}));
 });
-test('progress and scores save only under the owner',async()=>{
- await assertSucceeds(updateDoc(doc(db('student'),'users/student'),{moduleProgress:{module1:{percent:10}}}));
- await assertSucceeds(setDoc(doc(db('student'),'users/student/module_scores/test'),{score:8,total:10}));
+test('students cannot forge progress, scores, practical results, or achievements',async()=>{
+ await assertFails(updateDoc(doc(db('student'),'users/student'),{moduleProgress:{module1:{percent:100,completed:true}}}));
+ await assertFails(updateDoc(doc(db('student'),'users/student'),{practicalTests:{amdAssembly:{score:100}}}));
+ await assertFails(updateDoc(doc(db('student'),'users/student'),{accountAchievements:{admin:true}}));
+ await assertFails(setDoc(doc(db('student'),'users/student/module_scores/test'),{score:8,total:10}));
+ await assertFails(setDoc(doc(db('student'),'users/student/practical_results/test'),{score:100}));
+ await assertFails(setDoc(doc(db('student'),'users/student/achievements/test'),{earned:true}));
  await assertFails(setDoc(doc(db('student'),'users/faculty/module_scores/test'),{score:8,total:10}));
 });
 test('legacy mobile results can be read by owner and staff only',async()=>{

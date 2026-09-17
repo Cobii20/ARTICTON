@@ -361,7 +361,7 @@ function IntroDeck({ slides, onDone }) {
     <div className="pointer-events-none absolute inset-0 z-50">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,rgba(255,212,28,0.08),rgba(0,0,0,0.58)_58%,rgba(0,0,0,0.75))]" />
 
-      <div className="relative flex h-full w-full items-end justify-center p-4 pb-8 sm:items-center sm:p-6">
+      <div className="absolute inset-x-0 bottom-[6.75rem] top-0 flex min-h-0 w-full items-center justify-center p-4 sm:bottom-[7.25rem] sm:p-6">
         <AnimatePresence mode="wait">
           <motion.div
             key={slide.id}
@@ -369,7 +369,7 @@ function IntroDeck({ slides, onDone }) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.99 }}
             transition={{ duration: 0.22 }}
-            className="pointer-events-auto w-[760px] max-w-[calc(100vw-32px)] overflow-hidden rounded-[18px] border border-[#FFD41C]/30 bg-[#06131b]/72 shadow-[0_0_45px_rgba(255,212,28,0.16),0_32px_100px_rgba(0,0,0,0.55)] backdrop-blur-xl"
+            className="pointer-events-auto flex max-h-full w-[min(960px,calc(100vw-32px))] flex-col overflow-hidden rounded-[18px] border border-[#FFD41C]/30 bg-[#06131b]/72 shadow-[0_0_45px_rgba(255,212,28,0.16),0_32px_100px_rgba(0,0,0,0.55)] backdrop-blur-xl"
           >
             <div className="flex items-center justify-between gap-4 border-b border-[#FFD41C]/20 bg-[#FFD41C]/5 px-5 py-4 sm:px-7">
               <div className="min-w-0">
@@ -386,15 +386,16 @@ function IntroDeck({ slides, onDone }) {
               </div>
             </div>
 
-            <div className="px-5 py-5 sm:px-7 sm:py-6">
-              <div className="whitespace-pre-line text-[15px] leading-7 text-[#dbe6f5] sm:text-[17px]">
+            <div className="flex min-h-0 flex-1 flex-col">
+              <div className="min-h-0 overflow-y-auto px-5 py-5 sm:px-7 sm:py-6">
+              <div className="whitespace-pre-line text-[15px] leading-7 text-[#dbe6f5] sm:text-[16px]">
                 {slide.body}
               </div>
 
               {slide.points?.length ? (
-                <ul className="mt-6 space-y-3 text-[#c8d4e6]">
+                <ul className="mt-6 grid gap-3 text-[#c8d4e6] md:grid-cols-2">
                   {slide.points.map((p, i) => (
-                    <li key={i} className="flex gap-3 text-[17px] leading-relaxed">
+                    <li key={i} className="flex gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-[15px] leading-6">
                       <span className="mt-[10px] h-2 w-2 flex-none rounded-full bg-[#FFD41C]/70" />
                       <span>{p}</span>
                     </li>
@@ -402,7 +403,12 @@ function IntroDeck({ slides, onDone }) {
                 </ul>
               ) : null}
 
-              <div className="mt-10 flex items-center justify-end gap-4">
+              <div className="mt-6 text-[13px] text-[#7a8ba8]">
+                Tip: press <b>D</b> then click the model to log exact hotspot coordinates.
+              </div>
+              </div>
+
+              <div className="flex shrink-0 items-center justify-end gap-4 border-t border-[#FFD41C]/20 bg-[#06131b]/88 px-5 py-4 sm:px-7">
                 <div className="flex items-center justify-end gap-4">
                  
 
@@ -419,9 +425,6 @@ function IntroDeck({ slides, onDone }) {
                 </div>
               </div>
 
-              <div className="mt-6 text-[14px] text-[#7a8ba8]">
-                Tip: press <b>D</b> then click the model to log exact hotspot coordinates.
-              </div>
             </div>
           </motion.div>
         </AnimatePresence>

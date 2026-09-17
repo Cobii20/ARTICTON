@@ -14,3 +14,7 @@ test('support images allow only the owner, with image type and size restrictions
  await assertFails(uploadBytes(ref(storage,'supportTickets/student/big.png'),new Uint8Array(5*1024*1024),{contentType:'image/png'}));
  await assertFails(getBytes(ref(env.unauthenticatedContext().storage('gs://articton-57fd8.firebasestorage.app'),`supportTickets/student/${run}.png`)));
 });
+test('clients cannot upload directly into validated profile photo paths',async()=>{
+ const storage=env.authenticatedContext('student').storage('gs://articton-57fd8.firebasestorage.app');
+ await assertFails(uploadBytes(ref(storage,'profile-photos/student/avatar.png'),new Uint8Array([1,2,3]),{contentType:'image/png'}));
+});

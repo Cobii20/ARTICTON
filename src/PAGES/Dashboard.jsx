@@ -1872,9 +1872,11 @@ function AssessmentList({ title, subtitle, items, onOpen, openLabel, retakeLabel
 
   return (
     <div className="space-y-5">
-      <div>
+      <div className="mb-7">
         <div className="text-xl font-black tracking-tight text-white">{title}</div>
         <div className="mt-1 text-sm text-[#7a8ba8]">{subtitle}</div>
+      </div>
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
         {items.map((item) => {
           const locked = !!item.locked;
           const completed = !!item.completed;
@@ -1911,7 +1913,7 @@ function AssessmentList({ title, subtitle, items, onOpen, openLabel, retakeLabel
               key={item.id}
               {...motionPreset}
               className={[
-                "flex min-h-[190px] w-full flex-col items-start justify-between rounded-[28px] border p-8 text-left shadow-[0_30px_90px_rgba(0,0,0,0.42)]",
+                "flex min-h-[220px] w-full flex-col items-start justify-between rounded-[28px] border p-6 text-left shadow-[0_30px_90px_rgba(0,0,0,0.42)] sm:p-7",
                 locked
                   ? "border-[#1a2438] bg-[#0d1220]/70 opacity-80"
                   : completed
@@ -1933,9 +1935,9 @@ function AssessmentList({ title, subtitle, items, onOpen, openLabel, retakeLabel
                       <span>{scorePercentText}</span>
                       {hasPracticalDeductions ? (
                         <>
-                          <span className="text-[#FFD41C]/65">â€¢</span>
+                          <span aria-hidden="true" className="text-[#FFD41C]/65">•</span>
                           <span>Seq -{Number(item.progress.sequenceDeduction ?? 0)}</span>
-                          <span className="text-[#FFD41C]/65">â€¢</span>
+                          <span aria-hidden="true" className="text-[#FFD41C]/65">•</span>
                           <span>Time -{Number(item.progress.timeDeduction ?? 0)}</span>
                         </>
                       ) : null}
@@ -2554,34 +2556,71 @@ function AchievementsCardCompact({ achievements, onClick }) {
 function AchievementsPage({ achievements = [], tests = [], modules = [] }) {
   const passedTests = tests.filter((test) => test.completed && Number(test.progress?.score ?? 0) >= 75).length;
   const completedModules = modules.filter((module) => module.progress >= 100).length;
-  const mobileBadges = achievements.filter((achievement) => achievement.category?.includes("Mobile")).length;
-  const prePostBadges = achievements.filter((achievement) => achievement.icon === "pre" || achievement.icon === "post").length;
+  const isEarned = (achievement) => achievement.passed || achievement.statusText === "Completed";
+  const earnedAchievements = achievements.filter(isEarned);
+  const mobileBadges = earnedAchievements.filter((achievement) => achievement.category?.includes("Mobile")).length;
+  const prePostBadges = earnedAchievements.filter((achievement) => achievement.icon === "pre" || achievement.icon === "post").length;
+  const achievementCatalog = [
+    ...Object.values(ACHIEVEMENTS).map((achievement) => ({
+      ...achievement,
+      icon: achievement.id.includes("exam") ? "badge" : "trophy",
+      category: achievement.id.includes("exam") ? "Practical" : "Module",
+      statusText: "Not achieved",
+      passed: false,
+    })),
+    ...achievements,
+  ]
+    .filter((achievement, index, list) =>
+      index === list.findIndex((candidate) => candidate.id === achievement.id)
+    )
+    .map((catalogAchievement) => {
+      const recorded = achievements.find((achievement) => achievement.id === catalogAchievement.id);
+      return recorded ? { ...catalogAchievement, ...recorded } : catalogAchievement;
+    });
 
   return (
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-3">
-        <StatCard title="Achievements" value={`${achievements.length}`} hint="Unlocked badges" />
+        <StatCard title="Achievements" value={`${earnedAchievements.length}`} hint="Unlocked badges" />
         <StatCard title="Mobile Badges" value={`${mobileBadges}`} hint="Pre-tests, post-tests, and exams" />
         <StatCard title="Pre/Post Tests" value={`${prePostBadges}`} hint="Specific assessment badges" />
       </div>
 
-      <div className="rounded-[28px] border border-[#1a2438] bg-[#0d1220] p-7 shadow-[0_30px_90px_rgba(0,0,0,0.42)]">
+      <div className="rounded-[28px] border border-[#FFD41C]/25 bg-[#0d1220] p-7 shadow-[0_30px_90px_rgba(255,212,28,0.06)]">
         <div>
-          <div className="text-lg font-bold tracking-tight text-[#e8ecf4]">All Achievements</div>
+          <div className="text-lg font-bold tracking-tight text-[#e8ecf4]">Completed Achievements</div>
           <div className="mt-1 text-sm text-[#7a8ba8]">
-            {completedModules} modules complete, {passedTests} practical passes
+            Achievements you have successfully earned
           </div>
         </div>
         <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {achievements.length ? (
-            achievements.map((achievement) => (
-              <AchievementRow key={achievement.id} {...achievement} />
+          {earnedAchievements.length ? (
+            earnedAchievements.map((achievement) => (
+              <AchievementRow key={achievement.id} {...achievement} achieved />
             ))
           ) : (
             <div className="md:col-span-2 xl:col-span-3">
               <EmptyBadgeState />
             </div>
           )}
+        </div>
+      </div>
+
+      <div className="rounded-[28px] border border-[#1a2438] bg-[#0d1220] p-7 shadow-[0_30px_90px_rgba(0,0,0,0.42)]">
+        <div>
+          <div className="text-lg font-bold tracking-tight text-[#e8ecf4]">All Available Achievements</div>
+          <div className="mt-1 text-sm text-[#7a8ba8]">
+            {completedModules} modules complete, {passedTests} practical passes. Incomplete and failed achievements are muted.
+          </div>
+        </div>
+        <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {achievementCatalog.map((achievement) => (
+            <AchievementRow
+              key={achievement.id}
+              {...achievement}
+              achieved={isEarned(achievement)}
+            />
+          ))}
         </div>
       </div>
     </div>
@@ -2596,32 +2635,33 @@ function AchievementRow({
   scoreText = "",
   statusText = "",
   passed = false,
+  achieved = true,
   onClick,
 }) {
   const motionPreset = useCardMotion();
   const interactive = typeof onClick === "function";
 
   return (
-    <motion.button type="button" onClick={onClick} {...motionPreset} className="flex h-full w-full items-start gap-4 rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4 text-left focus:outline-none focus:ring-2 focus:ring-[#FFD41C]/25 disabled:cursor-default" aria-label={`Open achievement ${title}`} disabled={!interactive}>
-      <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[#FFD41C]/18 bg-[#FFD41C]/10">
-        <Icon kind={icon} active />
+    <motion.button type="button" onClick={onClick} {...motionPreset} className={["articton-achievement-card flex h-full w-full items-start gap-4 rounded-2xl border p-4 text-left focus:outline-none focus:ring-2 focus:ring-[#FFD41C]/25 disabled:cursor-default", achieved ? "is-earned border-[#FFD41C]/22 bg-[#FFD41C]/[0.06]" : "is-locked border-[#1a2438] bg-white/[0.025] grayscale"].join(" ")} aria-label={`${achieved ? "Achievement" : "Locked achievement"}: ${title}`} disabled={!interactive}>
+      <div className="articton-achievement-icon flex h-12 w-12 items-center justify-center rounded-2xl border border-[#FFD41C]/18 bg-[#FFD41C]/10">
+        <Icon kind={icon} active={achieved} />
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <div className="min-w-0 text-sm font-semibold text-white">{title}</div>
-          <span className="rounded-full border border-[#FFD41C]/20 bg-[#FFD41C]/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-[#FFD41C]">
+          <div className="articton-achievement-title min-w-0 text-sm font-semibold text-white">{title}</div>
+          <span className="articton-achievement-category rounded-full border border-[#FFD41C]/20 bg-[#FFD41C]/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-[#FFD41C]">
             {category}
           </span>
         </div>
-        <div className="mt-1 text-[12px] leading-5 text-[#7a8ba8]">{subtitle}</div>
+        <div className="articton-achievement-description mt-1 text-[12px] leading-5 text-[#7a8ba8]">{subtitle}</div>
         <div className="mt-3 flex flex-wrap gap-2">
           {statusText ? (
-            <span className={passed ? "rounded-full bg-[#FFD41C]/10 px-2 py-1 text-[11px] font-bold text-[#FFD41C]" : "rounded-full bg-yellow-300/10 px-2 py-1 text-[11px] font-bold text-yellow-200"}>
-              {statusText}
+            <span className={["articton-achievement-status rounded-full px-2 py-1 text-[11px] font-bold", passed ? "bg-[#FFD41C]/10 text-[#FFD41C]" : "bg-yellow-300/10 text-yellow-200"].join(" ")}>
+            {achieved ? statusText : statusText === "Failed" ? "Failed" : "Not achieved"}
             </span>
           ) : null}
           {scoreText ? (
-            <span className="rounded-full border border-white/10 bg-white/[0.03] px-2 py-1 text-[11px] font-bold text-[#dbe6f5]">
+            <span className="articton-achievement-score rounded-full border border-white/10 bg-white/[0.03] px-2 py-1 text-[11px] font-bold text-[#dbe6f5]">
               {scoreText}
             </span>
           ) : null}

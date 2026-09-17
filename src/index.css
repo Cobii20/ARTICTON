@@ -2750,6 +2750,88 @@ body:has(:where(.articton-module-page, .articton-module-theme, .articton-workspa
 .articton-zoom-notice button:focus-visible { outline: 2px solid var(--articton-primary); outline-offset: 2px; }
 @media print { .articton-zoom-notice { display: none !important; } }
 
+/* Stable assessment/module workspaces: feedback may scroll inside its reserved
+   row, but must never resize the WebGL viewport while a part is being moved. */
+.articton-validation {
+  width: min(32.5rem, 42vw);
+  min-height: 2.25rem;
+  max-height: 3.75rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+[data-articton-workspace-fullscreen]:fullscreen,
+[data-articton-workspace-fullscreen]:-webkit-full-screen {
+  width: 100vw;
+  height: 100vh;
+  border: 0;
+  border-radius: 0;
+  background: #070c14;
+}
+[data-articton-workspace-fullscreen]:fullscreen .articton-viewer-shell,
+[data-articton-workspace-fullscreen]:-webkit-full-screen .articton-viewer-shell {
+  border-radius: 0.75rem;
+}
+[data-articton-workspace-fullscreen]:fullscreen [data-step-sidebar],
+[data-articton-workspace-fullscreen]:-webkit-full-screen [data-step-sidebar] {
+  display: none;
+}
+[data-articton-workspace-fullscreen]:fullscreen .articton-viewer-shell,
+[data-articton-workspace-fullscreen]:-webkit-full-screen .articton-viewer-shell {
+  left: 1rem !important;
+}
+.articton-result-scoring-copy { color: #c8d4e6; }
+html.articton-light .articton-result-scoring-copy {
+  color: #26324f !important;
+  background: rgba(53, 64, 142, 0.08) !important;
+  border-color: rgba(53, 64, 142, 0.24) !important;
+}
+
+/* Achievement cards need stronger semantic contrast than the generic muted
+   dashboard palette, especially against the warm earned-card tint. */
+html.articton-light .articton-achievement-card.is-earned {
+  border-color: rgba(53, 64, 142, 0.3) !important;
+  background: linear-gradient(135deg, #ffffff 0%, #fff9df 100%) !important;
+  box-shadow: 0 8px 24px rgba(35, 44, 95, 0.07) !important;
+}
+html.articton-light .articton-achievement-card.is-earned .articton-achievement-title {
+  color: #151d45 !important;
+}
+html.articton-light .articton-achievement-card.is-earned .articton-achievement-description {
+  color: #445170 !important;
+}
+html.articton-light .articton-achievement-card.is-earned .articton-achievement-category {
+  color: #303b87 !important;
+  border-color: rgba(48, 59, 135, 0.3) !important;
+  background: rgba(48, 59, 135, 0.08) !important;
+}
+html.articton-light .articton-achievement-card.is-earned .articton-achievement-status {
+  color: #695000 !important;
+  background: #fff0ad !important;
+}
+html.articton-light .articton-achievement-card.is-earned .articton-achievement-score {
+  color: #25315c !important;
+  border-color: #cbd2e8 !important;
+  background: #ffffff !important;
+}
+html.articton-light .articton-achievement-card.is-earned .articton-achievement-icon {
+  color: #303b87 !important;
+  border-color: rgba(48, 59, 135, 0.26) !important;
+  background: #f0f2ff !important;
+}
+html.articton-light .articton-achievement-card.is-locked {
+  opacity: 0.68;
+  background: #f3f5f9 !important;
+}
+html.articton-light .articton-achievement-card.is-locked .articton-achievement-title {
+  color: #394158 !important;
+}
+html.articton-light .articton-achievement-card.is-locked .articton-achievement-description {
+  color: #606b80 !important;
+}
+@media (max-width: 767px) {
+  .articton-validation { width: 100%; max-height: 3.25rem; }
+}
+
 /* Full desktop dashboard: match the compact overview while keeping the
    existing collapsed layout below this breakpoint unchanged. */
 @media (min-width: 1024px) {

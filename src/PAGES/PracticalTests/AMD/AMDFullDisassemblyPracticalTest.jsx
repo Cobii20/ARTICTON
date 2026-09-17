@@ -1642,7 +1642,8 @@ function ModelViewer({
 
   const syncFullscreenState = useCallback(() => {
     const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement || null;
-    setIsFullscreen(fullscreenElement === viewerRef.current);
+    const fullscreenTarget = viewerRef.current?.closest("[data-articton-workspace-fullscreen]") || viewerRef.current;
+    setIsFullscreen(fullscreenElement === fullscreenTarget);
     refreshOverviewAfterResize();
   }, [refreshOverviewAfterResize]);
 
@@ -1658,9 +1659,10 @@ function ModelViewer({
   const toggleFullscreen = useCallback(async () => {
     if (isDraggingPart || !viewerRef.current) return;
     const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement || null;
+    const fullscreenTarget = viewerRef.current.closest("[data-articton-workspace-fullscreen]") || viewerRef.current;
 
     try {
-      if (fullscreenElement === viewerRef.current) {
+      if (fullscreenElement === fullscreenTarget) {
         const exitFullscreen = document.exitFullscreen || document.webkitExitFullscreen;
         if (exitFullscreen) await Promise.resolve(exitFullscreen.call(document));
         return;
@@ -1671,8 +1673,8 @@ function ModelViewer({
         if (exitFullscreen) await Promise.resolve(exitFullscreen.call(document));
       }
 
-      const requestFullscreen = viewerRef.current.requestFullscreen || viewerRef.current.webkitRequestFullscreen;
-      if (requestFullscreen) await Promise.resolve(requestFullscreen.call(viewerRef.current));
+      const requestFullscreen = fullscreenTarget.requestFullscreen || fullscreenTarget.webkitRequestFullscreen;
+      if (requestFullscreen) await Promise.resolve(requestFullscreen.call(fullscreenTarget));
     } catch (error) {
       console.error("Unable to toggle fullscreen mode:", error);
     }
@@ -1682,7 +1684,7 @@ function ModelViewer({
     <div
       ref={viewerRef}
       className={["relative h-full w-full overflow-hidden bg-[#070c14]", isFullscreen ? "rounded-none" : ""].join(" ")}
-      style={isFullscreen ? { width: "100vw", height: "100vh" } : undefined}
+      style={isFullscreen ? { width: "100%", height: "100%" } : undefined}
     >
       <Canvas
         camera={{ position: [24, 18, 110], fov: 44, near: 0.01, far: 2000 }}
@@ -1998,7 +2000,7 @@ function ResultsCard({ result, onRetry, onBackToDashboard }) {
             </div>
           </div>
 
-          <div className="mt-7 rounded-2xl border border-[#FFD41C]/18 bg-[#FFD41C]/6 px-4 py-3 text-xs leading-6 text-[#b7c6dd]">
+          <div className="articton-result-scoring-copy mt-7 rounded-2xl border border-[#FFD41C]/18 bg-[#FFD41C]/6 px-4 py-3 text-xs leading-6 text-[#b7c6dd]">
             Score starts at {result.startingScore}. Sequence errors deduct {PENALTY_WRONG_ORDER_CLICK} points each, capped at 25 points. Timing has a {formatDuration(TIME_GRACE_SECONDS)} grace period, then deducts 1 point per completed second, capped at 25 points. Placement misses block completion but do not deduct points. 75% or higher is PASSED.
           </div>
 
@@ -2196,7 +2198,15 @@ export default function AMDFullDisassemblyPracticalTest({ onFinish, onBack }) {
         wrongOrderCount: finalWrongOrder,
       };
 
-      setResult(finalResult);
+      const exitFullscreen = document.exitFullscreen || document.webkitExitFullscreen;
+      if ((document.fullscreenElement || document.webkitFullscreenElement) && exitFullscreen) {
+        Promise.resolve(exitFullscreen.call(document)).then(
+          () => setResult(finalResult),
+          () => setResult(finalResult)
+        );
+      } else {
+        setResult(finalResult);
+      }
       setTestActive(false);
       playCompletionSound(settings.sound, true);
       void saveTestResult(finalResult);
@@ -2311,7 +2321,7 @@ export default function AMDFullDisassemblyPracticalTest({ onFinish, onBack }) {
 
                 <div className="flex flex-wrap items-center justify-end gap-3">
                   {validationMessage ? (
-                    <div className="max-w-[520px] rounded-2xl border border-[#FFD41C]/20 bg-[#FFD41C]/8 px-4 py-2 text-xs font-semibold text-[#dffef5]">
+                    <div className="articton-validation max-w-[520px] rounded-2xl border border-[#FFD41C]/20 bg-[#FFD41C]/8 px-4 py-2 text-xs font-semibold text-[#dffef5]">
                       {validationMessage}
                     </div>
                   ) : null}
@@ -2338,7 +2348,7 @@ export default function AMDFullDisassemblyPracticalTest({ onFinish, onBack }) {
             </div>
 
             <div className="min-h-0 flex-1 px-4 py-4 md:px-8 md:py-5">
-              <div className="relative h-full overflow-hidden rounded-[24px] border border-[#1a2438] bg-[#0d1220]/78 shadow-[0_28px_90px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+              <div data-articton-workspace-fullscreen className="articton-stage-frame relative h-full overflow-hidden rounded-[24px] border border-[#1a2438] bg-[#0d1220]/78 shadow-[0_28px_90px_rgba(0,0,0,0.45)] backdrop-blur-xl">
                 <ChecklistSidebar
                   open={sidebarOpen}
                   onToggle={() => setSidebarOpen((value) => !value)}

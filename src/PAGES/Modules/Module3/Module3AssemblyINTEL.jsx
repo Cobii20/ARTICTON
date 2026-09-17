@@ -2126,6 +2126,7 @@ function ModelViewer({
   onPartCompleted,
   onLockedPartClick,
   onInteractionMessage,
+  onEnterFullscreen,
 }) {
   const [isDraggingPart, setIsDraggingPart] = useState(false);
   const [telemetry, setTelemetry] = useState(null);
@@ -2141,23 +2142,13 @@ function ModelViewer({
     setOverviewRequest((value) => value + 1);
   }, [activePartKeysKey]);
 
-  const refreshOverviewAfterResize = useCallback(() => {
-    // Fullscreen changes the canvas dimensions. Wait for the browser to finish
-    // laying out the fullscreen element before recalculating the overview.
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        setOverviewRequest((value) => value + 1);
-      });
-    });
-  }, []);
-
   const syncFullscreenState = useCallback(() => {
     const fullscreenElement =
       document.fullscreenElement || document.webkitFullscreenElement || null;
 
-    setIsFullscreen(fullscreenElement === viewerRef.current);
-    refreshOverviewAfterResize();
-  }, [refreshOverviewAfterResize]);
+    const fullscreenTarget = viewerRef.current?.closest("[data-articton-workspace-fullscreen]") || viewerRef.current;
+    setIsFullscreen(fullscreenElement === fullscreenTarget);
+  }, []);
 
   useEffect(() => {
     document.addEventListener("fullscreenchange", syncFullscreenState);
@@ -2174,9 +2165,10 @@ function ModelViewer({
 
     const fullscreenElement =
       document.fullscreenElement || document.webkitFullscreenElement || null;
+    const fullscreenTarget = viewerRef.current.closest("[data-articton-workspace-fullscreen]") || viewerRef.current;
 
     try {
-      if (fullscreenElement === viewerRef.current) {
+      if (fullscreenElement === fullscreenTarget) {
         const exitFullscreen =
           document.exitFullscreen || document.webkitExitFullscreen;
 
@@ -2197,16 +2189,17 @@ function ModelViewer({
       }
 
       const requestFullscreen =
-        viewerRef.current.requestFullscreen ||
-        viewerRef.current.webkitRequestFullscreen;
+        fullscreenTarget.requestFullscreen ||
+        fullscreenTarget.webkitRequestFullscreen;
 
       if (requestFullscreen) {
-        await Promise.resolve(requestFullscreen.call(viewerRef.current));
+        onEnterFullscreen?.();
+        await Promise.resolve(requestFullscreen.call(fullscreenTarget));
       }
     } catch (error) {
       console.error("Unable to toggle fullscreen mode:", error);
     }
-  }, [isDraggingPart]);
+  }, [isDraggingPart, onEnterFullscreen]);
 
   return (
     <div
@@ -2215,7 +2208,7 @@ function ModelViewer({
         "relative h-full w-full overflow-hidden bg-[#070c14]",
         isFullscreen ? "rounded-none" : "",
       ].join(" ")}
-      style={isFullscreen ? { width: "100vw", height: "100vh" } : undefined}
+      style={isFullscreen ? { width: "100%", height: "100%" } : undefined}
     >
       <Canvas
         camera={{ position: [35, 72, 52], fov: 42, near: 0.01, far: 1800 }}
@@ -3274,27 +3267,6 @@ export default function Module3AssemblyAMD({
           />
         ) : null}
 
-        {instructionStepIndex !== null ? (
-          <StepInstructionCard
-            platform="INTEL"
-            moduleType="Assembly"
-            stepNumber={Math.min(instructionStepIndex + 1, GUIDED_STEPS.length)}
-            totalSteps={GUIDED_STEPS.length}
-            stepName={steps[instructionStepIndex]?.name || "Assembly Step"}
-            guide={STEP_INSTRUCTION_GUIDES[steps[instructionStepIndex]?.key]}
-            isFinalChallenge={steps[instructionStepIndex]?.key === "final"}
-            onBegin={handleBeginInstructionStep}
-          />
-        ) : null}
-
-        {showFinalCompletionCard ? (
-          <FullAssemblyCompletionCard
-            platform="INTEL"
-            onReview={() => setShowFinalCompletionCard(false)}
-            onCertificate={() => setShowCertificate(true)}
-          />
-        ) : null}
-
         <div className="relative flex h-full w-full flex-col overflow-hidden">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(0,255,180,0.08),transparent_35%)]" />
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_88%_20%,rgba(0,255,180,0.05),transparent_30%)]" />
@@ -3386,7 +3358,26 @@ export default function Module3AssemblyAMD({
             </div>
 
             <div className="articton-stage min-h-0 flex-1 px-4 py-4 md:px-8 md:py-5">
-              <div className="articton-stage-frame relative h-full overflow-hidden rounded-[24px] border border-[#1a2438] bg-[#0d1220]/78 shadow-[0_28px_90px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+              <div data-articton-workspace-fullscreen className="articton-stage-frame relative h-full overflow-hidden rounded-[24px] border border-[#1a2438] bg-[#0d1220]/78 shadow-[0_28px_90px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+                {instructionStepIndex !== null ? (
+                  <StepInstructionCard
+                    platform="INTEL"
+                    moduleType="Assembly"
+                    stepNumber={Math.min(instructionStepIndex + 1, GUIDED_STEPS.length)}
+                    totalSteps={GUIDED_STEPS.length}
+                    stepName={steps[instructionStepIndex]?.name || "Assembly Step"}
+                    guide={STEP_INSTRUCTION_GUIDES[steps[instructionStepIndex]?.key]}
+                    isFinalChallenge={steps[instructionStepIndex]?.key === "final"}
+                    onBegin={handleBeginInstructionStep}
+                  />
+                ) : null}
+                {showFinalCompletionCard ? (
+                  <FullAssemblyCompletionCard
+                    platform="INTEL"
+                    onReview={() => setShowFinalCompletionCard(false)}
+                    onCertificate={() => setShowCertificate(true)}
+                  />
+                ) : null}
                 <Sidebar
                   open={effectiveSidebarOpen}
                   onToggle={() => setSidebarOpen((value) => !value)}
@@ -3415,6 +3406,7 @@ export default function Module3AssemblyAMD({
                     onPartCompleted={handlePartCompleted}
                     onLockedPartClick={handleLockedPartClick}
                     onInteractionMessage={setValidationMessage}
+                    onEnterFullscreen={() => setInstructionStepIndex(step)}
                   />
 
                   <ProcedureAssistantBubble
