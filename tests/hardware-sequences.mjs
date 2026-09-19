@@ -52,6 +52,13 @@ const practicalExamFiles = [
   },
 ];
 
+const guidedModuleFiles = [
+  "src/PAGES/Modules/Module2/Module2DisassmblyAMD.jsx",
+  "src/PAGES/Modules/Module2/Module2DisassmblyINTEL.jsx",
+  "src/PAGES/Modules/Module3/Module3AssemblyAMD.jsx",
+  "src/PAGES/Modules/Module3/Module3AssemblyINTEL.jsx",
+];
+
 function unique(values) {
   return [...new Set(values)];
 }
@@ -153,15 +160,14 @@ test("practical exams score sequence errors but keep placement mistakes feedback
 
     for (const token of [
       "PENALTY_WRONG_ORDER_CLICK",
-      "calculateScore(",
       "wrongOrderCount",
       "handleInvalidClick",
       "handleFumble",
       "onInvalidClick",
       "onFumble",
-      "orderPenaltyPoints",
-      "sequenceDeduction",
-      "timeDeduction",
+      "finishAuthoritativePractical",
+      "startAuthoritativePractical",
+      "Finalizing your result securely",
     ]) {
       assert.ok(source.includes(token), `${practical.label} keeps ${token} wired`);
     }
@@ -172,6 +178,8 @@ test("practical exams score sequence errors but keep placement mistakes feedback
       "Placement Errors",
       "placement error",
       "liveScoring",
+      "setDoc(",
+      "serverTimestamp(",
     ]) {
       assert.ok(!source.includes(removedToken), `${practical.label} removes ${removedToken}`);
     }
@@ -191,4 +199,20 @@ test("practical scoring uses unrounded 75 percent passing and capped deductions"
   assert.equal(calculatePracticalScore({ wrongOrderCount: 0, elapsedSeconds: TIME_GRACE_SECONDS + 90 }).timeDeduction, TIME_DEDUCTION_CAP);
   assert.equal(calculatePracticalScore({ wrongOrderCount: 99, elapsedSeconds: 0 }).sequenceDeduction, SEQUENCE_DEDUCTION_CAP);
   assert.equal(calculatePracticalScore({ wrongOrderCount: 1, elapsedSeconds: 145 }).passed, false);
+});
+
+test("guided instructions use the page overlay normally and remain inside the fullscreen scene", () => {
+  for (const path of guidedModuleFiles) {
+    const source = readRepoFile(path);
+    assert.equal(source.match(/instructionStepIndex !== null \?/g)?.length, 2, `${path} renders both guide placements`);
+    assert.ok(source.includes("articton-fullscreen-instruction"), `${path} marks the in-scene copy as fullscreen-only`);
+    assert.ok(source.includes("fullscreenOnly"), `${path} retains the page guide while supporting the fullscreen copy`);
+  }
+});
+
+test("practical 3D viewers remove the hidden checklist offset in fullscreen", () => {
+  for (const practical of practicalExamFiles) {
+    const source = readRepoFile(practical.path);
+    assert.ok(source.includes('className="articton-viewer-shell absolute'), `${practical.label} uses the shared fullscreen viewer sizing`);
+  }
 });

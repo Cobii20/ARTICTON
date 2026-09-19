@@ -115,3 +115,26 @@ test("assembly resumes the second RAM stage after either first stick", () => {
   } });
   assert.equal(getPracticeCheckpoint("a", route, assemblySteps, sequence).step, 3);
 });
+
+test("completed simulations reopen as clean retakes while incomplete work still resumes", () => {
+  recordModuleVisit("retake-user", { route, activity: "Completed", snapshot: {
+    step: steps.length - 1,
+    completedParts: sequence,
+    finalRoundCompletedParts: sequence,
+    showIntro: false,
+  } });
+  assert.deepEqual(getPracticeCheckpoint("retake-user", route, steps, sequence), {
+    step: 0,
+    completedParts: [],
+    finalRoundCompletedParts: [],
+    showIntro: true,
+  });
+
+  recordModuleVisit("resume-user", { route, activity: "RAM", snapshot: {
+    step: 1,
+    completedParts: ["cpu", "ram1"],
+    finalRoundCompletedParts: [],
+    showIntro: false,
+  } });
+  assert.deepEqual(getPracticeCheckpoint("resume-user", route, steps, sequence).completedParts, ["cpu", "ram1"]);
+});

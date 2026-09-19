@@ -9,11 +9,14 @@
     "build:spark": "vite build --mode spark",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "node --test tests/authentication.cjs tests/settings.mjs tests/module-visits.mjs tests/question-banks.mjs tests/hardware-sequences.mjs",
+    "test": "node --test tests/authentication.cjs tests/settings.mjs tests/module-visits.mjs tests/question-banks.mjs tests/hardware-sequences.mjs tests/system-integrity.mjs",
     "test:rules": "node --test tests/firestore-rules.mjs tests/storage-rules.mjs tests/question-bank-rules.mjs",
     "sync:questions": "node scripts/import-mobile-question-defaults.mjs",
     "verify:spark": "node scripts/verify-spark-build.mjs",
-    "deploy:spark:check": "node scripts/verify-spark-target.mjs"
+    "deploy:spark:check": "node scripts/verify-spark-target.mjs",
+    "release:artifact": "node scripts/create-release-manifest.mjs",
+    "release:plan": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release-production.ps1 -Action Plan",
+    "release:execute": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release-production.ps1 -Action Execute"
   },
   "dependencies": {
     "@emailjs/browser": "^4.4.1",

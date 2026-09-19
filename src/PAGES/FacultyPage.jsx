@@ -1,9 +1,10 @@
 import QuestionWorkspace from "../Components/QuestionWorkspace";
 import React, { useEffect, useMemo, useState } from "react";
 import { ChevronDown, LogOut, Settings as SettingsIcon } from "lucide-react";
-import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
 import { onAuthStateChanged } from "firebase/auth";
-import { auth, db } from "../firebase";
+import { auth, db, functions } from "../firebase";
 import { fetchMobileScoreDocs, mergeMobileScoresIntoProfile } from "../utils/mobileScores";
 import {
   PRACTICAL_PASSING_PERCENT,
@@ -155,6 +156,45 @@ function getScoreStatus(progress, passingPercent = PASSING_PERCENT) {
   };
 }
 
+function getContentStatus(progress) {
+  if (!progress) {
+    return {
+      completed: false,
+      passed: false,
+      scorePercent: null,
+      completionPercent: 0,
+      status: "Not started",
+    };
+  }
+
+  const percent = clampPercent(
+    progress.progressPercent ??
+    progress.completionPercent ??
+    progress.scorePercent ??
+    progress.percent ??
+    progress.percentage
+  );
+  const explicitStatus = String(progress.status || "").trim().toLowerCase();
+  const completed = percent !== null
+    ? percent >= 100
+    : progress.completed === true ||
+      progress.finished === true ||
+      !!progress.completedAt ||
+      ["completed", "complete", "finished"].includes(explicitStatus);
+  const started =
+    completed ||
+    (percent !== null && percent > 0) ||
+    ["started", "in progress", "in_progress", "unfinished", "not finished"].includes(explicitStatus);
+
+  return {
+    completed,
+    passed: completed,
+    scorePercent: percent,
+    completionPercent: completed ? 100 : 0,
+    status: completed ? "Finished" : started ? "Not finished" : "Not started",
+  };
+}
+
 function getFullName(data) {
   const firstName = data.firstName || "";
   const lastName = data.lastName || "";
@@ -188,7 +228,7 @@ function buildStudentRecord(docSnap, mobileScoreDocs = []) {
   const disassembly = getPracticalStatus(practicalProgress, "fullDisassembly");
   const mobileModules = MODULE_ACTIVITY_GROUPS.map((module) => ({
     ...module,
-    content: getScoreStatus(mobileModuleScores[`${module.key}Content`]),
+    content: getContentStatus(mobileModuleScores[`${module.key}Content`]),
     pre: getScoreStatus(mobileModuleScores[`${module.key}Pre`]),
     post: getScoreStatus(mobileModuleScores[`${module.key}Post`]),
   }));
@@ -200,7 +240,13 @@ function buildStudentRecord(docSnap, mobileScoreDocs = []) {
   const intelAssembly = getScoreStatus(practicalTests.intelAssembly, 75);
 
   const resultItems = [
-    ...mobileModules.flatMap((module) => [module.content, module.pre, module.post]),
+    ...mobileModules.flatMap((module, index) => [
+      module.content,
+      module.pre,
+      module.post.completed || module.post.scorePercent !== null
+        ? module.post
+        : [quiz1, quiz2, quiz3, quiz4][index],
+    ]),
     mobileExam1,
     mobileExam2,
     amdDisassembly,
@@ -330,19 +376,19 @@ export default function FacultyPage({ onLogout, questionEditorOnly = false }) {
     try {
       setLoading(true);
       setError("");
-      const studentQuery = query(
-        collection(db, "users"),
-        where("role", "==", "student")
-      );
-      const querySnapshot = await getDocs(studentQuery);
+      const listStudentSummaries = httpsCallable(functions, "listStudentSummaries");
+      const response = await listStudentSummaries();
+      const summaries = Array.isArray(response.data?.students) ? response.data.students : [];
       const records = await Promise.all(
-        querySnapshot.docs.map(async (studentDoc) => {
-          const mobileScores = await fetchMobileScoreDocs(studentDoc.id);
-          return buildStudentRecord(studentDoc, mobileScores);
+        summaries.map(async (summary) => {
+          const studentId = String(summary.uid || "").trim();
+          if (!studentId) return null;
+          const mobileScores = await fetchMobileScoreDocs(studentId);
+          return buildStudentRecord({ id: studentId, data: () => summary }, mobileScores);
         })
       );
       const sortedRecords = records
-        .filter((record) => record.role === "student")
+        .filter((record) => record?.role === "student")
         .sort((a, b) => a.name.localeCompare(b.name));
 
       setStudents(sortedRecords);

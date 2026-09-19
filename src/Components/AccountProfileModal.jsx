@@ -1,14 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
-import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
-import { auth, db, storage } from "../firebase";
-import {
-  createProfileImageDataUrl,
-  getProfileInitial,
-  getProfileName,
-  validateProfileImage,
-} from "../utils/profileImages";
+import { auth, db } from "../firebase";
+import { getProfileInitial, getProfileName } from "../utils/profileImages";
 
 const MotionDiv = motion.div;
 
@@ -17,7 +11,6 @@ export default function AccountProfileModal({ isOpen, onClose, profile, onProfil
   const [lastName, setLastName] = useState("");
   const [middleInitial, setMiddleInitial] = useState("");
   const [previewImage, setPreviewImage] = useState("");
-  const [selectedFile, setSelectedFile] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -34,7 +27,6 @@ export default function AccountProfileModal({ isOpen, onClose, profile, onProfil
     setLastName(currentProfile.lastName || "");
     setMiddleInitial(currentProfile.middleInitial || "");
     setPreviewImage(currentProfile.avatarUrl || "");
-    setSelectedFile(null);
     setError("");
   }, [
     isOpen,
@@ -43,21 +35,6 @@ export default function AccountProfileModal({ isOpen, onClose, profile, onProfil
     currentProfile.middleInitial,
     currentProfile.avatarUrl,
   ]);
-
-  const handleImageChange = (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const validationError = validateProfileImage(file);
-    if (validationError) {
-      setError(validationError);
-      return;
-    }
-
-    setError("");
-    setSelectedFile(file);
-    setPreviewImage(URL.createObjectURL(file));
-  };
 
   const handleSave = async () => {
     const uid = currentProfile.uid;
@@ -80,22 +57,6 @@ export default function AccountProfileModal({ isOpen, onClose, profile, onProfil
     setError("");
 
     try {
-      let avatarUrl = currentProfile.avatarUrl || "";
-
-      if (selectedFile) {
-        const fallbackAvatarUrl = await createProfileImageDataUrl(selectedFile);
-        const safeFileName = selectedFile.name.replace(/[^a-zA-Z0-9.-]/g, "_");
-        const imageRef = ref(storage, `profile-photos/${uid}/${Date.now()}-${safeFileName}`);
-
-        try {
-          await uploadBytes(imageRef, selectedFile, { contentType: selectedFile.type });
-          avatarUrl = await getDownloadURL(imageRef);
-        } catch (uploadError) {
-          console.warn("Profile photo storage upload failed; saving compressed image to Firestore instead.", uploadError);
-          avatarUrl = fallbackAvatarUrl;
-        }
-      }
-
       const userRef = doc(db, "users", uid);
       const userSnap = await getDoc(userRef);
 
@@ -109,7 +70,6 @@ export default function AccountProfileModal({ isOpen, onClose, profile, onProfil
         firstName: cleanFirstName,
         lastName: cleanLastName,
         middleInitial: cleanMiddleInitial,
-        avatarUrl,
         updatedAt: serverTimestamp(),
       };
 
@@ -122,8 +82,6 @@ export default function AccountProfileModal({ isOpen, onClose, profile, onProfil
         updatedAt: new Date().toISOString(),
       });
 
-      setPreviewImage(avatarUrl);
-      setSelectedFile(null);
       onClose?.();
     } catch (saveError) {
       console.error("Error updating profile:", saveError);
@@ -157,11 +115,7 @@ export default function AccountProfileModal({ isOpen, onClose, profile, onProfil
                 <div>
                   <div className="text-base font-bold text-white">{getProfileName(currentProfile)}</div>
                   <div className="mt-1 text-xs uppercase tracking-[0.18em] text-[#FFD41C]">{currentProfile.role || "Account"}</div>
-                  <label className="mt-4 inline-flex cursor-pointer rounded-xl border border-[#FFD41C]/30 bg-[#FFD41C]/12 px-4 py-2.5 text-sm font-semibold text-[#FFD41C] transition hover:bg-[#FFD41C]/18">
-                    Upload picture
-                    <input type="file" accept="image/*" onChange={handleImageChange} disabled={isSaving} className="hidden" />
-                  </label>
-                  <div className="mt-2 text-xs text-[#7a8ba8]">JPG, PNG, or WebP up to 5MB.</div>
+                  <div className="mt-4 rounded-xl border border-[#1a2438] bg-white/[0.03] px-4 py-2.5 text-sm text-[#9fb0c9]">Photo uploads are disabled for privacy.</div>
                 </div>
               </div>
 

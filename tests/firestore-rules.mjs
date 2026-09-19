@@ -10,6 +10,7 @@ before(async () => {
   await setDoc(doc(c.firestore(),'users/student/quizScores/legacy'),{score:8,total:10});
   await setDoc(doc(c.firestore(),'module_content_cards/card'),{moduleId:'module_1',title:'Test'});
   await setDoc(doc(c.firestore(),'student_summaries/student'),{uid:'student',displayName:'student Test',program:'',status:'active'});
+  await setDoc(doc(c.firestore(),'supportTickets/test-ticket'),{uid:'student',name:'Student Test',email:'student@example.com',subject:'Test',message:'Test message',screenshotURL:'',status:'open',createdAt:new Date()});
  });
 });
 after(async () => { await env?.cleanup(); });
@@ -29,7 +30,11 @@ test('signup creates only an owned student profile',async()=>{
  const fresh=env.authenticatedContext('new',{email:'new@example.com'}).firestore();
  await assertFails(setDoc(doc(fresh,'users/other'),{uid:'other',role:'student'}));
  await assertFails(setDoc(doc(fresh,'users/new'),{uid:'new',role:'admin'}));
- await assertSucceeds(setDoc(doc(fresh,'users/new'),{uid:'new',email:'new@example.com',role:'student'}));
+ await assertSucceeds(setDoc(doc(fresh,'users/new'),{
+  uid:'new',email:'new@example.com',role:'student',firstName:'New',lastName:'Student',
+  middleName:'',gender:'',birthday:'',program:'',contactNumber:'',
+  updatedAt:serverTimestamp(),createdAt:serverTimestamp()
+ }));
 });
 test('profile edits work but role escalation is denied',async()=>{
  await assertSucceeds(updateDoc(doc(db('student'),'users/student'),{firstName:'Updated',updatedAt:serverTimestamp()}));
@@ -56,9 +61,9 @@ test('module content is readable after login and writable only by admin',async()
 test('answer keys and obsolete OTP documents remain private',async()=>{
  for(const path of ['assessment_answer_keys/test','otp_sessions/student','otp_challenges/student']) await assertFails(getDoc(doc(db('student'),path)));
 });
-test('support request accepts authenticated user payload',async()=>{
+test('support requests must use the rate-limited callable',async()=>{
  const ticket = doc(db('student'),'supportTickets/test-ticket');
- await assertSucceeds(setDoc(ticket,{name:'Student Test',email:'student@example.com',subject:'Test',message:'Test message',screenshotURL:'',status:'open',createdAt:serverTimestamp()}));
+ await assertFails(setDoc(ticket,{name:'Student Test',email:'student@example.com',subject:'Test',message:'Test message',screenshotURL:'',status:'open',createdAt:serverTimestamp()}));
  await assertFails(getDoc(ticket));
  await assertFails(updateDoc(ticket,{status:'resolved'}));
  await assertSucceeds(getDoc(doc(db('admin'),'supportTickets/test-ticket')));

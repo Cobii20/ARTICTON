@@ -351,6 +351,11 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      match /module_completions/{moduleId} {
+        allow read: if isAdmin() || isFaculty() || isOwnUser(uid);
+        allow write: if false;
+      }
+
       match /achievements/{achievementId} {
         allow read: if isAdmin() || isFaculty() || isOwnUser(uid);
         allow write: if false;
@@ -391,7 +396,8 @@ service cloud.firestore {
     }
 
     match /supportTickets/{ticketId} {
-      allow create: if isValidSupportTicket();
+      // Tickets are created by the rate-limited submitSupportTicket callable.
+      allow create: if false;
       allow read: if isAdmin();
       allow update: if isValidSupportTicketUpdate();
       allow delete: if isAdmin();

@@ -48,6 +48,10 @@ export function getPracticeCheckpoint(uid, route, steps, sequence) {
   if (!validOrder(saved.completedParts) || !validOrder(saved.finalRoundCompletedParts) ||
       guided.slice(0, saved.step).some((step) => !complete(step, saved.completedParts)) ||
       (saved.step !== steps.length - 1 && saved.finalRoundCompletedParts.length > 0)) return empty;
+  // Completed simulations start as a clean retake when reopened. Incomplete
+  // simulations still resume below, while saved course completion records and
+  // achievements remain untouched in Firestore.
+  if (saved.finalRoundCompletedParts.length === sequence.length) return empty;
   // A visit may happen during the animation before the next instruction opens.
   const firstIncomplete = guided.findIndex((step) => !complete(step, saved.completedParts));
   const step = firstIncomplete < 0 ? steps.length - 1 : firstIncomplete;

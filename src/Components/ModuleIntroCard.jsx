@@ -1,8 +1,20 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { useProgress } from "@react-three/drei";
 
 // Preparation reference: keit104.pdf, printed pp. 213–215 and 222–223.
 export default function ModuleIntroCard({ platform, moduleType, onStart }) {
   const assembly = moduleType === "Assembly";
+  const { active, progress } = useProgress();
+  const [modelsReady, setModelsReady] = useState(false);
+
+  useEffect(() => {
+    if (active) {
+      setModelsReady(false);
+      return undefined;
+    }
+    const readyTimer = window.setTimeout(() => setModelsReady(true), 200);
+    return () => window.clearTimeout(readyTimer);
+  }, [active, progress]);
   return (
     <div className="articton-module-intro-overlay absolute inset-0 z-[750] overflow-y-auto bg-[#050912]/78 p-4 backdrop-blur-md sm:p-6">
       <section aria-labelledby="module-intro-title" className="articton-module-intro relative mx-auto my-4 w-full max-w-5xl rounded-[30px] border border-[#00ffb4]/30 bg-[#0b1220]/96 p-5 text-[#9fb0ca] shadow-[0_40px_120px_rgba(0,0,0,0.7)] sm:p-8">
@@ -44,7 +56,9 @@ export default function ModuleIntroCard({ platform, moduleType, onStart }) {
         </section>
         <p className="mt-4 text-sm leading-6">Different safe approaches may be valid depending on the hardware. This module teaches a structured procedure based on recognized safety practices. Follow the guided sequence during the simulation, and consult the manufacturer's instructions when working with real equipment.</p>
         <div className="mt-5 flex flex-wrap items-center justify-end gap-4">
-          <button type="button" onClick={onStart} className="rounded-2xl bg-[#00ffb4] px-6 py-3 text-sm font-black text-[#07111d] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#00ffb4]">Start Guided Practice →</button>
+          <button type="button" onClick={onStart} disabled={!modelsReady} className="rounded-2xl bg-[#00ffb4] px-6 py-3 text-sm font-black text-[#07111d] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#00ffb4] disabled:cursor-wait disabled:opacity-65">
+            {modelsReady ? "Start Guided Practice →" : `Loading 3D models… ${Math.round(progress)}%`}
+          </button>
         </div>
       </section>
     </div>

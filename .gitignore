@@ -28,6 +28,8 @@ dist-ssr
 !.env.example
 !**/.env.example
 !.env.spark.example
+!.env.production.example
+release-artifact.json
 
 # Local verification artifacts
 .tmp/

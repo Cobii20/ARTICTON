@@ -1,4 +1,4 @@
-import { restoreDisassemblyPlacement } from "../../../utils/disassemblyPlacement";
+﻿import { restoreDisassemblyPlacement } from "../../../utils/disassemblyPlacement";
 import ModuleIntroCard from "../../../Components/ModuleIntroCard";
 import ModuleSceneBackground from "../../../Components/ModuleSceneBackground";
 import { getPracticeCheckpoint, recordModuleVisit } from "../../../utils/moduleVisits";
@@ -19,8 +19,9 @@ import ProcedureAssistantBubble from "../../../Components/ProcedureAssistantBubb
 import { auth, db, functions } from "../../../firebase.js";
 import { onAuthStateChanged } from "firebase/auth";
 import { httpsCallable } from "firebase/functions";
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
-import { AchievementToast, unlockAchievement } from "../../../utils/achievements.jsx";
+import { doc, getDoc } from "firebase/firestore";
+import { AchievementToast, resolveAchievement } from "../../../utils/achievements.jsx";
+import { completeGuidedModule } from "../../../utils/authoritativeModules.js";
 import { formatTutorReply } from "../../../utils/tutorReply.js";
 import { getUserSettings } from "../../../utils/userSettings";
 import { PDF_BASED_DISASSEMBLY_GUIDES } from "../../../utils/pdfBasedInstructionGuides";
@@ -2197,7 +2198,7 @@ function ModelViewer({
           type="button"
           onClick={() => setOverviewRequest((value) => value + 1)}
           disabled={isDraggingPart}
-          className="rounded-xl border border-[#00ffb4]/30 bg-[#0b1220]/92 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#7dffdc] shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl transition hover:bg-[#00ffb4]/12 disabled:cursor-not-allowed disabled:opacity-45"
+          className="articton-reset-camera rounded-xl border border-[#00ffb4]/30 bg-[#0b1220]/92 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#7dffdc] shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl transition hover:bg-[#00ffb4]/12 disabled:cursor-not-allowed disabled:opacity-45"
         >
           Reset Camera View
         </button>
@@ -2490,6 +2491,7 @@ function StepInstructionCard({
   guide,
   isFinalChallenge = false,
   onBegin,
+  fullscreenOnly = false,
 }) {
   const action = moduleType === "Assembly" ? "installation" : "removal";
   const safeGuide = guide || {
@@ -2504,7 +2506,7 @@ function StepInstructionCard({
 
   return (
     <div
-      className="articton-instruction-overlay absolute inset-0 z-[780] flex items-center justify-center bg-[#050912]/82 p-4 backdrop-blur-md md:p-6"
+      className={`${fullscreenOnly ? "articton-fullscreen-instruction " : ""}articton-instruction-overlay absolute inset-0 z-[780] flex items-center justify-center bg-[#050912]/82 p-4 backdrop-blur-md md:p-6`}
       role="dialog"
       aria-modal="true"
       aria-labelledby="step-instruction-title"
@@ -2616,7 +2618,7 @@ function CompletionCertificate({
     <div className="articton-module-theme min-h-screen w-full overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased print:bg-white">
       <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden px-5 py-8">
         <ModuleBackground />
-        <div className="relative z-10 w-full max-w-4xl overflow-hidden rounded-[34px] border border-[#00ffb4]/35 bg-[#0d1220]/94 p-7 text-center shadow-[0_40px_120px_rgba(0,0,0,0.65)] backdrop-blur-xl md:p-12 print:border-black print:bg-white print:text-black print:shadow-none">
+        <div className="articton-nu-certificate relative z-10 w-full max-w-4xl overflow-hidden rounded-[34px] border border-[#00ffb4]/35 bg-[#0d1220]/94 p-7 text-center shadow-[0_40px_120px_rgba(0,0,0,0.65)] backdrop-blur-xl md:p-12 print:border-black print:bg-white print:text-black print:shadow-none">
           <div className="pointer-events-none absolute inset-4 rounded-[26px] border border-dashed border-[#00ffb4]/30 print:border-black/40" />
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(0,255,180,0.14),transparent_42%)] print:hidden" />
 
@@ -2826,27 +2828,8 @@ export default function Module2DisassemblyAMD({ onFinish, onBack, onLogout, onSw
     if (!firebaseUser) return;
 
     try {
-      const completedSteps = Object.fromEntries(
-        steps.map((item) => [item.key, true])
-      );
-      const userRef = doc(db, "users", firebaseUser.uid);
-
-      await setDoc(
-        userRef,
-        {
-          moduleProgress: {
-            module2AMD: {
-              currentStep: steps.length - 1,
-              completed: true,
-              percent: 100,
-              completedSteps,
-              updatedAt: serverTimestamp(),
-            },
-          },
-        },
-        { merge: true }
-      );
-      const achievement = await unlockAchievement(firebaseUser.uid, "module2", { platform: "AMD" });
+      await completeGuidedModule("module2AMD");
+      const achievement = resolveAchievement("module2", { platform: "AMD" });
       setAchievementToast(achievement);
       window.setTimeout(() => setAchievementToast(null), 4200);
     } catch (error) {
@@ -3099,6 +3082,19 @@ export default function Module2DisassemblyAMD({ onFinish, onBack, onLogout, onSw
           />
         ) : null}
 
+        {instructionStepIndex !== null ? (
+          <StepInstructionCard
+            platform="AMD"
+            moduleType="Disassembly"
+            stepNumber={Math.min(instructionStepIndex + 1, GUIDED_STEPS.length)}
+            totalSteps={GUIDED_STEPS.length}
+            stepName={steps[instructionStepIndex]?.name || "Disassembly Step"}
+            guide={STEP_INSTRUCTION_GUIDES[steps[instructionStepIndex]?.key]}
+            isFinalChallenge={steps[instructionStepIndex]?.key === "final"}
+            onBegin={handleBeginInstructionStep}
+          />
+        ) : null}
+
         <div className="relative flex h-full w-full flex-col overflow-hidden">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(0,255,180,0.08),transparent_35%)]" />
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_88%_20%,rgba(0,255,180,0.05),transparent_30%)]" />
@@ -3185,6 +3181,7 @@ export default function Module2DisassemblyAMD({ onFinish, onBack, onLogout, onSw
               <div data-articton-workspace-fullscreen className="articton-stage-frame relative h-full overflow-hidden rounded-[24px] border border-[#1a2438] bg-[#0d1220]/78 shadow-[0_28px_90px_rgba(0,0,0,0.45)] backdrop-blur-xl">
                 {instructionStepIndex !== null ? (
                   <StepInstructionCard
+                    fullscreenOnly
                     platform="AMD"
                     moduleType="Disassembly"
                     stepNumber={Math.min(instructionStepIndex + 1, GUIDED_STEPS.length)}
@@ -3197,7 +3194,7 @@ export default function Module2DisassemblyAMD({ onFinish, onBack, onLogout, onSw
                 ) : null}
                 {isFinalRound && finalRoundCompletedParts.length === REMOVAL_SEQUENCE.length ? (
                   <div className="absolute inset-0 z-[760] flex items-center justify-center bg-[#050912]/78 p-5 backdrop-blur-md" role="status">
-                    <div className="w-full max-w-xl rounded-[28px] border border-[#00ffb4]/35 bg-[#0b1220]/96 p-7 text-center shadow-[0_35px_100px_rgba(0,0,0,0.65)]">
+                    <div className="articton-nu-completion-card w-full max-w-xl rounded-[28px] border border-[#00ffb4]/35 bg-[#0b1220]/96 p-7 text-center shadow-[0_35px_100px_rgba(0,0,0,0.65)]">
                       <div className="text-xs font-black uppercase tracking-[0.2em] text-[#00ffb4]">Full Disassembly Complete</div>
                       <h2 className="mt-3 text-3xl font-black text-white">All components removed successfully</h2>
                       <p className="mt-3 text-sm leading-6 text-[#b7c6dd]">The complete unguided disassembly sequence is finished. Your certificate is ready.</p>
@@ -3345,7 +3342,6 @@ export default function Module2DisassemblyAMD({ onFinish, onBack, onLogout, onSw
 }
 
 /* Preload the AMD table and every component model up front */
-PART_MODELS.forEach((part) => useGLTF.preload(encodeURI(part.path)));
 
 
 

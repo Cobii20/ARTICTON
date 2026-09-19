@@ -14,5 +14,15 @@ export default defineConfig(({ mode }) => {
       throw new Error("Spark builds require VITE_FIREBASE_DEPLOYMENT_MODE=spark.");
     }
   }
-  return { plugins: [react(), tailwindcss()] };
+  return {
+    plugins: [react(), tailwindcss()],
+    build: {
+      target: "es2020",
+      cssCodeSplit: true,
+      sourcemap: false,
+      // The on-demand Three.js controls chunk is ~966 kB; the initial entry is
+      // much smaller and does not preload this chunk.
+      chunkSizeWarningLimit: 1000,
+    },
+  };
 });

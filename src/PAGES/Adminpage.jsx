@@ -281,6 +281,48 @@ function getScoreStatus(progress, passingPercent = PASSING_PERCENT) {
   };
 }
 
+function getContentStatus(progress) {
+  if (!progress) {
+    return {
+      exists: false,
+      completed: false,
+      passed: false,
+      scorePercent: null,
+      completionPercent: 0,
+      status: "Not started",
+    };
+  }
+
+  const percent = clampPercent(
+    progress.progressPercent ??
+    progress.completionPercent ??
+    progress.scorePercent ??
+    progress.percent ??
+    progress.percentage
+  );
+  const explicitStatus = String(progress.status || "").trim().toLowerCase();
+  const completed = percent !== null
+    ? percent >= 100
+    : progress.completed === true ||
+      progress.finished === true ||
+      !!progress.completedAt ||
+      ["completed", "complete", "finished"].includes(explicitStatus);
+  const started =
+    completed ||
+    (percent !== null && percent > 0) ||
+    ["started", "in progress", "in_progress", "unfinished", "not finished"].includes(explicitStatus);
+
+  return {
+    exists: true,
+    completed,
+    passed: completed,
+    scorePercent: percent,
+    completionPercent: completed ? 100 : 0,
+    status: completed ? "Finished" : started ? "Not finished" : "Not started",
+    raw: progress,
+  };
+}
+
 function buildStudentRecord(docSnap, mobileScoreDocs = []) {
   const data = mergeMobileScoresIntoProfile(docSnap.data(), mobileScoreDocs);
 
@@ -298,16 +340,16 @@ function buildStudentRecord(docSnap, mobileScoreDocs = []) {
   const disassembly = getPracticalStatus(practicalProgress, "fullDisassembly");
   const module1Post = getScoreStatus(mobileModuleScores.module1Post);
   const module1Pre = getScoreStatus(mobileModuleScores.module1Pre);
-  const module1Content = getScoreStatus(mobileModuleScores.module1Content);
+  const module1Content = getContentStatus(mobileModuleScores.module1Content);
   const module2Post = getScoreStatus(mobileModuleScores.module2Post);
   const module2Pre = getScoreStatus(mobileModuleScores.module2Pre);
-  const module2Content = getScoreStatus(mobileModuleScores.module2Content);
+  const module2Content = getContentStatus(mobileModuleScores.module2Content);
   const module3Post = getScoreStatus(mobileModuleScores.module3Post);
   const module3Pre = getScoreStatus(mobileModuleScores.module3Pre);
-  const module3Content = getScoreStatus(mobileModuleScores.module3Content);
+  const module3Content = getContentStatus(mobileModuleScores.module3Content);
   const module4Post = getScoreStatus(mobileModuleScores.module4Post);
   const module4Pre = getScoreStatus(mobileModuleScores.module4Pre);
-  const module4Content = getScoreStatus(mobileModuleScores.module4Content);
+  const module4Content = getContentStatus(mobileModuleScores.module4Content);
   const mobileExam1 = getScoreStatus(mobilePracticeScores.practiceExam1);
   const mobileExam2 = getScoreStatus(mobilePracticeScores.practiceExam2);
   const amdDisassembly = getScoreStatus(practicalTests.amdDisassembly, 75);

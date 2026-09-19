@@ -1,14 +1,14 @@
-import { recordModuleVisit } from "../../utils/moduleVisits";
+﻿import { recordModuleVisit } from "../../utils/moduleVisits";
 import React, { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
-import { Bounds, Environment, Html, OrbitControls, useGLTF } from "@react-three/drei";
+import { Bounds, Html, OrbitControls, useGLTF } from "@react-three/drei";
 import { motion, AnimatePresence } from "framer-motion";
 import Settings from "../../Components/Settings";
 import { getUserSettings } from "../../utils/userSettings";
 import * as THREE from "three";
 import { auth, db } from "../../firebase.js";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import { useThree, useFrame } from "@react-three/fiber";
 import {
   module1ScenesBase,
@@ -1359,10 +1359,6 @@ export default function Module1Page({ onBack, onLogout, resumeVisit }) {
     setActiveId(null);
   }, [current?.key, experienceStep]);
 
-  useEffect(() => {
-    modules.forEach((m) => useGLTF.preload(m.url));
-  }, [modules]);
-
   const activeHotspot = useMemo(() => {
     return (current?.hotspots || []).find((hotspot) => hotspot.id === activeId) || null;
   }, [current?.hotspots, activeId]);
@@ -1433,45 +1429,22 @@ export default function Module1Page({ onBack, onLogout, resumeVisit }) {
     const overallPercent = Math.round((percent + otherPercent) / 2);
     const overallCompleted = completed && otherPlatformProgress.completed === true;
 
-    try {
-      const userRef = doc(db, "users", firebaseUser.uid);
-
-      await setDoc(
-        userRef,
-        {
-          moduleProgress: {
-            module1: {
-              currentPage: page,
-              totalPages,
-              introDone,
-              completed,
-              percent,
-              selectedPlatform: currentPlatform || null,
-              lastVisitedModuleKey: moduleKey,
-              completedParts: mergedParts,
-              overallPercent,
-              overallCompleted,
-              platformProgress: {
-                [currentPlatform]: {
-                  currentPage: page,
-                  totalPages,
-                  introDone,
-                  completed,
-                  percent,
-                  lastVisitedModuleKey: moduleKey,
-                  completedParts: mergedParts,
-                  updatedAt: serverTimestamp(),
-                },
-              },
-              updatedAt: serverTimestamp(),
-            },
-          },
-        },
-        { merge: true }
-      );
-    } catch (err) {
-      console.error("Error saving module 1 progress:", err);
-    }
+    localStorage.setItem(
+      `articton:module-navigation:${firebaseUser.uid}:module1`,
+      JSON.stringify({
+        currentPage: page,
+        totalPages,
+        introDone,
+        completed,
+        percent,
+        selectedPlatform: currentPlatform || null,
+        lastVisitedModuleKey: moduleKey,
+        completedParts: mergedParts,
+        overallPercent,
+        overallCompleted,
+        savedAt: new Date().toISOString(),
+      })
+    );
   };
 
   const goNextModule = async () => {
@@ -1918,7 +1891,6 @@ export default function Module1Page({ onBack, onLogout, resumeVisit }) {
                           <IntroStageVisual step={experienceStep} />
                         )}
 
-                        <Environment preset="city" />
                       </Suspense>
 
                       <OrbitControls
@@ -2252,13 +2224,3 @@ function ModulePageBackground() {
   );
 }
 
-useGLTF.preload("/models/Case(Base).glb");
-useGLTF.preload("/models/CpuAMD(Base).glb");
-useGLTF.preload("/models/CpuINTEL(Base).glb");
-useGLTF.preload("/models/Gpu(Base).glb");
-useGLTF.preload("/models/Hdd(Base).glb");
-useGLTF.preload("/models/MotherboardAMD(Base).glb");
-useGLTF.preload("/models/MotherboardINTEL(Base).glb");
-useGLTF.preload("/models/Psu(Base).glb");
-useGLTF.preload("/models/Ram(Base).glb");
-useGLTF.preload("/models/Ssd(Base).glb");

@@ -9,12 +9,9 @@ service firebase.storage {
 
     match /supportTickets/{uid}/{fileName} {
       allow read: if request.auth != null && request.auth.uid == uid;
-      allow create: if request.auth != null
-                    && request.auth.uid == uid
-                    && request.resource.size < 2 * 1024 * 1024
-                    && request.resource.contentType.matches('image/(png|jpeg|webp)')
-                    && fileName.matches('[A-Za-z0-9._-]{1,120}');
-      allow update, delete: if false;
+      // Disabled until a trusted backend validates decoded file bytes and
+      // publishes a clean object. Client-provided MIME metadata is insufficient.
+      allow create, update, delete: if false;
     }
 
     match /{path=**} {

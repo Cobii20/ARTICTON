@@ -16,7 +16,6 @@ import {
   collection,
   doc,
   getDoc,
-  setDoc,
   serverTimestamp,
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
@@ -183,14 +182,9 @@ function Module3PlatformChoice({
               </div>
             </div>
 
-            <HeaderDropdown
-              userName={user.name}
-              userEmail={user.email}
-              avatarUrl={user.avatarUrl}
-              onBack={onBack}
-              onLogout={onLogout}
-              setIsSettingsOpen={setIsSettingsOpen}
-            />
+            <button type="button" onClick={() => onBack?.("Modules")} className="rounded-2xl border border-[#1a2438] bg-white/[0.03] px-4 py-2.5 text-[13px] font-semibold text-[#dbe6f5] transition hover:bg-white/[0.06]">
+              Go back to Dashboard
+            </button>
           </div>
 
           <div className="relative z-10 flex flex-1 items-center justify-center px-6 py-7 md:px-8 md:py-8">
@@ -650,42 +644,10 @@ const askAI = async () => {
       JSON.stringify(mergedSteps)
     );
 
-    if (!firebaseUser) return;
-
-    const completedCount =
-      Object.values(mergedSteps).filter(Boolean).length;
-
-    const percent = Math.round(
-      (completedCount / module3Steps.length) * 100
+    if (firebaseUser) localStorage.setItem(
+      `articton:module-navigation:${firebaseUser.uid}:module3`,
+      JSON.stringify({ currentStep, completedSteps: mergedSteps, savedAt: new Date().toISOString() })
     );
-
-    const completed =
-      completedCount === module3Steps.length;
-
-    try {
-      const userRef = doc(db, "users", firebaseUser.uid);
-
-      await setDoc(
-        userRef,
-        {
-          moduleProgress: {
-            module3: {
-              currentStep,
-              completed,
-              percent,
-              completedSteps: mergedSteps,
-              updatedAt: serverTimestamp(),
-            },
-          },
-        },
-        { merge: true }
-      );
-    } catch (err) {
-      console.error(
-        "Error saving module 3 progress:",
-        err
-      );
-    }
   };
 
   useEffect(() => {

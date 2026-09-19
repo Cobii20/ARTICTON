@@ -1,4 +1,4 @@
-import React, {
+﻿import React, {
   useMemo,
   useRef,
   useState,
@@ -1499,10 +1499,3 @@ export default function FullAssembly({ onComplete }) {
   );
 }
 
-useGLTF.preload(CASE_URL);
-useGLTF.preload(MB_URL);
-useGLTF.preload(CPU_URL);
-useGLTF.preload(RAM_URL);
-useGLTF.preload(SSD_URL);
-useGLTF.preload(HDD_URL);
-useGLTF.preload(PSU_URL);

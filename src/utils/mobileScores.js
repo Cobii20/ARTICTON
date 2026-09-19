@@ -8,6 +8,7 @@ import {
 export const MOBILE_SCORE_SUBCOLLECTIONS = [
   "module_scores",
   "practice_scores",
+  "practical_results",
   "scores",
   "mobileScores",
   "studentScores",
@@ -134,6 +135,32 @@ function shouldReplaceModuleScore(current, incoming) {
 
 function toProgressPayload(data) {
   const scorePercent = getScorePercent(data);
+  const assessmentType = normalizeAssessmentType(data);
+  if (assessmentType === "content") {
+    const explicitStatus = String(data.status || "").trim().toLowerCase();
+    const completed = scorePercent !== null
+      ? scorePercent >= 100
+      : data.completed === true ||
+        data.finished === true ||
+        ["completed", "complete", "finished"].includes(explicitStatus);
+    const started =
+      completed ||
+      (scorePercent !== null && scorePercent > 0) ||
+      ["started", "in progress", "in_progress", "unfinished", "not finished"].includes(explicitStatus);
+
+    return {
+      ...data,
+      completed,
+      finished: completed,
+      score: data.score ?? data.latestScore ?? data.finalScore ?? scorePercent,
+      total: data.total ?? data.latestTotal ?? data.maxScore ?? 100,
+      percent: data.percent ?? scorePercent,
+      scorePercent,
+      passed: completed,
+      status: completed ? "Finished" : started ? "Not finished" : "Not started",
+    };
+  }
+
   const completed =
     data.completed === true ||
     data.finished === true ||

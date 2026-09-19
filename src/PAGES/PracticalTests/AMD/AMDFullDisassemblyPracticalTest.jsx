@@ -1,4 +1,4 @@
-import React, {
+﻿import React, {
   Suspense,
   useCallback,
   useEffect,
@@ -12,8 +12,9 @@ import { OrbitControls, useGLTF, Html } from "@react-three/drei";
 import Settings from "../../../Components/Settings";
 import { auth, db } from "../../../firebase.js";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
-import { AchievementToast, unlockAchievement } from "../../../utils/achievements.jsx";
+import { doc, getDoc } from "firebase/firestore";
+import { AchievementToast, resolveAchievement } from "../../../utils/achievements.jsx";
+import { finishAuthoritativePractical, startAuthoritativePractical } from "../../../utils/authoritativePractical.js";
 import { getUserSettings } from "../../../utils/userSettings";
 import { DISASSEMBLY_PREREQUISITES, DISASSEMBLY_SEQUENCE } from "../../../utils/hardwareSequences";
 import {
@@ -1604,6 +1605,13 @@ function InitialSceneCamera({ sceneRootRef, controlsRef, overviewRequest }) {
   return null;
 }
 
+function SceneReadyNotifier({ onReady }) {
+  useEffect(() => {
+    onReady?.();
+  }, [onReady]);
+  return null;
+}
+
 function ModelViewer({
   parts,
   completedParts,
@@ -1613,6 +1621,7 @@ function ModelViewer({
   onInvalidClick,
   onFumble,
   onInteractionMessage,
+  onModelsReady,
 }) {
   const [isDraggingPart, setIsDraggingPart] = useState(false);
   const [, setTelemetry] = useState(null);
@@ -1716,6 +1725,7 @@ function ModelViewer({
               onDragStateChange={setIsDraggingPart}
               onTelemetry={setTelemetry}
             />
+            <SceneReadyNotifier onReady={onModelsReady} />
           </Suspense>
         </ModelErrorBoundary>
 
@@ -1735,7 +1745,7 @@ function ModelViewer({
           type="button"
           onClick={() => setOverviewRequest((value) => value + 1)}
           disabled={isDraggingPart}
-          className="rounded-xl border border-[#FFD41C]/30 bg-[#FFD41C]/12 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#7dffdc] shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl transition hover:bg-[#FFD41C]/20 disabled:cursor-not-allowed disabled:opacity-45"
+          className="articton-reset-camera rounded-xl border border-[#FFD41C]/30 bg-[#FFD41C]/12 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#7dffdc] shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl transition hover:bg-[#FFD41C]/20 disabled:cursor-not-allowed disabled:opacity-45"
         >
           Reset Camera View
         </button>
@@ -1879,7 +1889,7 @@ function ChecklistSidebar({ open, onToggle, completedParts, checklistOrder, onRe
   );
 }
 
-function TestIntroCard({ onStart }) {
+function TestIntroCard({ onStart, statusMessage, modelsReady }) {
   return (
     <div className="absolute inset-0 z-[750] flex items-center justify-center bg-[#050912]/78 p-5 backdrop-blur-md">
       <div className="relative w-full max-w-2xl overflow-hidden rounded-[30px] border border-[#FFD41C]/30 bg-[#0b1220]/96 p-7 shadow-[0_40px_120px_rgba(0,0,0,0.7)] md:p-9">
@@ -1913,7 +1923,7 @@ function TestIntroCard({ onStart }) {
             <div className="rounded-2xl border border-[#1a2438] bg-white/[0.03] p-4">
               <div className="text-xs font-black uppercase tracking-[0.16em] text-[#FFD41C]">Scored</div>
               <div className="mt-2 text-xs leading-5 text-[#9fb0ca]">
-                Confirmed sequence errors and failed placement attempts cost points.
+                Sequence errors cost points; placement misses only block progress until corrected.
               </div>
             </div>
           </div>
@@ -1925,11 +1935,13 @@ function TestIntroCard({ onStart }) {
             <button
               type="button"
               onClick={onStart}
-              className="rounded-2xl bg-[#FFD41C] px-7 py-3 text-sm font-black text-[#07111d] shadow-[0_16px_45px_rgba(255,212,28,0.25)] transition hover:scale-[1.03]"
+              disabled={!modelsReady}
+              className="rounded-2xl bg-[#FFD41C] px-7 py-3 text-sm font-black text-[#07111d] shadow-[0_16px_45px_rgba(255,212,28,0.25)] transition hover:scale-[1.03] disabled:cursor-wait disabled:opacity-65 disabled:hover:scale-100"
             >
-              Begin Test →
+              {modelsReady ? "Begin Test →" : "Loading 3D models…"}
             </button>
           </div>
+          {statusMessage ? <p className="mt-3 text-xs text-[#ffb4a0]" role="status">{statusMessage}</p> : null}
         </div>
       </div>
     </div>
@@ -2037,6 +2049,7 @@ export default function AMDFullDisassemblyPracticalTest({ onFinish, onBack }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showIntro, setShowIntro] = useState(true);
+  const [modelsReady, setModelsReady] = useState(false);
   const [testActive, setTestActive] = useState(false);
   const [completedParts, setCompletedParts] = useState([]);
   const checklistOrder = REMOVAL_SEQUENCE;
@@ -2048,6 +2061,7 @@ export default function AMDFullDisassemblyPracticalTest({ onFinish, onBack }) {
   const lastOrderMistakeRef = useRef({ partKey: null, timestamp: 0 });
 
   const startedAtRef = useRef(null);
+  const practicalAttemptIdRef = useRef(null);
   const finalizationTimerRef = useRef(null);
   const [startedAt, setStartedAt] = useState(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -2136,67 +2150,22 @@ export default function AMDFullDisassemblyPracticalTest({ onFinish, onBack }) {
     return () => window.clearInterval(timerId);
   }, [result, testActive]);
 
-  const saveTestResult = useCallback(
-    async (finalResult) => {
-      if (!firebaseUser) return;
-      try {
-        const userRef = doc(db, "users", firebaseUser.uid);
-        await setDoc(
-          userRef,
-          {
-            practicalTests: {
-              amdDisassembly: {
-                score: finalResult.score,
-                finalScore: finalResult.finalScore,
-                startingScore: finalResult.startingScore,
-                scorePercent: finalResult.scorePercent,
-                percent: finalResult.scorePercent,
-                percentage: finalResult.scorePercent,
-                passed: finalResult.passed,
-                status: finalResult.status,
-                grade: computeGrade(finalResult.score).letter,
-                elapsedSeconds: finalResult.elapsedSeconds,
-                wrongOrderCount: finalResult.wrongOrderCount,
-                sequenceDeduction: finalResult.sequenceDeduction,
-                orderPenaltyPoints: finalResult.orderPenaltyPoints,
-                timeDeduction: finalResult.timeDeduction,
-                timePenaltyPoints: finalResult.timePenaltyPoints,
-                totalDeduction: finalResult.totalDeduction,
-                completedAt: serverTimestamp(),
-              },
-            },
-          },
-          { merge: true }
-        );
-        const achievement = await unlockAchievement(firebaseUser.uid, "amdDisassembly", { score: finalResult.score });
-        setAchievementToast(achievement);
-        window.setTimeout(() => setAchievementToast(null), 4200);
-      } catch (error) {
-        console.error("Error saving AMD Disassembly Practical Test result:", error);
-      }
-    },
-    [firebaseUser]
-  );
-
   const finishTest = useCallback(
-    (
+    async (
       finalCompletedParts = completedPartsRef.current,
       finalWrongOrder = wrongOrderCountRef.current
     ) => {
-      const startTimestamp = startedAtRef.current ?? startedAt;
-      const finalElapsedSeconds = startTimestamp
-        ? (Date.now() - startTimestamp) / 1000
-        : 0;
-      const scoring = calculateScore(finalWrongOrder, finalElapsedSeconds);
-      const score = scoring.score;
-      const finalResult = {
-        ...scoring,
-        score,
-        finalScore: score,
-        elapsedSeconds: finalElapsedSeconds,
-        partsCompleted: finalCompletedParts.length,
-        wrongOrderCount: finalWrongOrder,
-      };
+      setTestActive(false);
+      setValidationMessage("Finalizing your result securely...");
+      let finalResult;
+      try {
+        finalResult = await finishAuthoritativePractical({ attemptId: practicalAttemptIdRef.current, practicalId: "amdDisassembly", wrongOrderCount: finalWrongOrder, completedParts: finalCompletedParts });
+      } catch (error) {
+        console.error("Error finalizing AMD Disassembly Practical Test:", error);
+        setValidationMessage("The result could not be finalized. Check your connection and try again.");
+        setTestActive(true);
+        return;
+      }
 
       const exitFullscreen = document.exitFullscreen || document.webkitExitFullscreen;
       if ((document.fullscreenElement || document.webkitFullscreenElement) && exitFullscreen) {
@@ -2207,11 +2176,13 @@ export default function AMDFullDisassemblyPracticalTest({ onFinish, onBack }) {
       } else {
         setResult(finalResult);
       }
-      setTestActive(false);
       playCompletionSound(settings.sound, true);
-      void saveTestResult(finalResult);
+      if (finalResult.passed) {
+        setAchievementToast(resolveAchievement("amdDisassembly"));
+        window.setTimeout(() => setAchievementToast(null), 4200);
+      }
     },
-    [saveTestResult, settings.sound, startedAt]
+    [settings.sound]
   );
 
   const handlePartCompleted = useCallback(
@@ -2263,14 +2234,24 @@ export default function AMDFullDisassemblyPracticalTest({ onFinish, onBack }) {
     []
   );
 
-  const handleStartTest = useCallback(() => {
-    setShowIntro(false);
-    setTestActive(true);
-    const started = Date.now();
-    startedAtRef.current = started;
-    setStartedAt(started);
-    setElapsedSeconds(0);
-  }, []);
+  const handleStartTest = useCallback(async () => {
+    if (!firebaseUser) {
+      setValidationMessage("Sign in before starting the practical test.");
+      return;
+    }
+    try {
+      practicalAttemptIdRef.current = await startAuthoritativePractical("amdDisassembly");
+      setShowIntro(false);
+      setTestActive(true);
+      const started = Date.now();
+      startedAtRef.current = started;
+      setStartedAt(started);
+      setElapsedSeconds(0);
+    } catch (error) {
+      console.error("Error starting AMD Disassembly Practical Test:", error);
+      setValidationMessage("The practical test could not be started. Check your connection and try again.");
+    }
+  }, [firebaseUser]);
 
   const handleBackToDashboard = () => {
     let handled = false;
@@ -2291,7 +2272,7 @@ export default function AMDFullDisassemblyPracticalTest({ onFinish, onBack }) {
         <ModuleBackground />
         <AchievementToast achievement={achievementToast} onClose={() => setAchievementToast(null)} />
 
-        {showIntro ? <TestIntroCard onStart={handleStartTest} /> : null}
+        {showIntro ? <TestIntroCard onStart={handleStartTest} statusMessage={validationMessage} modelsReady={modelsReady} /> : null}
         {result ? (
           <ResultsCard result={result} onRetry={resetTest} onBackToDashboard={handleBackToDashboard} />
         ) : null}
@@ -2361,7 +2342,7 @@ export default function AMDFullDisassemblyPracticalTest({ onFinish, onBack }) {
                 <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_120px_rgba(0,0,0,0.55)]" />
 
                 <div
-                  className="absolute top-3 bottom-3 right-3 z-[40] overflow-hidden rounded-[18px] border border-[#1a2438] bg-black/20 transition-all duration-300 md:top-4 md:bottom-4 md:right-4"
+                  className="articton-viewer-shell absolute top-3 bottom-3 right-3 z-[40] overflow-hidden rounded-[18px] border border-[#1a2438] bg-black/20 transition-all duration-300 md:top-4 md:bottom-4 md:right-4"
                   style={{ left: sidebarOpen ? "clamp(220px, 22vw, 280px)" : 64 }}
                 >
                   <ModelViewer
@@ -2374,6 +2355,7 @@ export default function AMDFullDisassemblyPracticalTest({ onFinish, onBack }) {
                     onInvalidClick={handleInvalidClick}
                     onFumble={handleFumble}
                     onInteractionMessage={setValidationMessage}
+                    onModelsReady={() => setModelsReady(true)}
                   />
                 </div>
               </div>
@@ -2394,6 +2376,5 @@ export default function AMDFullDisassemblyPracticalTest({ onFinish, onBack }) {
 }
 
 /* Preload the AMD table and every component model up front */
-PART_MODELS.forEach((part) => useGLTF.preload(encodeURI(part.path)));
 
 

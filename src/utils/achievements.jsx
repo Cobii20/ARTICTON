@@ -1,6 +1,4 @@
 import React from "react";
-import { doc, serverTimestamp, setDoc } from "firebase/firestore";
-import { db } from "../firebase.js";
 
 export const ACHIEVEMENTS = {
   module2: { id: "module-2-complete", title: "Module 2 Complete", subtitle: "Completed the full disassembly module." },
@@ -22,7 +20,7 @@ function getPlatformKey(platform) {
   return "";
 }
 
-function resolveAchievement(key, extra = {}) {
+export function resolveAchievement(key, extra = {}) {
   const platform = getPlatformKey(extra.platform);
 
   if (key === "module2" && platform) {
@@ -39,21 +37,8 @@ function resolveAchievement(key, extra = {}) {
 export async function unlockAchievement(userId, key, extra = {}) {
   const achievement = resolveAchievement(key, extra);
   if (!userId || !achievement) return null;
-
-  await setDoc(
-    doc(db, "users", userId),
-    {
-      accountAchievements: {
-        [achievement.id]: {
-          ...achievement,
-          ...extra,
-          unlocked: true,
-          unlockedAt: serverTimestamp(),
-        },
-      },
-    },
-    { merge: true }
-  );
+  // Compatibility helper only. Authoritative achievement writes are performed
+  // by callable Functions after a verified module or practical finalization.
   return achievement;
 }
 

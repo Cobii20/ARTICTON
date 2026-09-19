@@ -1,27 +1,24 @@
 import { getModuleVisit, recordModuleVisit } from "./utils/moduleVisits";
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "./firebase";
 
 // Main pages
-import ArtictonLandingPage from "./PAGES/LandingPage";
-import Dashboard from "./PAGES/Dashboard";
-import AdminPage from "./PAGES/Adminpage";
-
-// Module pages
-import Module1Page from "./PAGES/Modules/Module1";
-import Module2Page from "./PAGES/Modules/Module2";
-import Module3Page from "./PAGES/Modules/Module3";
-
-
-// Module 2 platform pages
-import Module2DisassemblyAMD from "./PAGES/Modules/Module2/Module2DisassmblyAMD";
-import Module2DisassemblyINTEL from "./PAGES/Modules/Module2/Module2DisassmblyINTEL";
-
-// Module 3 platform pages
-import Module3AssemblyAMD from "./PAGES/Modules/Module3/Module3AssemblyAMD";
-import Module3AssemblyINTEL from "./PAGES/Modules/Module3/Module3AssemblyINTEL";
-import FacultyPage from "./PAGES/FacultyPage";
+const ArtictonLandingPage = lazy(() => import("./PAGES/LandingPage"));
+const Dashboard = lazy(() => import("./PAGES/Dashboard"));
+const AdminPage = lazy(() => import("./PAGES/Adminpage"));
+const FacultyPage = lazy(() => import("./PAGES/FacultyPage"));
+const Module1Page = lazy(() => import("./PAGES/Modules/Module1"));
+const Module2Page = lazy(() => import("./PAGES/Modules/Module2"));
+const Module3Page = lazy(() => import("./PAGES/Modules/Module3"));
+const Module2DisassemblyAMD = lazy(() => import("./PAGES/Modules/Module2/Module2DisassmblyAMD"));
+const Module2DisassemblyINTEL = lazy(() => import("./PAGES/Modules/Module2/Module2DisassmblyINTEL"));
+const Module3AssemblyAMD = lazy(() => import("./PAGES/Modules/Module3/Module3AssemblyAMD"));
+const Module3AssemblyINTEL = lazy(() => import("./PAGES/Modules/Module3/Module3AssemblyINTEL"));
+const AMDFullAssemblyPracticalTest = lazy(() => import("./PAGES/PracticalTests/AMD/AMDFullAssemblyPracticalTest.jsx"));
+const AMDFullDisassemblyPracticalTest = lazy(() => import("./PAGES/PracticalTests/AMD/AMDFullDisassemblyPracticalTest.jsx"));
+const INTELFullAssemblyPracticalTest = lazy(() => import("./PAGES/PracticalTests/INTEL/INTELFullAssemblyPracticalTest.jsx"));
+const INTELFullDisassemblyPracticalTest = lazy(() => import("./PAGES/PracticalTests/INTEL/INTELFullDisassemblyPracticalTest.jsx"));
 import {
   applyThemeSettings,
   getUserSettings,
@@ -128,12 +125,19 @@ export default function App() {
     setPage("dashboard");
   };
 
+  const returnToPracticeTests = () => {
+    setDashboardSection("Practice Tests");
+    setPage("dashboard");
+  };
+
+  let content;
+
   if (page === "landing") {
-    return <ArtictonLandingPage onLogin={handleLogin} />;
+    content = <ArtictonLandingPage onLogin={handleLogin} />;
   }
 
-  if (page === "module-1") {
-    return (
+  else if (page === "module-1") {
+    content = (
       <Module1Page
         resumeVisit={resumeVisit}
         onBack={handleModuleBack}
@@ -142,8 +146,8 @@ export default function App() {
     );
   }
 
-  if (page === "module-2") {
-    return (
+  else if (page === "module-2") {
+    content = (
       <Module2Page
         onBack={handleModuleBack}
         onLogout={handleLogout}
@@ -153,8 +157,8 @@ export default function App() {
     );
   }
 
-  if (page === "module-2-amd") {
-    return (
+  else if (page === "module-2-amd") {
+    content = (
       <Module2DisassemblyAMD
         onFinish={returnToDashboard}
         onBack={handleModuleBack}
@@ -164,8 +168,8 @@ export default function App() {
     );
   }
 
-  if (page === "module-2-intel") {
-    return (
+  else if (page === "module-2-intel") {
+    content = (
       <Module2DisassemblyINTEL
         onFinish={returnToDashboard}
         onBack={handleModuleBack}
@@ -175,8 +179,8 @@ export default function App() {
     );
   }
 
-  if (page === "module-3") {
-    return (
+  else if (page === "module-3") {
+    content = (
       <Module3Page
         onBack={handleModuleBack}
         onLogout={handleLogout}
@@ -185,8 +189,8 @@ export default function App() {
     );
   }
 
-  if (page === "module-3-amd") {
-    return (
+  else if (page === "module-3-amd") {
+    content = (
       <Module3AssemblyAMD
         onFinish={returnToDashboard}
         onBack={handleModuleBack}
@@ -196,8 +200,8 @@ export default function App() {
     );
   }
 
-  if (page === "module-3-intel") {
-    return (
+  else if (page === "module-3-intel") {
+    content = (
       <Module3AssemblyINTEL
         onFinish={returnToDashboard}
         onBack={handleModuleBack}
@@ -209,8 +213,8 @@ export default function App() {
 
  
 
-  if (page === "admin") {
-    return (
+  else if (page === "admin") {
+    content = (
       <AdminPage
         adminUser={userProfile}
         onLogout={handleLogout}
@@ -218,16 +222,32 @@ export default function App() {
     );
   }
 
-  if (page === "faculty") {
-    return <FacultyPage questionEditorOnly={String(userProfile?.role || "").trim().toLowerCase() === "staff"} onLogout={handleLogout} />;
+  else if (page === "faculty") {
+    content = <FacultyPage questionEditorOnly={String(userProfile?.role || "").trim().toLowerCase() === "staff"} onLogout={handleLogout} />;
   }
 
-  return (
+  else if (page === "amd-full-assembly-practical") {
+    content = <AMDFullAssemblyPracticalTest onBack={returnToPracticeTests} />;
+  }
+
+  else if (page === "amd-full-disassembly-practical") {
+    content = <AMDFullDisassemblyPracticalTest onBack={returnToPracticeTests} />;
+  }
+
+  else if (page === "intel-full-assembly-practical") {
+    content = <INTELFullAssemblyPracticalTest onBack={returnToPracticeTests} />;
+  }
+
+  else if (page === "intel-full-disassembly-practical") {
+    content = <INTELFullDisassemblyPracticalTest onBack={returnToPracticeTests} />;
+  }
+  else if (!content) content = (
     <Dashboard
       initialSection={dashboardSection}
       profileEditRequestId={profileEditRequestId}
       onProfileEditRequestHandled={() => setProfileEditRequestId(0)}
       onLogout={handleLogout}
+      onOpenPractical={(practicalId) => setPage(practicalId)}
       onOpenModule={(module) => {
         const id = typeof module === "object" ? module.id : module;
 
@@ -247,5 +267,11 @@ export default function App() {
         if (nextPage) setPage(nextPage);
       }}
     />
+  );
+
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-[#0a0e17] text-white">Loading…</div>}>
+      {content}
+    </Suspense>
   );
 }

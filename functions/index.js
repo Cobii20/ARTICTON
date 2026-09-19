@@ -1,4 +1,5 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onDocumentWritten } = require("firebase-functions/v2/firestore");
 const admin = require("firebase-admin");
 const { PROCEDURE_DETAILS, getProcedureText } = require("./procedureNotes");
 
@@ -8,6 +9,129 @@ if (admin.apps.length === 0) {
 
 const db = admin.firestore();
 const authAdmin = admin.auth();
+
+function cleanProfilePhotoUrl(profile = {}) {
+  const candidate = String(
+    profile.avatarUrl ||
+    profile.photoURL ||
+    profile.profilePhotoUrl ||
+    profile.profilePictureUrl ||
+    profile.imageUrl ||
+    ""
+  ).trim();
+  if (!candidate) return "";
+
+  if (candidate.startsWith("/")) {
+    return candidate.length <= 1024 && !candidate.startsWith("//") ? candidate : "";
+  }
+
+  if (/^data:image\/(?:png|jpe?g|webp|gif);base64,[a-z0-9+/=\r\n]+$/i.test(candidate)) {
+    return candidate.length <= 750000 ? candidate : "";
+  }
+
+  if (candidate.length > 2048) return "";
+
+  try {
+    const url = new URL(candidate);
+    return url.protocol === "https:" ? url.toString() : "";
+  } catch {
+    return "";
+  }
+}
+
+const PROGRESS_VALUE_FIELDS = Object.freeze([
+  "score", "latestScore", "finalScore", "total", "latestTotal", "maxScore",
+  "scorePercent", "percent", "percentage", "progressPercent", "completionPercent", "completed",
+  "finished", "passed", "status", "grade", "letterGrade", "elapsedSeconds",
+  "durationSeconds", "timeSeconds", "wrongOrderCount", "wrongOrder",
+  "sequenceDeduction", "orderPenaltyPoints", "timeDeduction", "timePenaltyPoints",
+  "totalDeduction", "mistakes", "deductionPercent", "wrongClickDeduction",
+]);
+
+function cleanProgressEntry(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+
+  const result = {};
+  for (const field of PROGRESS_VALUE_FIELDS) {
+    const fieldValue = value[field];
+    if (["string", "number", "boolean"].includes(typeof fieldValue)) {
+      result[field] = typeof fieldValue === "string" ? fieldValue.slice(0, 80) : fieldValue;
+    }
+  }
+
+  // The dashboards only need to know whether a completion marker exists; they
+  // do not need the timestamp value itself in this faculty-facing response.
+  if (value.completedAt) result.completedAt = true;
+  if (value.timestamp) result.timestamp = true;
+  if (value.updatedAt) result.updatedAt = true;
+
+  return result;
+}
+
+function cleanProgressMap(profile, field, allowedKeys) {
+  const source = profile?.[field];
+  if (!source || typeof source !== "object" || Array.isArray(source)) return {};
+
+  return Object.fromEntries(
+    allowedKeys
+      .map((key) => [key, cleanProgressEntry(source[key])])
+      .filter(([, value]) => value !== null)
+  );
+}
+
+function studentSummaryFromProfile(uid, profile = {}) {
+  const firstName = String(profile.firstName || "").trim().slice(0, 80);
+  const lastName = String(profile.lastName || "").trim().slice(0, 80);
+  const role = String(profile.role || "student").toLowerCase();
+  return {
+    uid,
+    firstName,
+    lastName,
+    displayName: [firstName, lastName].filter(Boolean).join(" ") || "Student",
+    avatarUrl: cleanProfilePhotoUrl(profile),
+    program: String(profile.program || "").trim().slice(0, 100),
+    role: role === "student" ? "student" : role,
+    status: String(profile.status || "active").trim().slice(0, 30),
+    quizProgress: cleanProgressMap(profile, "quizProgress", [
+      "module1", "module2", "module3", "module4",
+    ]),
+    practicalProgress: cleanProgressMap(profile, "practicalProgress", [
+      "fullAssembly", "fullDisassembly",
+    ]),
+    practicalTests: cleanProgressMap(profile, "practicalTests", [
+      "amdDisassembly", "intelDisassembly", "amdAssembly", "intelAssembly",
+    ]),
+    mobileModuleScores: cleanProgressMap(profile, "mobileModuleScores", [
+      "module1Content", "module1Pre", "module1Post",
+      "module2Content", "module2Pre", "module2Post",
+      "module3Content", "module3Pre", "module3Post",
+      "module4Content", "module4Pre", "module4Post",
+    ]),
+    mobilePracticeScores: cleanProgressMap(profile, "mobilePracticeScores", [
+      "practiceExam1", "practiceExam2",
+    ]),
+    schemaVersion: 1,
+  };
+}
+
+exports.syncStudentSummary = onDocumentWritten("users/{uid}", async (event) => {
+  const uid = event.params.uid;
+  const after = event.data?.after;
+  const summaryRef = db.doc(`student_summaries/${uid}`);
+  if (!after?.exists) {
+    await summaryRef.delete();
+    return;
+  }
+  const profile = after.data();
+  if (String(profile.role || "student").toLowerCase() !== "student") {
+    await summaryRef.delete();
+    return;
+  }
+  await summaryRef.set({
+    ...studentSummaryFromProfile(uid, profile),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  }, { merge: false });
+});
 
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 const GEMINI_TUTOR_ENABLED = process.env.GEMINI_TUTOR_ENABLED === "true";
@@ -125,6 +249,72 @@ async function assertAdmin(request) {
 
   return authContext;
 }
+
+async function assertFacultyOrAdmin(request) {
+  const authContext = await requireAuthenticatedUser(request);
+  const profileSnapshot = await db.doc(`users/${authContext.uid}`).get();
+
+  if (!profileSnapshot.exists) {
+    throw new HttpsError("permission-denied", "Faculty profile not found.");
+  }
+
+  const role = String(profileSnapshot.data().role || "").trim().toLowerCase();
+  if (role !== "faculty" && role !== "admin") {
+    throw new HttpsError("permission-denied", "Faculty access is required.");
+  }
+
+  return authContext;
+}
+
+exports.listStudentSummaries = onCall(callableOptions, async (request) => {
+  await assertFacultyOrAdmin(request);
+  const snapshot = await db.collection("users")
+    .where("role", "==", "student")
+    .limit(1000)
+    .get();
+
+  return {
+    students: snapshot.docs.map((studentDoc) =>
+      studentSummaryFromProfile(studentDoc.id, studentDoc.data())
+    ),
+  };
+});
+
+exports.submitSupportTicket = onCall(callableOptions, async (request) => {
+  const { uid, email } = await requireAuthenticatedUser(request);
+  requirePlainObject(request.data, "request", ["subject", "message"]);
+  const subject = requireBoundedString(request.data.subject, "subject", 160);
+  const message = requireBoundedString(request.data.message, "message", 5000);
+
+  // One ticket per ten minutes and no more than ten per day prevents repeated
+  // submissions while still leaving room for legitimate follow-up concerns.
+  await enforceRateLimit(uid, "submit_support_ticket", {
+    windowMs: 10 * 60 * 1000,
+    windowMax: 1,
+    dailyMax: 10,
+  });
+
+  const profileSnapshot = await db.doc(`users/${uid}`).get();
+  const profile = profileSnapshot.exists ? profileSnapshot.data() : {};
+  const firstName = String(profile.firstName || "").trim();
+  const lastName = String(profile.lastName || "").trim();
+  const name = [firstName, lastName].filter(Boolean).join(" ") ||
+    String(profile.displayName || "Student").trim().slice(0, 120);
+
+  const ticketRef = db.collection("supportTickets").doc();
+  await ticketRef.set({
+    uid,
+    name: name.slice(0, 120),
+    email,
+    subject,
+    message,
+    screenshotURL: "",
+    status: "open",
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  return { ticketId: ticketRef.id, submitted: true };
+});
 
 function cleanTutorMode(value) {
   const mode = String(value || "").trim().toLowerCase();
@@ -673,6 +863,9 @@ const PRACTICAL_IDS = Object.freeze({
   amdDisassembly: { mode: "disassembly", platform: "amd" },
   intelDisassembly: { mode: "disassembly", platform: "intel" },
 });
+const PRACTICAL_COMPONENTS = Object.freeze([
+  "cpu", "ram1", "ram2", "ssd", "psu", "motherboard", "hdd", "gpu",
+]);
 
 function practicalScore(wrongOrderCount, elapsedSeconds) {
   const sequenceDeduction = Math.min(25, wrongOrderCount * 6);
@@ -727,16 +920,21 @@ exports.finishPracticalAttempt = onCall(callableOptions, async (request) => {
   if (!PRACTICAL_IDS[practicalId] || !Number.isInteger(wrongOrderCount) || wrongOrderCount < 0 || wrongOrderCount > 100) {
     throw new HttpsError("invalid-argument", "Practical result fields are invalid.");
   }
-  if (!Array.isArray(completedParts) || completedParts.length < 6 || completedParts.length > 20 ||
+  if (!Array.isArray(completedParts) || completedParts.length !== PRACTICAL_COMPONENTS.length ||
       completedParts.some((part) => typeof part !== "string" || !part.trim() || part.length > 60) ||
-      new Set(completedParts).size !== completedParts.length) {
+      new Set(completedParts).size !== completedParts.length ||
+      PRACTICAL_COMPONENTS.some((part) => !completedParts.includes(part))) {
     throw new HttpsError("invalid-argument", "The completed component list is invalid.");
   }
   await enforceRateLimit(uid, "finish_practical", { windowMs: 60_000, windowMax: 6, dailyMax: 30 });
   const attemptRef = db.doc(`users/${uid}/practical_attempts/${attemptId}`);
+  const resultRef = db.doc(`users/${uid}/practical_results/${practicalId}`);
   let responseResult;
   await db.runTransaction(async (transaction) => {
-    const snapshot = await transaction.get(attemptRef);
+    const [snapshot, previousResultSnapshot] = await Promise.all([
+      transaction.get(attemptRef),
+      transaction.get(resultRef),
+    ]);
     if (!snapshot.exists) throw new HttpsError("not-found", "Practical attempt not found.");
     const attempt = snapshot.data();
     if (attempt.uid !== uid || Number(attempt.authTime) !== authTime || attempt.practicalId !== practicalId) {
@@ -751,16 +949,22 @@ exports.finishPracticalAttempt = onCall(callableOptions, async (request) => {
     }
     const elapsedSeconds = Math.max(0, Math.floor((Date.now() - attempt.startedAt.toMillis()) / 1000));
     const result = practicalScore(wrongOrderCount, elapsedSeconds);
-    responseResult = result;
+    const previousResult = previousResultSnapshot.exists ? previousResultSnapshot.data() : {};
+    const highestScore = Math.max(
+      Number(previousResult.highestScore ?? previousResult.bestScore ?? previousResult.score ?? 0),
+      Number(result.score || 0),
+    );
+    responseResult = { ...result, highestScore };
     transaction.update(attemptRef, {
       status: "submitted",
-      result,
+      result: responseResult,
       completedParts,
       trustLevel: "client-reported-actions-server-timed",
       submittedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
-    transaction.set(db.doc(`users/${uid}/practical_results/${practicalId}`), {
+    transaction.set(resultRef, {
       ...result,
+      highestScore,
       uid,
       practicalId,
       attemptId,
@@ -779,4 +983,48 @@ exports.finishPracticalAttempt = onCall(callableOptions, async (request) => {
     });
   });
   return responseResult;
+});
+
+const GUIDED_MODULES = Object.freeze({
+  module2AMD: { module: 2, platform: "amd", achievementId: "module-2-amd-disassembly-complete" },
+  module2INTEL: { module: 2, platform: "intel", achievementId: "module-2-intel-disassembly-complete" },
+  module3AMD: { module: 3, platform: "amd", achievementId: "module-3-amd-assembly-complete" },
+  module3INTEL: { module: 3, platform: "intel", achievementId: "module-3-intel-assembly-complete" },
+});
+
+exports.completeGuidedModule = onCall(callableOptions, async (request) => {
+  const { uid, authTime } = await requireAuthenticatedUser(request);
+  requirePlainObject(request.data, "request", ["moduleId"]);
+  const moduleId = requireBoundedString(request.data.moduleId, "moduleId", 30, /^[A-Za-z0-9]+$/);
+  const definition = GUIDED_MODULES[moduleId];
+  if (!definition) throw new HttpsError("invalid-argument", "Unknown guided module.");
+  await enforceRateLimit(uid, "complete_guided_module", { windowMs: 60_000, windowMax: 6, dailyMax: 40 });
+
+  const completionRef = db.doc(`users/${uid}/module_completions/${moduleId}`);
+  const achievementRef = db.doc(`users/${uid}/achievements/${definition.achievementId}`);
+  await db.runTransaction(async (transaction) => {
+    const current = await transaction.get(completionRef);
+    const previous = current.exists ? current.data() : {};
+    transaction.set(completionRef, {
+      uid,
+      authTime,
+      moduleId,
+      ...definition,
+      completed: true,
+      source: "server",
+      trustLevel: "client-reported-guided-actions",
+      attemptCount: Number(previous.attemptCount || 0) + 1,
+      firstCompletedAt: previous.firstCompletedAt || admin.firestore.FieldValue.serverTimestamp(),
+      completedAt: admin.firestore.FieldValue.serverTimestamp(),
+      schemaVersion: 1,
+    });
+    transaction.set(achievementRef, {
+      uid,
+      achievementId: definition.achievementId,
+      earned: true,
+      source: "server",
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+  });
+  return { moduleId, completed: true };
 });

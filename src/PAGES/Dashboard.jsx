@@ -1,27 +1,13 @@
 import { getLastModuleVisit } from "../utils/moduleVisits";
 import ModuleImage from "../Components/ModuleImage";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import Settings from "../Components/Settings";
-import AMDFullAssemblyPracticalTest from "./PracticalTests/AMD/AMDFullAssemblyPracticalTest.jsx";
-import AMDFullDisassemblyPracticalTest from "./PracticalTests/AMD/AMDFullDisassemblyPracticalTest.jsx";
-import INTELFullAssemblyPracticalTest from "./PracticalTests/INTEL/INTELFullAssemblyPracticalTest.jsx";
-import INTELFullDisassemblyPracticalTest from "./PracticalTests/INTEL/INTELFullDisassemblyPracticalTest.jsx";
-import { auth, db, storage } from "../firebase.js";
+import { auth, db } from "../firebase.js";
 import { onAuthStateChanged } from "firebase/auth";
-import {
-  doc,
-  getDoc,
-  updateDoc,
-  serverTimestamp,
-  addDoc,
-  collection,
-} from "firebase/firestore";
-import {
-  ref,
-  uploadBytes,
-  getDownloadURL,
-} from "firebase/storage";
+import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
+import { functions } from "../firebase.js";
 import { fetchMobileScoreDocs, mergeMobileScoresIntoProfile } from "../utils/mobileScores";
 import {
   PRACTICAL_PASSING_PERCENT,
@@ -29,7 +15,6 @@ import {
 } from "../utils/practicalScoring";
 import { ACHIEVEMENTS } from "../utils/achievements.jsx";
 import { getUserSettings } from "../utils/userSettings";
-import { createProfileImageDataUrl, validateProfileImage } from "../utils/profileImages";
 
 function isCompletedProgress(progress) {
   return !!progress?.completed || !!progress?.finished || (progress?.percent || 0) >= 100;
@@ -127,6 +112,7 @@ function makeAchievement({ id, icon = "badge", title, subtitle, result, category
 export default function Dashboard({
   onLogout,
   onOpenModule,
+  onOpenPractical,
   initialSection = "Dashboard",
   profileEditRequestId = 0,
   onProfileEditRequestHandled,
@@ -141,6 +127,7 @@ export default function Dashboard({
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isProfileEditOpen, setIsProfileEditOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const contentScrollRef = useRef(null);
 
 
   const [settings, setSettings] = useState(getUserSettings);
@@ -195,10 +182,11 @@ export default function Dashboard({
     }
   }, [profileEditRequestId, onProfileEditRequestHandled]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const prevHtml = document.documentElement.style.overflow;
     const prevBody = document.body.style.overflow;
 
+    window.scrollTo(0, 0);
     document.documentElement.style.overflow = "hidden";
     document.body.style.overflow = "hidden";
 
@@ -207,6 +195,11 @@ export default function Dashboard({
       document.body.style.overflow = prevBody;
     };
   }, []);
+
+  useLayoutEffect(() => {
+    window.scrollTo(0, 0);
+    if (contentScrollRef.current) contentScrollRef.current.scrollTop = 0;
+  }, [section]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -251,30 +244,7 @@ const openModule = (id, platform)=>{
 
   const openTest = (test) => {
     if (!test || test.locked) return;
-
-    if (test.id === "amd-full-assembly-practical") {
-      setSection("AMD Full Assembly Practical");
-      return;
-    }
-
-    if (test.id === "amd-full-disassembly-practical") {
-      setSection("AMD Full Disassembly Practical");
-      return;
-    }
-
-    if (test.id === "intel-full-assembly-practical") {
-      setSection("INTEL Full Assembly Practical");
-      return;
-    }
-
-    if (test.id === "intel-full-disassembly-practical") {
-      setSection("INTEL Full Disassembly Practical");
-    }
-  };
-
-  const backToPracticeTests = async () => {
-    await refreshUserProfile();
-    setSection("Practice Tests");
+    onOpenPractical?.(test.id);
   };
 
   const data = useMemo(() => {
@@ -526,6 +496,7 @@ const createTestProgress = (result) => {
     total: 100,
     percent: scorePercent,
     scorePercent,
+    highestScore: Number(result.highestScore ?? result.bestScore ?? score),
     completionPercent: 100,
     passed: normalized.passed,
     status: normalized.status,
@@ -894,7 +865,7 @@ const assemblyPracticalUnlocked =
       : section;
 
   return (
-    <div className="articton-app-shell articton-dashboard-page min-h-screen w-full overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased">
+    <div className="articton-app-shell articton-dashboard-page h-[100dvh] w-full overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased">
       <style>{`
         .scrollArea {
           scrollbar-width: none;
@@ -905,7 +876,7 @@ const assemblyPracticalUnlocked =
         }
       `}</style>
 
-      <div className="articton-dashboard-viewport relative h-screen w-full overflow-hidden">
+      <div className="articton-dashboard-viewport relative h-[100dvh] w-full overflow-hidden">
         <DashboardBackground />
 
         <div className="articton-dashboard-inset relative h-full w-full overflow-hidden p-0 md:p-3">
@@ -1012,6 +983,7 @@ const assemblyPracticalUnlocked =
                   )}
 
                   <div
+                    ref={contentScrollRef}
                     className={[
                       "scrollArea min-h-0 min-w-0 max-w-none overflow-auto pr-1",
                       isFullPracticalSection ? "h-full overflow-hidden pr-0" : "",
@@ -1061,30 +1033,6 @@ const assemblyPracticalUnlocked =
                         {section === "Achievements" ? (
                           <PageMotion keyName="achievements" reduce={reduce}>
                             <AchievementsPage achievements={data.achievements} tests={data.tests} modules={allModules} />
-                          </PageMotion>
-                        ) : null}
-
-                        {section === "AMD Full Assembly Practical" ? (
-                          <PageMotion keyName="amd-full-assembly" reduce={reduce} className="relative h-full min-h-[680px] w-full min-w-0 max-w-none overflow-hidden">
-                            <AMDFullAssemblyPracticalTest onBack={backToPracticeTests} />
-                          </PageMotion>
-                        ) : null}
-
-                        {section === "AMD Full Disassembly Practical" ? (
-                          <PageMotion keyName="amd-full-disassembly" reduce={reduce} className="relative h-full min-h-[680px] w-full min-w-0 max-w-none overflow-hidden">
-                            <AMDFullDisassemblyPracticalTest onBack={backToPracticeTests} />
-                          </PageMotion>
-                        ) : null}
-
-                        {section === "INTEL Full Assembly Practical" ? (
-                          <PageMotion keyName="intel-full-assembly" reduce={reduce} className="relative h-full min-h-[680px] w-full min-w-0 max-w-none overflow-hidden">
-                            <INTELFullAssemblyPracticalTest onBack={backToPracticeTests} />
-                          </PageMotion>
-                        ) : null}
-
-                        {section === "INTEL Full Disassembly Practical" ? (
-                          <PageMotion keyName="intel-full-disassembly" reduce={reduce} className="relative h-full min-h-[680px] w-full min-w-0 max-w-none overflow-hidden">
-                            <INTELFullDisassemblyPracticalTest onBack={backToPracticeTests} />
                           </PageMotion>
                         ) : null}
 
@@ -1360,7 +1308,6 @@ function CustomerServiceModal({ isOpen, onClose, user }) {
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [submitted, setSubmitted] = useState(false);
-  const [screenshot, setScreenshot] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [submitError, setSubmitError] = useState("");
 
@@ -1375,30 +1322,10 @@ function CustomerServiceModal({ isOpen, onClose, user }) {
       setSubmitError("Please sign in again before sending a support request.");
       return;
     }
-    if (screenshot && (!screenshot.type.startsWith("image/") || screenshot.size >= 5 * 1024 * 1024)) {
-      setSubmitError("Choose an image smaller than 5 MB.");
-      return;
-    }
-
     try {
       setUploading(true);
-      let screenshotURL = "";
-
-      if (screenshot) {
-        const fileRef = ref(storage, `supportTickets/${auth.currentUser.uid}/${Date.now()}-${screenshot.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`);
-        await uploadBytes(fileRef, screenshot);
-        screenshotURL = await getDownloadURL(fileRef);
-      }
-
-      await addDoc(collection(db, "supportTickets"), {
-        name: user.name,
-        email: user.email,
-        subject,
-        message,
-        screenshotURL,
-        status: "open",
-        createdAt: serverTimestamp(),
-      });
+      const submitSupportTicket = httpsCallable(functions, "submitSupportTicket");
+      await submitSupportTicket({ subject: subject.trim(), message: message.trim() });
 
       setSubmitted(true);
 
@@ -1406,12 +1333,15 @@ function CustomerServiceModal({ isOpen, onClose, user }) {
         setSubmitted(false);
         setSubject("");
         setMessage("");
-        setScreenshot(null);
         onClose();
       }, 1800);
     } catch (err) {
       console.error("Error submitting support ticket:", err);
-      setSubmitError("Your request could not be sent. Please try again.");
+      setSubmitError(
+        err?.code === "functions/resource-exhausted"
+          ? "Please wait before sending another support request."
+          : "Your request could not be sent. Please try again."
+      );
     } finally {
       setUploading(false);
     }
@@ -1467,12 +1397,8 @@ function CustomerServiceModal({ isOpen, onClose, user }) {
                 />
               </div>
 
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-[0.2em] text-[#7a8ba8]">Screenshot / Snippet</label>
-                <label className="mt-2 flex cursor-pointer items-center justify-center rounded-2xl border border-dashed border-[#1a2438] bg-white/[0.03] px-4 py-6 text-sm text-[#9fb0c9] transition hover:border-[#FFD41C]/40 hover:bg-white/[0.05]">
-                  <input type="file" accept="image/*" className="hidden" onChange={(e) => setScreenshot(e.target.files?.[0] || null)} />
-                  {screenshot ? screenshot.name : "Upload screenshot"}
-                </label>
+              <div className="rounded-2xl border border-[#1a2438] bg-white/[0.03] px-4 py-3 text-sm text-[#9fb0c9]">
+                Screenshot attachments are disabled until server-side file validation is available.
               </div>
 
               {submitError ? <p role="alert" className="text-sm text-red-400">{submitError}</p> : null}
@@ -1888,18 +1814,14 @@ function AssessmentList({ title, subtitle, items, onOpen, openLabel, retakeLabel
             item.progress.score !== undefined &&
             item.progress.total !== null &&
             item.progress.total !== undefined;
-          const hasPercent =
-            hasProgress &&
-            item.progress.percent !== null &&
-            item.progress.percent !== undefined;
           const hasPracticalDeductions =
             hasProgress &&
             (item.progress.sequenceDeduction !== undefined ||
               item.progress.timeDeduction !== undefined);
 
           const scoreText = hasScore ? `${item.progress.score}/${item.progress.total}` : "—";
-          const scorePercentText = hasPercent
-            ? `${item.progress.scorePercent ?? item.progress.percent}% Score`
+          const highestScoreText = hasScore
+            ? `${item.progress.highestScore ?? item.progress.score}/${item.progress.total}`
             : "—";
           const completionText =
             item.progress?.completionPercent !== undefined
@@ -1932,7 +1854,7 @@ function AssessmentList({ title, subtitle, items, onOpen, openLabel, retakeLabel
                       <span className="text-[#FFD41C]/65">•</span>
                       <span>{completionText}</span>
                       <span className="text-[#FFD41C]/65">•</span>
-                      <span>{scorePercentText}</span>
+                      <span>Highest Score: {highestScoreText}</span>
                       {hasPracticalDeductions ? (
                         <>
                           <span aria-hidden="true" className="text-[#FFD41C]/65">•</span>
@@ -2034,7 +1956,6 @@ function ProfilePage({
   const [lastName, setLastName] = useState("");
   const [mi, setMi] = useState("");
   const [previewImage, setPreviewImage] = useState(user.avatarUrl || "");
-  const [selectedImageFile, setSelectedImageFile] = useState(null);
   const [profileError, setProfileError] = useState("");
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const isEditOpen = typeof controlledIsEditOpen === "boolean" ? controlledIsEditOpen : localIsEditOpen;
@@ -2047,26 +1968,10 @@ function ProfilePage({
     setLastName(parts.length > 1 ? parts[parts.length - 1] : "");
     setMi(user.middleInitial || "");
     setPreviewImage(user.avatarUrl || "");
-    setSelectedImageFile(null);
     setProfileError("");
   }, [user.name, user.avatarUrl, user.middleInitial]);
 
   const fullName = `${firstName} ${mi ? mi + "." : ""} ${lastName}`.trim();
-
-  const handleImageChange = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const validationError = validateProfileImage(file);
-    if (validationError) {
-      setProfileError(validationError);
-      return;
-    }
-
-    setProfileError("");
-    setSelectedImageFile(file);
-    setPreviewImage(URL.createObjectURL(file));
-  };
 
   const handleSave = async () => {
     if (!firebaseUser?.uid) {
@@ -2087,34 +1992,12 @@ function ProfilePage({
     setProfileError("");
 
     try {
-      let avatarUrl = user.avatarUrl || "";
-
-      if (selectedImageFile) {
-        const fallbackAvatarUrl = await createProfileImageDataUrl(selectedImageFile);
-        const safeFileName = selectedImageFile.name.replace(/[^a-zA-Z0-9.-]/g, "_");
-        const imageRef = ref(
-          storage,
-          `profile-photos/${firebaseUser.uid}/${Date.now()}-${safeFileName}`
-        );
-
-        try {
-          await uploadBytes(imageRef, selectedImageFile, {
-            contentType: selectedImageFile.type,
-          });
-          avatarUrl = await getDownloadURL(imageRef);
-        } catch (uploadError) {
-          console.warn("Profile photo storage upload failed; saving compressed image to Firestore instead.", uploadError);
-          avatarUrl = fallbackAvatarUrl;
-        }
-      }
-
       const userRef = doc(db, "users", firebaseUser.uid);
 
       await updateDoc(userRef, {
         firstName: cleanFirstName,
         lastName: cleanLastName,
         middleInitial: cleanMi,
-        avatarUrl,
         updatedAt: serverTimestamp(),
       });
 
@@ -2123,11 +2006,7 @@ function ProfilePage({
         firstName: cleanFirstName,
         lastName: cleanLastName,
         middleInitial: cleanMi,
-        avatarUrl,
       }));
-
-      setPreviewImage(avatarUrl);
-      setSelectedImageFile(null);
       setIsEditOpen(false);
     } catch (err) {
       console.error("Error updating profile:", err);
@@ -2266,11 +2145,7 @@ function ProfilePage({
                   <ProfileAvatar image={previewImage} fallback={(firstName || "U").charAt(0).toUpperCase()} large />
 
                   <div>
-                    <label className="inline-flex cursor-pointer rounded-xl border border-[#FFD41C]/30 bg-[#FFD41C]/12 px-4 py-2.5 text-sm font-semibold text-[#FFD41C] transition hover:bg-[#FFD41C]/18">
-                      Upload picture
-                      <input type="file" accept="image/*" onChange={handleImageChange} disabled={isSavingProfile} className="hidden" />
-                    </label>
-                    <div className="mt-2 text-xs text-[#7a8ba8]">JPG, PNG, or WebP up to 5MB.</div>
+                    <div className="rounded-xl border border-[#1a2438] bg-white/[0.03] px-4 py-2.5 text-sm text-[#9fb0c9]">Photo uploads are disabled for privacy.</div>
                   </div>
                 </div>
 

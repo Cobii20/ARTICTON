@@ -1580,6 +1580,381 @@ html.articton-light .articton-settings-dialog .articton-setting-row [class*="bg-
 /* Landing page                                                               */
 /* -------------------------------------------------------------------------- */
 
+/* 2026 landing refresh: lightweight 2D product story, inspired by the compact
+   engineering-console layout while preserving Articton's NU palette. */
+.articton-home,
+.articton-section {
+  background: #0a0e17;
+  color: #e8ecf4;
+}
+
+.articton-home-screen {
+  min-height: 100svh !important;
+  overflow: visible !important;
+}
+
+.articton-scan-wave {
+  position: absolute;
+  inset-inline: 0;
+  top: -9rem;
+  z-index: 1;
+  height: 10rem;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent, rgba(255, 212, 28, 0.12) 42%, rgba(255, 212, 28, 0.28) 50%, rgba(53, 64, 142, 0.12) 58%, transparent);
+  filter: blur(9px);
+  animation: artictonLandingScan 6s linear infinite;
+}
+
+@keyframes artictonLandingScan {
+  from { transform: translateY(0); opacity: 0; }
+  12% { opacity: 0.75; }
+  80% { opacity: 0.55; }
+  to { transform: translateY(calc(100svh + 12rem)); opacity: 0; }
+}
+
+.articton-landing-hero {
+  min-height: auto !important;
+  background:
+    radial-gradient(circle at 50% 18%, rgba(53, 64, 142, 0.2), transparent 30rem),
+    #0a0e17 !important;
+}
+
+.articton-hero-orb {
+  position: absolute;
+  width: 26rem;
+  height: 26rem;
+  border-radius: 999px;
+  filter: blur(100px);
+  opacity: 0.13;
+  pointer-events: none;
+}
+
+.articton-hero-orb--left { left: -12rem; top: 12rem; background: #35408e; }
+.articton-hero-orb--right { right: -12rem; top: 19rem; background: #ffd41c; }
+
+.articton-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  border: 1px solid rgba(255, 212, 28, 0.28);
+  border-radius: 999px;
+  background: rgba(255, 212, 28, 0.06);
+  padding: 0.48rem 0.85rem;
+  color: #ffd41c;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.articton-hero-title { color: #f6f8fc; }
+.articton-hero-title span {
+  color: #ffd41c;
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 212, 28, 0.45);
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.12em;
+}
+.articton-hero-copy,
+.articton-section-copy { color: #91a0ba; }
+.articton-proof-row { color: #b8c3d6; }
+
+.articton-secondary-cta {
+  border-color: #27324b;
+  background: #121927;
+  color: #dce4f1;
+}
+.articton-secondary-cta:hover { border-color: rgba(255, 212, 28, 0.38); background: #172033; }
+
+.articton-workspace {
+  border: 1px solid #26324a;
+  background: #0d131e;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.42), 0 0 0 1px rgba(53, 64, 142, 0.16);
+}
+.articton-workspace-top { border-bottom: 1px solid #222e44; background: #111824; color: #93a0b5; }
+.articton-workspace-top > div span { display: block; width: 0.55rem; height: 0.55rem; border-radius: 50%; background: #ff6978; }
+.articton-workspace-top > div span:nth-child(2) { background: #ffd41c; }
+.articton-workspace-top > div span:nth-child(3) { background: #5bd69c; }
+.articton-live-pill { border: 1px solid rgba(91, 214, 156, 0.28); border-radius: 999px; background: rgba(91, 214, 156, 0.08); padding: 0.25rem 0.5rem; color: #5bd69c; }
+.articton-workspace-tabs { border-bottom: 1px solid #222e44; background: #0e141f; color: #74839b; }
+.articton-workspace-tabs > * { flex: 0 0 auto; border: 1px solid #222e44; border-radius: 0.45rem; padding: 0.36rem 0.62rem; }
+.articton-workspace-tabs b { border-color: rgba(255, 212, 28, 0.35); background: rgba(255, 212, 28, 0.08); color: #ffd41c; }
+.articton-workspace-body { background-image: linear-gradient(rgba(53,64,142,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(53,64,142,.05) 1px, transparent 1px); background-size: 24px 24px; }
+.articton-workspace-panel { border: 1px solid #222e44; border-radius: 0.75rem; background: rgba(15, 22, 34, 0.94); }
+.articton-workspace-panel h3 { color: #edf2f9; font-size: 0.9rem; font-weight: 800; }
+.articton-workspace-panel > p:not(.articton-panel-label) { color: #8190a8; font-size: 0.72rem; line-height: 1.55; }
+.articton-panel-label { color: #ffd41c; font-size: 0.58rem; font-weight: 900; letter-spacing: 0.14em; text-transform: uppercase; }
+.articton-progress { height: 0.35rem; overflow: hidden; border-radius: 999px; background: #222b3a; }
+.articton-progress span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #35408e, #ffd41c); }
+.articton-mini-stat { border: 1px solid #212c40; border-radius: 0.55rem; background: #111925; padding: 0.65rem; }
+.articton-mini-stat span { display: block; color: #65738a; font-size: 0.55rem; text-transform: uppercase; }
+.articton-mini-stat b { color: #dce5f4; font-size: 0.7rem; }
+.articton-checklist { display: grid; gap: 0.45rem; padding-top: 0.3rem; }
+.articton-checklist p { display: flex; align-items: center; gap: 0.45rem; color: #8795aa; font-size: 0.66rem; }
+.articton-checklist svg { width: 0.75rem; height: 0.75rem; color: #5bd69c; }
+.articton-checklist .is-current { color: #ffd41c; }
+.articton-checklist .is-current span { width: 0.65rem; height: 0.65rem; border: 2px solid #ffd41c; border-radius: 50%; box-shadow: 0 0 9px rgba(255,212,28,.5); }
+
+.articton-hardware-map { background: radial-gradient(circle at 50% 48%, rgba(53,64,142,.15), transparent 45%), #0f1622; }
+.articton-board { left: 50% !important; right: auto !important; top: 15% !important; bottom: 7% !important; width: min(52%, 22rem); transform: translateX(-50%); border: 1px solid #35408e; background: linear-gradient(135deg, transparent 72%, rgba(255,212,28,.05) 72%), linear-gradient(rgba(53,64,142,.12) 1px, transparent 1px), linear-gradient(90deg, rgba(53,64,142,.12) 1px, transparent 1px), #090e15; background-size: auto, 13px 13px, 13px 13px, auto; box-shadow: inset 0 0 28px rgba(53,64,142,.12), 0 18px 35px rgba(0,0,0,.28); }
+.articton-io-shield { position: absolute; left: 0; top: 3%; width: 12%; height: 44%; border-right: 1px solid #4c5d7c; background: linear-gradient(135deg, #161e2c 0 42%, #35408e 43% 48%, #151a24 49%); }
+.articton-io-shield i { display: block; width: 45%; height: 5px; margin: 12px auto; border: 1px solid #6f7c91; border-radius: 2px; }
+.articton-vrm { position: absolute; background: linear-gradient(135deg, #826b09, #b7940b 45%, #544609 46%); clip-path: polygon(0 0, 86% 0, 100% 35%, 86% 100%, 0 100%, 10% 50%); }
+.articton-vrm--top { left: 22%; top: 0; width: 48%; height: 13%; }
+.articton-vrm--left { left: 13%; top: 16%; width: 17%; height: 32%; transform: rotate(180deg); }
+.articton-cpu-socket { position: absolute; left: 35%; top: 22%; display: grid; place-items: center; width: 27%; height: 28%; border: 2px solid #ffd41c; border-radius: 0.35rem; background: rgba(255,212,28,.06); color: #ffd41c; }
+.articton-cpu-socket span { font-size: 0.55rem; font-weight: 900; letter-spacing: .12em; }
+.articton-ram-slots { position: absolute; right: 7%; top: 15%; display: flex; gap: 4px; height: 40%; }
+.articton-ram-slots i { width: 6px; border: 1px solid #5bd69c; border-radius: 2px; background: rgba(91,214,156,.12); }
+.articton-pcie { position: absolute; left: 18%; bottom: 12%; display: grid; gap: 7px; width: 55%; }
+.articton-pcie i { height: 6px; border: 1px solid #6684c9; border-radius: 2px; background: rgba(102,132,201,.16); }
+.articton-audio { position: absolute; left: 2%; bottom: 2%; display: flex; flex-wrap: wrap; gap: 3px; width: 13%; }
+.articton-audio i { width: 6px; height: 6px; border: 1px solid #b7940b; border-radius: 50%; background: #3c3210; }
+.articton-map-label { position: absolute; border: 1px solid #34425d; border-radius: 4px; background: #131d2b; padding: 3px 5px; color: #9aabc5; font-size: .48rem; font-weight: 700; }
+.map-label--one { right: -8%; top: 8%; }.map-label--two { left: 12%; bottom: -8%; }.map-label--three { left: -7%; top: 18%; }
+.articton-ready { color: #5bd69c; font-size: .55rem; font-weight: 900; text-transform: uppercase; }
+.articton-guide-step { margin-top: 1rem; border-left: 2px solid #ffd41c; padding: .25rem 0 .25rem .8rem; }
+.articton-guide-step > span { color: #ffd41c; font-size: .58rem; font-weight: 900; text-transform: uppercase; }
+.articton-guide-step p, .articton-safety p { margin-top: .45rem; color: #8997ac; font-size: .68rem; line-height: 1.55; }
+.articton-safety { margin-top: 1rem; border: 1px solid rgba(255,212,28,.2); border-radius: .6rem; background: rgba(255,212,28,.05); padding: .7rem; }
+.articton-safety b { color: #ffd41c; font-size: .62rem; text-transform: uppercase; }
+.articton-ai-button { display: flex; align-items: center; justify-content: center; gap: .4rem; width: 100%; margin-top: 1rem; border: 1px solid #34415a; border-radius: .55rem; background: #182237; padding: .65rem; color: #dce4ef; font-size: .68rem; font-weight: 800; }
+.articton-workspace-footer { border-top: 1px solid #222e44; background: #101722; color: #7f8da2; }
+.articton-workspace-footer > span { border: 1px solid #263147; border-radius: .35rem; padding: .3rem .5rem; }
+.articton-workspace-footer button { display: inline-flex; align-items: center; gap: .35rem; margin-left: auto; border-radius: .4rem; background: #ffd41c; padding: .38rem .7rem; color: #11162d; font-weight: 900; }
+
+.articton-section--tinted { border-block: 1px solid #19243a; background: #0c121d; }
+.articton-section-eyebrow { color: #ffd41c; font-size: .72rem; font-weight: 900; letter-spacing: .18em; text-transform: uppercase; }
+.articton-section-title { color: #f1f4f9; letter-spacing: -.025em; }
+.articton-value-card, .articton-path-card { border: 1px solid #222d43; border-radius: 1.1rem; background: #0f1622; padding: 1.6rem; transition: transform .2s ease, border-color .2s ease; }
+.articton-value-card:hover, .articton-path-card:hover { transform: translateY(-4px); border-color: rgba(255,212,28,.35); }
+.articton-value-card > div { display: grid; place-items: center; width: 2.8rem; height: 2.8rem; border: 1px solid rgba(255,212,28,.22); border-radius: .8rem; background: rgba(255,212,28,.07); color: #ffd41c; }
+.articton-value-card svg { width: 1.3rem; }.articton-value-card h3, .articton-path-card h3 { margin-top: 1.15rem; color: #ecf1f8; font-size: 1.05rem; font-weight: 800; }
+.articton-value-card p, .articton-path-card p { margin-top: .55rem; color: #8290a7; font-size: .85rem; line-height: 1.65; }
+.articton-path-card > div span { color: #4e5d75; font-family: monospace; font-weight: 800; }
+.articton-process-step { position: relative; border-top: 1px solid #33405a; padding-top: 1.2rem; }
+.articton-process-step span { color: #ffd41c; font-family: monospace; font-size: .75rem; font-weight: 900; }.articton-process-step h3 { margin-top: .65rem; color: #e7edf6; font-weight: 800; }
+.articton-final-cta { border: 1px solid rgba(255,212,28,.22); background: radial-gradient(circle at 50% 0%, rgba(255,212,28,.12), transparent 45%), linear-gradient(135deg, #111936, #0d1422); }
+.articton-final-cta h2 { color: #f5f7fb; }.articton-final-cta p { color: #91a0b7; }
+
+html.articton-light .articton-home,
+html.articton-light .articton-section { background: #f7f8fc; color: #151c3d; }
+html.articton-light .articton-landing-hero { background: radial-gradient(circle at 50% 18%, rgba(53,64,142,.13), transparent 30rem), #f7f8fc !important; }
+html.articton-light .articton-hero-title, html.articton-light .articton-section-title { color: #171d3d !important; }
+html.articton-light .articton-hero-title span { color: #35408e !important; text-decoration-color: #ffd41c; }
+html.articton-light .articton-hero-copy, html.articton-light .articton-section-copy { color: #56617a !important; }
+html.articton-light .articton-proof-row { color: #46526d; }
+html.articton-light .articton-kicker {
+  border-color: rgba(53, 64, 142, 0.32);
+  background: linear-gradient(90deg, rgba(53,64,142,.1), rgba(255,212,28,.16));
+  color: #273277;
+  box-shadow: 0 6px 18px rgba(53,64,142,.08);
+}
+html.articton-light .articton-kicker > span {
+  background: #35408e !important;
+  box-shadow: 0 0 0 3px rgba(255,212,28,.28), 0 0 10px rgba(53,64,142,.25) !important;
+}
+html.articton-light .articton-section--tinted { border-color: #dce2ef; background: #eef1f8; }
+html.articton-light .articton-value-card, html.articton-light .articton-path-card { border-color: #d9dfeb; background: #fff; box-shadow: 0 14px 35px rgba(53,64,142,.07); }
+html.articton-light .articton-value-card h3, html.articton-light .articton-path-card h3, html.articton-light .articton-process-step h3 { color: #1b2348; }
+html.articton-light .articton-value-card p, html.articton-light .articton-path-card p { color: #5d6880; }
+html.articton-light .articton-process-step { border-color: #cbd3e3; }
+html.articton-light .articton-final-cta { border-color: rgba(53,64,142,.18); background: radial-gradient(circle at 50% 0%, rgba(255,212,28,.23), transparent 47%), linear-gradient(135deg, #fff, #eef1fb); }
+html.articton-light .articton-final-cta h2 { color: #171d3d; } html.articton-light .articton-final-cta p { color: #56617a; }
+
+/* Light-mode learning workspace */
+html.articton-light .articton-workspace {
+  border-color: #cbd4e5;
+  background: #f8faff;
+  box-shadow: 0 24px 65px rgba(53, 64, 142, 0.16), 0 0 0 1px rgba(255,255,255,.7);
+}
+html.articton-light .articton-workspace-top {
+  border-color: #d7deeb;
+  background: #eef2f9;
+  color: #53617c;
+}
+html.articton-light .articton-workspace-tabs {
+  border-color: #d7deeb;
+  background: #f5f7fb;
+  color: #61708b;
+}
+html.articton-light .articton-workspace-tabs > * {
+  border-color: #d1d9e8;
+  background: #fff;
+}
+html.articton-light .articton-workspace-tabs b {
+  border-color: rgba(53,64,142,.35);
+  background: rgba(53,64,142,.09);
+  color: #35408e;
+}
+html.articton-light .articton-workspace-body {
+  background-color: #f8faff;
+  background-image: linear-gradient(rgba(53,64,142,.07) 1px, transparent 1px), linear-gradient(90deg, rgba(53,64,142,.07) 1px, transparent 1px);
+}
+html.articton-light .articton-workspace-panel {
+  border-color: #d5ddeb;
+  background: rgba(255,255,255,.96);
+}
+html.articton-light .articton-workspace-panel h3 { color: #1a2349; }
+html.articton-light .articton-workspace-panel > p:not(.articton-panel-label),
+html.articton-light .articton-guide-step p,
+html.articton-light .articton-safety p { color: #596780; }
+html.articton-light .articton-panel-label { color: #35408e; }
+html.articton-light .articton-progress { background: #dfe5ef; }
+html.articton-light .articton-mini-stat {
+  border-color: #d6deea;
+  background: #f4f7fb;
+}
+html.articton-light .articton-mini-stat span { color: #71809a; }
+html.articton-light .articton-mini-stat b { color: #273258; }
+html.articton-light .articton-checklist p { color: #5f6d85; }
+html.articton-light .articton-checklist .is-current { color: #35408e; }
+html.articton-light .articton-checklist .is-current span {
+  border-color: #35408e;
+  box-shadow: 0 0 8px rgba(53,64,142,.28);
+}
+html.articton-light .articton-hardware-map {
+  background: radial-gradient(circle at 50% 48%, rgba(255,212,28,.16), transparent 48%), #f4f7fc;
+}
+html.articton-light .articton-board {
+  border-color: #6f7eb1;
+  background: linear-gradient(135deg, transparent 72%, rgba(255,212,28,.12) 72%), linear-gradient(rgba(53,64,142,.11) 1px, transparent 1px), linear-gradient(90deg, rgba(53,64,142,.11) 1px, transparent 1px), #e8edf6;
+  background-size: auto, 13px 13px, 13px 13px, auto;
+  box-shadow: inset 0 0 26px rgba(53,64,142,.1), 0 14px 28px rgba(53,64,142,.12);
+}
+html.articton-light .articton-io-shield {
+  border-color: #8c99b1;
+  background: linear-gradient(135deg, #cbd3e1 0 42%, #35408e 43% 48%, #e4e8f0 49%);
+}
+html.articton-light .articton-io-shield i { border-color: #75839d; }
+html.articton-light .articton-cpu-socket { background: rgba(255,212,28,.18); color: #35408e; }
+html.articton-light .articton-pcie i { border-color: #7184ba; background: rgba(53,64,142,.13); }
+html.articton-light .articton-map-label {
+  border-color: #bcc7d9;
+  background: #fff;
+  color: #3f4d69;
+  box-shadow: 0 3px 9px rgba(53,64,142,.1);
+}
+html.articton-light .articton-guide-step { border-color: #35408e; }
+html.articton-light .articton-guide-step > span { color: #35408e; }
+html.articton-light .articton-safety {
+  border-color: rgba(188,145,0,.3);
+  background: rgba(255,212,28,.13);
+}
+html.articton-light .articton-safety b { color: #806400; }
+html.articton-light .articton-ai-button {
+  border-color: #c5cfdf;
+  background: #e9eef8;
+  color: #28345c;
+}
+html.articton-light .articton-workspace-footer {
+  border-color: #d4dce9;
+  background: #eef2f8;
+  color: #53617a;
+}
+html.articton-light .articton-workspace-footer > span {
+  border-color: #c8d1e0;
+  background: #fff;
+}
+
+@media (max-width: 700px) {
+  .articton-home-screen {
+    min-height: 100svh !important;
+    overflow-y: auto;
+    padding-bottom: 1.5rem;
+  }
+  .articton-workspace-body { grid-template-columns: 1fr; }
+  .articton-workspace-body > :first-child { display: none; }
+  .articton-workspace-top > span:not(.articton-live-pill) { display: none; }
+  .articton-workspace-footer button { margin-left: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .articton-scan-wave { animation: none; opacity: 0; }
+}
+
+/* Keep the complete hero console inside one desktop viewport. The footer is
+   the only section that follows it in document flow. */
+@media (min-width: 1024px) and (min-height: 800px) {
+  .articton-home-screen {
+    box-sizing: border-box;
+    height: 100svh;
+    min-height: 100svh !important;
+    padding-top: 5.45rem !important;
+    padding-bottom: 0.55rem !important;
+    overflow: hidden !important;
+  }
+
+  .articton-home-screen .articton-kicker {
+    padding-block: 0.38rem;
+  }
+
+  .articton-home-screen .articton-hero-title {
+    max-width: 62rem;
+    margin-top: 0.7rem !important;
+    font-size: clamp(2.8rem, 3.15vw, 3.45rem) !important;
+    line-height: 1.02 !important;
+  }
+
+  .articton-home-screen .articton-hero-copy {
+    margin-top: 0.7rem !important;
+    line-height: 1.45;
+  }
+
+  .articton-home-screen .articton-hero-copy + div {
+    margin-top: 0.85rem !important;
+  }
+
+  .articton-home-screen .articton-proof-row {
+    margin-top: 0.75rem !important;
+  }
+
+  .articton-home-screen .articton-proof-row + div {
+    margin-top: 0.9rem !important;
+  }
+
+  .articton-home-screen .articton-workspace-top {
+    padding-block: 0.55rem;
+  }
+
+  .articton-home-screen .articton-workspace-tabs {
+    padding-block: 0.4rem;
+  }
+
+  .articton-home-screen .articton-workspace-body {
+    height: clamp(235px, 28vh, 275px);
+    overflow: hidden;
+  }
+
+  .articton-home-screen .articton-workspace-panel {
+    min-height: 0 !important;
+    overflow: hidden;
+  }
+
+  .articton-home-screen .articton-hardware-map {
+    min-height: 0 !important;
+    height: 100%;
+  }
+
+  .articton-home-screen .articton-guide-step {
+    margin-top: 0.65rem;
+  }
+
+  .articton-home-screen .articton-safety {
+    margin-top: 0.65rem;
+    padding: 0.55rem;
+  }
+
+  .articton-home-screen .articton-ai-button {
+    margin-top: 0.65rem;
+    padding-block: 0.5rem;
+  }
+
+  .articton-home-screen .articton-workspace-footer {
+    padding-block: 0.5rem;
+  }
+}
+
 .articton-landing {
   min-height: 100dvh;
   background: var(--articton-bg);
@@ -2759,6 +3134,15 @@ body:has(:where(.articton-module-page, .articton-module-theme, .articton-workspa
   overflow-y: auto;
   overscroll-behavior: contain;
 }
+
+.articton-fullscreen-instruction {
+  display: none !important;
+}
+
+[data-articton-workspace-fullscreen]:fullscreen .articton-fullscreen-instruction,
+[data-articton-workspace-fullscreen]:-webkit-full-screen .articton-fullscreen-instruction {
+  display: flex !important;
+}
 [data-articton-workspace-fullscreen]:fullscreen,
 [data-articton-workspace-fullscreen]:-webkit-full-screen {
   width: 100vw;
@@ -2807,6 +3191,73 @@ html.articton-light .articton-achievement-card.is-earned .articton-achievement-c
 html.articton-light .articton-achievement-card.is-earned .articton-achievement-status {
   color: #695000 !important;
   background: #fff0ad !important;
+}
+
+/* NU completion treatment shared by Module 2 and Module 3. The certificate
+   keeps its printable white variant, while the screen presentation stays
+   consistently navy and gold in both application themes. */
+.articton-nu-certificate,
+.articton-nu-completion-card,
+html.articton-light .articton-nu-certificate,
+html.articton-light .articton-nu-completion-card {
+  border-color: rgba(255, 212, 28, 0.72) !important;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 212, 28, 0.16), transparent 38%),
+    linear-gradient(145deg, #111a4b 0%, #080f2f 58%, #050a20 100%) !important;
+  box-shadow: 0 34px 100px rgba(3, 7, 28, 0.58), 0 0 54px rgba(255, 212, 28, 0.12) !important;
+  color: #fffdf1 !important;
+}
+
+.articton-nu-certificate h1,
+.articton-nu-certificate h2,
+.articton-nu-certificate p,
+.articton-nu-certificate span,
+.articton-nu-completion-card h2,
+.articton-nu-completion-card p,
+html.articton-light .articton-nu-certificate h1,
+html.articton-light .articton-nu-certificate h2,
+html.articton-light .articton-nu-certificate p,
+html.articton-light .articton-nu-certificate span,
+html.articton-light .articton-nu-completion-card h2,
+html.articton-light .articton-nu-completion-card p {
+  color: #fffdf1 !important;
+}
+
+.articton-nu-certificate > div:first-child,
+.articton-nu-completion-card [class*="text-[#00ffb4]"],
+.articton-nu-completion-card [class*="text-[#73ffd4]"] {
+  color: #ffd41c !important;
+  border-color: rgba(255, 212, 28, 0.48) !important;
+}
+
+.articton-nu-certificate button:first-child,
+.articton-nu-completion-card button:last-child {
+  border-color: #ffd41c !important;
+  background: #ffd41c !important;
+  color: #111a4b !important;
+  box-shadow: 0 14px 34px rgba(255, 212, 28, 0.22) !important;
+}
+
+.articton-nu-certificate button:not(:first-child),
+.articton-nu-completion-card button:not(:last-child) {
+  border-color: rgba(255, 212, 28, 0.38) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: #fff8cf !important;
+}
+
+@media print {
+  .articton-nu-certificate {
+    border-color: #111 !important;
+    background: #fff !important;
+    box-shadow: none !important;
+    color: #111 !important;
+  }
+  .articton-nu-certificate h1,
+  .articton-nu-certificate h2,
+  .articton-nu-certificate p,
+  .articton-nu-certificate span {
+    color: #111 !important;
+  }
 }
 html.articton-light .articton-achievement-card.is-earned .articton-achievement-score {
   color: #25315c !important;
@@ -3056,6 +3507,11 @@ html .articton-platform-choice-panel :focus-visible {
 .articton-home-overview .articton-progress-card,
 .articton-home-overview .articton-progress-card .scrollArea { height: auto; overflow: visible; }
 .articton-dashboard-header { gap: clamp(0.75rem, 2vw, 1.5rem); }
+html.articton-light .articton-reset-camera {
+  color: #172554 !important;
+  background-color: rgba(255, 255, 255, 0.94) !important;
+  border-color: rgba(49, 46, 129, 0.38) !important;
+}
 @media (max-height: 600px) {
   .articton-dashboard-header h1 { font-size: 1.75rem; margin-top: 0.5rem; }
   .articton-dashboard-header p { margin-top: 0.5rem; }

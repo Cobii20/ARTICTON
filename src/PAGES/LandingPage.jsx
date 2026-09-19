@@ -1,8 +1,15 @@
-import React, { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Canvas, useFrame } from "@react-three/fiber";
-import { OrbitControls, useGLTF, Bounds, Grid } from "@react-three/drei";
-import { Cpu, GraduationCap, Moon, MousePointerClick, Rotate3d, Sun } from "lucide-react";
+import {
+  ArrowRight,
+  Bot,
+  CheckCircle2,
+  ChevronRight,
+  CircleCheck,
+  Cpu,
+  Moon,
+  Sun,
+} from "lucide-react";
 import { auth, db } from "../firebase.js";
 import {
   createUserWithEmailAndPassword,
@@ -66,9 +73,7 @@ export default function ArtictonLandingPage({ onLogin }) {
           <HeroShowcaseFull
             onLogin={() => setActiveSection("login")}
             onSignup={() => setActiveSection("signup")}
-            
           />
-         
           <Footer dark={!isLightPage} />
         </>
       ) : activeSection === "about" ? (
@@ -140,208 +145,119 @@ function Navbar({ isHome, onHome, onAbout, onOpenLogin, onSignup, isLightPage, o
 }
 
 function HeroShowcaseFull({ onLogin, onSignup }) {
-  const controlsRef = useRef(null);
-  const [mouse, setMouse] = useState({ x: 0, y: 0 });
-
-  const defaultCamera = useMemo(
-    () => ({
-      position: [1.6, 1.0, 2.0],
-      fov: 32,
-    }),
-    []
-  );
-
-  useEffect(() => {
-    const handleMouseMove = (e) => {
-      const x = (e.clientX / window.innerWidth) * 2 - 1;
-      const y = (e.clientY / window.innerHeight) * 2 - 1;
-      setMouse({ x, y });
-    };
-
-    window.addEventListener("mousemove", handleMouseMove);
-    return () => window.removeEventListener("mousemove", handleMouseMove);
-  }, []);
-
-  useEffect(() => {
-    if (!controlsRef.current) return;
-    controlsRef.current.object.position.set(...defaultCamera.position);
-    controlsRef.current.target.set(0, 0, 0);
-    controlsRef.current.update();
-    controlsRef.current.saveState();
-  }, [defaultCamera]);
-
-
-  
   return (
-  <section className="articton-landing-hero relative min-h-screen flex items-center justify-center overflow-hidden bg-[#0a0e17] px-6 pt-28 pb-16">
-    <style>{`
-      @keyframes greenWaveFlow {
-        0% {
-          transform: translateY(-160%);
-          opacity: 0;
-        }
-        15% {
-          opacity: 0.12;
-        }
-        45% {
-          opacity: 0.22;
-        }
-        85% {
-          opacity: 0.12;
-        }
-        100% {
-          transform: translateY(110vh);
-          opacity: 0;
-        }
-      }
-    `}</style>
+    <main className="articton-home">
+      <section className="articton-landing-hero articton-home-screen relative overflow-hidden px-5 pb-4 pt-24 sm:px-8 lg:pt-24">
+        <AnimatedGridBackground />
+        <AmbientGlowLines />
+        <div className="articton-scan-wave" aria-hidden="true" />
+        <div className="articton-hero-orb articton-hero-orb--left" />
+        <div className="articton-hero-orb articton-hero-orb--right" />
 
-    <AnimatedGridBackground />
-    <AmbientGlowLines />
-
-    <div className="absolute inset-0 pointer-events-none overflow-hidden">
-      {[0].map((delay, i) => (
-        <div
-          key={i}
-          className="articton-landing-wave absolute left-0 w-full"
-          style={{
-            top: "-80px",
-            height: "200px",
-            background:
-              "linear-gradient(180deg, transparent 0%, rgba(255,212,28,0.10) 45%, rgba(255,212,28,0.16) 50%, rgba(255,212,28,0.10) 55%, transparent 100%)",
-            animation: "greenWaveFlow 5.5s linear infinite",
-            animationDelay: `${delay}s`,
-            filter: "blur(10px)",
-          }}
-        />
-      ))}
-    </div>
-      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_60%_50%_at_50%_50%,rgba(255,212,28,0.08),transparent)]" />
-      <div className="relative z-10 mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-2 lg:gap-20">
-        <div className="text-center lg:text-left">
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#FFD41C]/25 bg-[#FFD41C]/6 px-4 py-1.5"
-          >
-            <span className="h-2 w-2 rounded-full bg-[#FFD41C]" />
-            <span className="text-xs font-medium uppercase tracking-[0.25em] text-[#FFD41C]">
-              Interactive 3D Experience
-            </span>
+        <div className="relative z-10 mx-auto max-w-7xl text-center">
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="articton-kicker">
+            <span className="h-2 w-2 rounded-full bg-[#FFD41C] shadow-[0_0_12px_#FFD41C]" />
+            Interactive computer hardware learning
           </motion.div>
 
           <motion.h2
-            initial={{ opacity: 0, y: 28 }}
+            initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-            className="text-4xl font-black leading-[1.1] tracking-tight text-[#e8ecf4] sm:text-5xl lg:text-6xl"
+            transition={{ duration: 0.65 }}
+            className="articton-hero-title mx-auto mt-4 max-w-5xl text-4xl font-black leading-[1.05] tracking-[-0.035em] sm:text-5xl lg:text-6xl"
           >
-            Learn PC Hardware.
-            <br />
-            <span className="text-[#FFD41C]">Build Confidence in 3D.</span>
+            Learn PC Hardware by <span>Actually Working With It.</span>
           </motion.h2>
 
           <motion.p
-            initial={{ opacity: 0, y: 28 }}
+            initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.12 }}
-            className="mx-auto mt-6 max-w-xl text-base leading-relaxed text-[#7a8ba8] lg:mx-0 sm:text-lg"
+            transition={{ delay: 0.1, duration: 0.65 }}
+            className="articton-hero-copy mx-auto mt-4 max-w-3xl text-sm leading-6 sm:text-base"
           >
-            Rotate, inspect, and understand each PC component in an immersive 3D
-            workspace designed for guided learning and hands-on exploration.
+            Explore computer components, follow guided assembly and disassembly procedures,
+            and build practical skills through structured, interactive learning.
           </motion.p>
 
-          <motion.div
-            initial={{ opacity: 0, y: 28 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.24 }}
-            className="articton-hero-actions mt-10 flex flex-col justify-center gap-4 sm:flex-row lg:justify-start"
-          >
-            <button
-              onClick={onLogin}
-              className="articton-primary-cta group relative overflow-hidden rounded-xl bg-[#FFD41C] px-8 py-4 text-lg font-semibold tracking-wide text-[#0a0e17] transition hover:scale-[1.02]"
-            >
-              <span className="absolute inset-0 -translate-x-full bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.18),transparent)] transition duration-500 group-hover:translate-x-full" />
-              <span className="relative">Start Learning</span>
+          <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="mt-5 flex flex-col justify-center gap-3 sm:flex-row">
+            <button onClick={onLogin} className="articton-primary-cta group inline-flex items-center justify-center gap-2 rounded-xl bg-[#FFD41C] px-7 py-3.5 font-bold text-[#10152f] shadow-[0_12px_32px_rgba(255,212,28,0.2)] transition hover:-translate-y-0.5">
+              Start Learning <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" />
             </button>
-            <button
-              onClick={onSignup}
-              className="articton-secondary-cta rounded-xl border border-white/12 px-8 py-4 text-lg font-semibold text-[#7a8ba8] transition hover:bg-white/5 hover:text-white"
-            >
-              Create Account
+            <button onClick={onSignup} className="articton-secondary-cta inline-flex items-center justify-center gap-2 rounded-xl border px-7 py-3.5 font-bold transition hover:-translate-y-0.5">
+              Create Account <ChevronRight className="h-4 w-4" />
             </button>
           </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.36 }}
-            className="articton-hero-chips mt-7 flex flex-wrap justify-center gap-3 lg:justify-start"
-          >
-            <HeroChip icon={Rotate3d} label="3D Guided Modules" />
-            <HeroChip icon={MousePointerClick} label="Interactive Practice" />
-            <HeroChip icon={GraduationCap} label="Progress Tracking" />
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.32 }} className="articton-proof-row mx-auto mt-4 flex max-w-3xl flex-wrap items-center justify-center gap-x-7 gap-y-2">
+            <ProofItem text="Guided procedures" />
+            <ProofItem text="AMD & Intel paths" />
+            <ProofItem text="Progress tracking" />
           </motion.div>
 
-        
+          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.24, duration: 0.75 }} className="mt-6">
+            <LearningWorkspace />
+          </motion.div>
         </div>
-
-       <motion.div
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.18 }}
-            className="articton-hero-model-wrap relative flex justify-center lg:justify-end lg:pl-10 xl:pl-28"
-          >
-          <div className="articton-hero-model-glow absolute right-[-90px] top-1/2 h-[700px] w-[620px] -translate-y-1/2 rounded-[120px] bg-[radial-gradient(circle_at_center,rgba(255,212,28,0.18),transparent_70%)] blur-3xl" />
-          <div className="articton-hero-model-stage relative h-[460px] w-full max-w-[760px] sm:h-[540px] lg:h-[640px] xl:h-[700px]">
-            <div className="articton-hero-model-panel pointer-events-none absolute inset-x-6 top-10 bottom-10 rounded-[42px] border border-[#FFD41C]/20 bg-white/[0.03]" />
-            <div className="articton-hero-model-label pointer-events-none absolute right-8 top-12 z-20 rounded-full border border-[#FFD41C]/25 bg-[#0d1220]/80 px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] text-[#FFD41C] shadow-[0_14px_36px_rgba(0,0,0,0.22)] backdrop-blur-xl">
-              Live 3D Workspace
-            </div>
-            <div className="articton-hero-model-caption pointer-events-none absolute bottom-12 left-8 z-20 max-w-[260px] rounded-2xl border border-white/10 bg-[#0d1220]/78 px-4 py-3 text-sm leading-6 text-[#c8d4e6] shadow-[0_14px_34px_rgba(0,0,0,0.24)] backdrop-blur-xl">
-              Guided hardware exploration with a real-time PC model.
-            </div>
-            
-            <div className="absolute inset-0 z-10">
-              <Canvas
-                dpr={[1, 2]}
-                gl={{ antialias: true, alpha: true }}
-                camera={{ position: [0.95, 0.72, 1.2] }}
-                style={{ background: "transparent" }}
-              >
-                <Suspense fallback={<CanvasFallback />}>
-                  <ModelOnlyScene mouse={mouse} />
-                </Suspense>
-                <OrbitControls
-                  ref={controlsRef}
-                  makeDefault
-                  enableDamping
-                  dampingFactor={0.08}
-                  rotateSpeed={0.75}
-                enableZoom={false}
-                  enableRotate={false}
-                  enablePan={false}
-                  minDistance={0.2}
-                  maxDistance={20}
-                />
-              </Canvas>
-            </div>
-            
-          </div>
-        </motion.div>
-      </div>
-    </section>
+      </section>
+    </main>
   );
 }
 
-function HeroChip({ icon: Icon, label }) {
+function ProofItem({ text }) {
+  return <span className="inline-flex items-center gap-2 text-sm"><CircleCheck className="h-4 w-4 text-[#FFD41C]" />{text}</span>;
+}
+
+function LearningWorkspace() {
   return (
-    <div className="articton-hero-chip inline-flex items-center gap-2 rounded-full border border-[#FFD41C]/20 bg-[#FFD41C]/8 px-4 py-2 text-sm font-semibold text-[#c8d4e6]">
-      <Icon className="h-4 w-4 text-[#FFD41C]" />
-      <span>{label}</span>
+    <div className="articton-workspace mx-auto max-w-6xl overflow-hidden rounded-2xl text-left shadow-2xl">
+      <div className="articton-workspace-top flex flex-wrap items-center gap-3 px-4 py-3 text-[11px] font-bold uppercase tracking-wider">
+        <div className="flex gap-1.5"><span /><span /><span /></div>
+        <p className="mr-auto">Articton learning workspace</p>
+        <span className="articton-live-pill">Live module</span><span>AMD / Intel</span><span className="text-[#FFD41C]">68% complete</span>
+      </div>
+      <div className="articton-workspace-tabs flex gap-2 overflow-x-auto px-4 py-2 text-xs">
+        <b>Module 3 · Assembly</b><span>Component map</span><span>Procedure guide</span><span>Assessment</span>
+      </div>
+      <div className="articton-workspace-body grid gap-3 p-3 lg:grid-cols-[0.78fr_1.65fr_0.9fr]">
+        <div className="articton-workspace-panel space-y-3 p-4">
+          <PanelLabel>Current module</PanelLabel><h3>Install the motherboard</h3><p>Prepare the case, align the rear I/O, and secure the board safely.</p>
+          <div className="articton-progress"><span style={{ width: "68%" }} /></div>
+          <div className="grid grid-cols-2 gap-2"><MiniStat label="Step" value="06 / 09" /><MiniStat label="Track" value="Assembly" /></div>
+          <div className="articton-checklist"><p><CheckCircle2 /> Prepare standoffs</p><p><CheckCircle2 /> Align I/O shield</p><p className="is-current"><span /> Secure motherboard</p></div>
+        </div>
+        <HardwareDiagram />
+        <div className="articton-workspace-panel p-4">
+          <div className="flex items-center justify-between"><PanelLabel>Procedure guide</PanelLabel><span className="articton-ready">Ready</span></div>
+          <div className="articton-guide-step"><span>Step 06</span><h3>Secure the board</h3><p>Tighten screws in a cross pattern. Stop when the board is secure—do not overtighten.</p></div>
+          <div className="articton-safety"><b>Safety reminder</b><p>Keep the case grounded and handle the board by its edges.</p></div>
+          <button type="button" className="articton-ai-button"><Bot className="h-4 w-4" /> Ask AI Guide</button>
+        </div>
+      </div>
+      <div className="articton-workspace-footer flex flex-wrap items-center gap-2 px-4 py-3 text-xs"><span>Labels: On</span><span>Notes</span><span>Quick quiz</span><button type="button">Continue <ArrowRight className="h-3.5 w-3.5" /></button></div>
     </div>
   );
 }
+
+function HardwareDiagram() {
+  return (
+    <div className="articton-hardware-map articton-workspace-panel relative min-h-[260px] overflow-hidden p-4 sm:min-h-[300px]">
+      <div className="flex items-center justify-between"><PanelLabel>Hardware map</PanelLabel><span className="text-[10px] font-bold uppercase tracking-widest text-[#FFD41C]">Guided view</span></div>
+      <div className="articton-board absolute inset-x-[12%] bottom-[12%] top-[18%] rounded-xl">
+        <div className="articton-io-shield"><i /><i /><i /></div>
+        <div className="articton-vrm articton-vrm--top" />
+        <div className="articton-vrm articton-vrm--left" />
+        <div className="articton-cpu-socket"><Cpu className="h-8 w-8" /><span>CPU</span></div>
+        <div className="articton-ram-slots"><i /><i /><i /><i /></div>
+        <div className="articton-pcie"><i /><i /><i /></div>
+        <div className="articton-audio"><i /><i /><i /><i /><i /></div>
+        <span className="articton-map-label map-label--one">DDR slots</span><span className="articton-map-label map-label--two">PCIe x16</span><span className="articton-map-label map-label--three">Power</span>
+      </div>
+    </div>
+  );
+}
+
+function PanelLabel({ children }) { return <p className="articton-panel-label">{children}</p>; }
+function MiniStat({ label, value }) { return <div className="articton-mini-stat"><span>{label}</span><b>{value}</b></div>; }
 
 function AmbientGlowLines() {
   return (
@@ -985,52 +901,6 @@ function Dropdown({ value, onChange, options, placeholder = "Select" }) {
         </div>
       )}
     </div>
-  );
-}
-
-function ModelOnlyScene({ mouse }) {
-  return (
-    <>
-      <ambientLight intensity={0.8} />
-      <directionalLight position={[6, 7, 5]} intensity={2.25} />
-      <directionalLight position={[-6, 3.5, -4]} intensity={0.9} />
-      <directionalLight position={[0, 4, -8]} intensity={0.8} />
-      <Bounds fit clip margin={1.5}>
-        <MouseFollowModel mouse={mouse} />
-      </Bounds>
-    </>
-  );
-}
-
-function MouseFollowModel({ mouse }) {
-  const groupRef = useRef();
-
-  useFrame(() => {
-    if (!groupRef.current) return;
-    const targetX = mouse.x * 3;
-    const targetY = -mouse.y * 1.5;
-    const targetZ = 2;
-    groupRef.current.lookAt(targetX, targetY, targetZ);
-  });
-
-  return (
-    <group ref={groupRef} position={[0, -0.05, 0]}>
-      <HardwareModel />
-    </group>
-  );
-}
-
-function HardwareModel() {
-  const { scene } = useGLTF("/models/pc.glb");
-  return <primitive object={scene} />;
-}
-useGLTF.preload("/models/pc.glb");
-
-function CanvasFallback() {
-  return (
-    <mesh>
-      <ambientLight intensity={1} />
-    </mesh>
   );
 }
 

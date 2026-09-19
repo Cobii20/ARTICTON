@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState, useEffect, useCallback } from "react";
+﻿import React, { useMemo, useRef, useState, useEffect, useCallback } from "react";
 import * as THREE from "three";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import {
@@ -769,9 +769,3 @@ export default function HDDtoCase({
   );
 }
 
-useGLTF.preload(CASE_URL);
-useGLTF.preload(MB_URL);
-useGLTF.preload(CPU_URL);
-useGLTF.preload(RAM_URL);
-useGLTF.preload(SSD_URL);
-useGLTF.preload(HDD_URL);

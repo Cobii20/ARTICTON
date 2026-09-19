@@ -1,4 +1,4 @@
-import ModuleIntroCard from "../../../Components/ModuleIntroCard";
+﻿import ModuleIntroCard from "../../../Components/ModuleIntroCard";
 import ModuleSceneBackground from "../../../Components/ModuleSceneBackground";
 import { getPracticeCheckpoint, recordModuleVisit } from "../../../utils/moduleVisits";
 import React, {
@@ -17,8 +17,9 @@ import ProcedureAssistantBubble from "../../../Components/ProcedureAssistantBubb
 import { auth, db, functions } from "../../../firebase.js";
 import { onAuthStateChanged } from "firebase/auth";
 import { httpsCallable } from "firebase/functions";
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
-import { AchievementToast, unlockAchievement } from "../../../utils/achievements.jsx";
+import { doc, getDoc } from "firebase/firestore";
+import { AchievementToast, resolveAchievement } from "../../../utils/achievements.jsx";
+import { completeGuidedModule } from "../../../utils/authoritativeModules.js";
 import { formatTutorReply } from "../../../utils/tutorReply.js";
 import { getUserSettings } from "../../../utils/userSettings";
 import { PDF_BASED_ASSEMBLY_GUIDES } from "../../../utils/pdfBasedInstructionGuides";
@@ -33,7 +34,7 @@ import {
 } from "../../../utils/threeCameraControls";
 
 /* ------------------------------------------------------------------ */
-/* Module 3 validated assembly configuration (AMD platform)           */
+/* Module 3 validated assembly configuration (Intel platform)         */
 /* ------------------------------------------------------------------ */
 
 /*
@@ -50,16 +51,16 @@ import {
 const steps = ASSEMBLY_STEPS;
 
 const PART_MODELS = [
-  { key: "table", path: "/models/AMDtable.glb" },
-  { key: "case", path: "/models/NEWcaseAMD.glb" },
-  { key: "motherboard", path: "/models/NEWmotherboardAMD.glb" },
-  { key: "cpu", path: "/models/NEWcpuAMD.glb" },
-  { key: "ram1", path: "/models/NEWramAMD.glb" },
-  { key: "ram2", path: "/models/NEWram2AMD.glb" },
-  { key: "ssd", path: "/models/NEWssdAMD.glb" },
-  { key: "hdd", path: "/models/NEWhddAMD.glb" },
-  { key: "psu", path: "/models/NEWpsuAMD.glb" },
-  { key: "gpu", path: "/models/NEWgpuAMD.glb" },
+  { key: "table", path: "/models/INTELtable.glb" },
+  { key: "case", path: "/models/NEWcaseINTEL.glb" },
+  { key: "motherboard", path: "/models/NEWmotherboardINTEL.glb" },
+  { key: "cpu", path: "/models/NEWcpuINTEL.glb" },
+  { key: "ram1", path: "/models/NEWramINTEL.glb" },
+  { key: "ram2", path: "/models/NEWram2INTEL.glb" },
+  { key: "ssd", path: "/models/NEWssdINTEL.glb" },
+  { key: "hdd", path: "/models/NEWhddINTEL.glb" },
+  { key: "psu", path: "/models/NEWpsuINTEL.glb" },
+  { key: "gpu", path: "/models/NEWgpuINTEL.glb" },
 ];
 
 const GUIDED_STEPS = steps.filter((item) => item.key !== "final");
@@ -2278,7 +2279,7 @@ function ModelViewer({
           type="button"
           onClick={() => setOverviewRequest((value) => value + 1)}
           disabled={isDraggingPart}
-          className="rounded-xl border border-[#00ffb4]/30 bg-[#0b1220]/92 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#7dffdc] shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl transition hover:bg-[#00ffb4]/12 disabled:cursor-not-allowed disabled:opacity-45"
+          className="articton-reset-camera rounded-xl border border-[#00ffb4]/30 bg-[#0b1220]/92 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#7dffdc] shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl transition hover:bg-[#00ffb4]/12 disabled:cursor-not-allowed disabled:opacity-45"
         >
           <span className="hidden sm:inline">Reset Camera View</span>
           <span className="sm:hidden">Work View</span>
@@ -2567,6 +2568,7 @@ function StepInstructionCard({
   guide,
   isFinalChallenge = false,
   onBegin,
+  fullscreenOnly = false,
 }) {
   const action = moduleType === "Assembly" ? "installation" : "removal";
   const safeGuide = guide || {
@@ -2581,7 +2583,7 @@ function StepInstructionCard({
 
   return (
     <div
-      className="articton-instruction-overlay absolute inset-0 z-[780] flex items-center justify-center bg-[#050912]/82 p-4 backdrop-blur-md md:p-6"
+      className={`${fullscreenOnly ? "articton-fullscreen-instruction " : ""}articton-instruction-overlay absolute inset-0 z-[780] flex items-center justify-center bg-[#050912]/82 p-4 backdrop-blur-md md:p-6`}
       role="dialog"
       aria-modal="true"
       aria-labelledby="step-instruction-title"
@@ -2686,7 +2688,7 @@ function FullAssemblyCompletionCard({ platform, onReview, onCertificate }) {
       aria-modal="true"
       aria-labelledby="full-assembly-completion-title"
     >
-      <div className="relative w-full max-w-2xl overflow-hidden rounded-[30px] border border-[#00ffb4]/35 bg-[#0b1220]/97 p-7 shadow-[0_40px_120px_rgba(0,0,0,0.76),0_0_70px_rgba(0,255,180,0.10)] md:p-9">
+      <div className="articton-nu-completion-card relative w-full max-w-2xl overflow-hidden rounded-[30px] border border-[#00ffb4]/35 bg-[#0b1220]/97 p-7 shadow-[0_40px_120px_rgba(0,0,0,0.76),0_0_70px_rgba(0,255,180,0.10)] md:p-9">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_0%,rgba(0,255,180,0.16),transparent_42%)]" />
         <div className="articton-instruction-content relative">
           <div className="articton-instruction-topbar flex flex-wrap items-center justify-between gap-3">
@@ -2755,7 +2757,7 @@ function CompletionCertificate({
     <div className="articton-module-theme min-h-screen w-full overflow-hidden bg-[#0a0e17] font-sans text-[#e8ecf4] antialiased print:bg-white">
       <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden px-5 py-8">
         <ModuleBackground />
-        <div className="relative z-10 w-full max-w-4xl overflow-hidden rounded-[34px] border border-[#00ffb4]/35 bg-[#0d1220]/94 p-7 text-center shadow-[0_40px_120px_rgba(0,0,0,0.65)] backdrop-blur-xl md:p-12 print:border-black print:bg-white print:text-black print:shadow-none">
+        <div className="articton-nu-certificate relative z-10 w-full max-w-4xl overflow-hidden rounded-[34px] border border-[#00ffb4]/35 bg-[#0d1220]/94 p-7 text-center shadow-[0_40px_120px_rgba(0,0,0,0.65)] backdrop-blur-xl md:p-12 print:border-black print:bg-white print:text-black print:shadow-none">
           <div className="pointer-events-none absolute inset-4 rounded-[26px] border border-dashed border-[#00ffb4]/30 print:border-black/40" />
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(0,255,180,0.14),transparent_42%)] print:hidden" />
 
@@ -2985,27 +2987,8 @@ export default function Module3AssemblyAMD({
     if (!firebaseUser) return;
 
     try {
-      const completedSteps = Object.fromEntries(
-        steps.map((item) => [item.key, true])
-      );
-      const userReference = doc(db, "users", firebaseUser.uid);
-
-      await setDoc(
-        userReference,
-        {
-          moduleProgress: {
-            module3AMD: {
-              currentStep: steps.length - 1,
-              completed: true,
-              percent: 100,
-              completedSteps,
-              updatedAt: serverTimestamp(),
-            },
-          },
-        },
-        { merge: true }
-      );
-      const achievement = await unlockAchievement(firebaseUser.uid, "module3", {
+      await completeGuidedModule("module3INTEL");
+      const achievement = resolveAchievement("module3", {
         platform: "AMD",
       });
       setAchievementToast(achievement);
@@ -3267,6 +3250,19 @@ export default function Module3AssemblyAMD({
           />
         ) : null}
 
+        {instructionStepIndex !== null ? (
+          <StepInstructionCard
+            platform="INTEL"
+            moduleType="Assembly"
+            stepNumber={Math.min(instructionStepIndex + 1, GUIDED_STEPS.length)}
+            totalSteps={GUIDED_STEPS.length}
+            stepName={steps[instructionStepIndex]?.name || "Assembly Step"}
+            guide={STEP_INSTRUCTION_GUIDES[steps[instructionStepIndex]?.key]}
+            isFinalChallenge={steps[instructionStepIndex]?.key === "final"}
+            onBegin={handleBeginInstructionStep}
+          />
+        ) : null}
+
         <div className="relative flex h-full w-full flex-col overflow-hidden">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(0,255,180,0.08),transparent_35%)]" />
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_88%_20%,rgba(0,255,180,0.05),transparent_30%)]" />
@@ -3361,6 +3357,7 @@ export default function Module3AssemblyAMD({
               <div data-articton-workspace-fullscreen className="articton-stage-frame relative h-full overflow-hidden rounded-[24px] border border-[#1a2438] bg-[#0d1220]/78 shadow-[0_28px_90px_rgba(0,0,0,0.45)] backdrop-blur-xl">
                 {instructionStepIndex !== null ? (
                   <StepInstructionCard
+                    fullscreenOnly
                     platform="INTEL"
                     moduleType="Assembly"
                     stepNumber={Math.min(instructionStepIndex + 1, GUIDED_STEPS.length)}
@@ -3516,4 +3513,3 @@ export default function Module3AssemblyAMD({
 }
 
 /* Preload the table, case, and every assembly component. */
-PART_MODELS.forEach((part) => useGLTF.preload(encodeURI(part.path)));

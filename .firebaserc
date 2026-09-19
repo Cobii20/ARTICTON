@@ -1,5 +1,6 @@
 {
   "projects": {
-    "default": "articton-57fd8"
+    "default": "articton-57fd8",
+    "staging": "articton-staging"
   }
 }

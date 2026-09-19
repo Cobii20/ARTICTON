@@ -1,4 +1,4 @@
-import React, { Suspense, useEffect, useMemo } from "react";
+﻿import React, { Suspense, useEffect, useMemo } from "react";
 import * as THREE from "three";
 import { Canvas } from "@react-three/fiber";
 import {
@@ -176,4 +176,3 @@ export default function DefaultModule3ModelViewer({ onComplete }) {
   );
 }
 
-MODEL_URLS.forEach((url) => useGLTF.preload(url));
