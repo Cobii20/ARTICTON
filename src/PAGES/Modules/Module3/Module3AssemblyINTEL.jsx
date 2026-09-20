@@ -81,18 +81,18 @@ const COMPONENT_LABELS = {
   gpu: "GPU (Graphics Processing Unit)",
 };
 
-const STEP_INSTRUCTION_GUIDES = PDF_BASED_ASSEMBLY_GUIDES.amd;
+const STEP_INSTRUCTION_GUIDES = PDF_BASED_ASSEMBLY_GUIDES.intel;
 
-/* Module 2 table seats become the loose starting positions for assembly. */
+/* Keep the guided Intel bench layout aligned with the verified practical test. */
 const TABLE_STARTS = Object.freeze({
-  cpu: { position: [-24.32, -27.331, 85.547], snapDistance: 0.75, magnetDistance: 4.5 },
-  ram1: { position: [-53.836, -27.553, 80.307], snapDistance: 0.85, magnetDistance: 5 },
-  ram2: { position: [-55.587, -27.596, 75.629], snapDistance: 0.85, magnetDistance: 5 },
-  ssd: { position: [-28.53, -13.076, 98.981], snapDistance: 1, magnetDistance: 6 },
-  motherboard: { position: [-41.07, -21.537, 54.246], snapDistance: 2, magnetDistance: 11 },
-  psu: { position: [-28.697, -2.967, 75.561], snapDistance: 1.6, magnetDistance: 9, preserveTableRotation: true },
-  hdd: { position: [-38.289, -9.671, 90.063], snapDistance: 1.25, magnetDistance: 7 },
-  gpu: { position: [-41.711, -17.422, 88.557], snapDistance: 1.5, magnetDistance: 9 },
+  cpu: { position: [-12.615, -9.935, 19.679], snapDistance: 0.75, magnetDistance: 4.5 },
+  ram1: { position: [-14.962, -10.105, 22.539], snapDistance: 0.85, magnetDistance: 5 },
+  ram2: { position: [-15.606, -10.102, 21.06], snapDistance: 0.85, magnetDistance: 5 },
+  ssd: { position: [-5.398, -7.823, 28.806], snapDistance: 1, magnetDistance: 6 },
+  motherboard: { position: [-11.627, -7.507, 13.488], snapDistance: 2, magnetDistance: 11 },
+  psu: { position: [-5.545, -0.965, 19.931], snapDistance: 1.6, magnetDistance: 9, preserveTableRotation: true },
+  hdd: { position: [-10.726, -3.46, 24.501], snapDistance: 1.25, magnetDistance: 7 },
+  gpu: { position: [-11.387, -6.232, 24.891], snapDistance: 1.5, magnetDistance: 9 },
 });
 
 const DEFAULT_SNAP_DISTANCE = 1;
