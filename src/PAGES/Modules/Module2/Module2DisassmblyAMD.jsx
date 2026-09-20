@@ -203,7 +203,9 @@ const DRAG_FOLLOW_SPEED = 18;
 const ROTATION_FOLLOW_SPEED = 7.5;
 const SETTLE_SPEED = 6;
 const WORKSPACE_PADDING_MULTIPLIER = 1.5;
-const TELEMETRY_FRAME_INTERVAL = 3;
+// Keep the diagnostic overlay responsive without forcing a large React tree
+// to reconcile repeatedly while Three.js is following the pointer.
+const TELEMETRY_FRAME_INTERVAL = 10;
 const TELEMETRY_IDLE_FRAME_INTERVAL = 16;
 const DRAG_SCREEN_GAIN = 1.06;
 const SAFE_CARRY_RISE_START = 0.18;
@@ -979,6 +981,20 @@ function PartModel({
         .sub(rotatedHostOffsetRef.current);
       rotationRef.current.quaternion.copy(hostTransform.quaternion);
       installedQuaternionRef.current.copy(hostTransform.quaternion);
+    }
+
+    // Inactive parts only need the lightweight host-follow update above.
+    // Avoid running magnetic-field, bounds, easing, and telemetry work for
+    // every model on every frame. An inactive motherboard only publishes its
+    // already-current transform before taking the same fast path.
+    if (!isActive) {
+      onTransformChange?.({
+        position: groupRef.current.position,
+        quaternion: rotationRef.current.quaternion,
+        pivot: modelCenter,
+        phase: phaseRef.current,
+      });
+      return;
     }
 
     const centers = targetPosition ? getVisualCenters() : null;
@@ -2132,12 +2148,11 @@ function ModelViewer({
     >
       <Canvas
         camera={{ position: [24, 18, 110], fov: 44, near: 0.01, far: 2000 }}
-        dpr={[1, 1.5]}
-        shadows
-        performance={{ min: 0.55 }}
+        dpr={[0.75, 1]}
+        performance={{ min: 0.6, debounce: 300 }}
         className="h-full w-full"
         gl={{
-          antialias: true,
+          antialias: false,
           powerPreference: "high-performance",
           alpha: false,
           stencil: false,
@@ -2150,9 +2165,6 @@ function ModelViewer({
         <directionalLight
           position={[6, 10, 7]}
           intensity={1.75}
-          castShadow
-          shadow-mapSize-width={1024}
-          shadow-mapSize-height={1024}
         />
         <directionalLight position={[-5, 4, 2]} intensity={0.68} />
 

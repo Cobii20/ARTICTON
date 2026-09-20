@@ -33,3 +33,8 @@ release-artifact.json
 
 # Local verification artifacts
 .tmp/
+model-optimization-candidates/
+model backups/
+
+.vercel
+.env*

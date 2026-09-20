@@ -1,0 +1,12 @@
+.git
+.firebase
+.env*
+!.env.example
+!.env.production.example
+!.env.spark.example
+dist
+functions
+model backups
+model-optimization-candidates*
+public/models(original glb)
+firebase-debug*.log

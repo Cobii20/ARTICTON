@@ -1844,13 +1844,16 @@ export default function Module1Page({ onBack, onLogout, resumeVisit }) {
                     <Canvas
                       key={`${isComponentStage ? current.url : "module1-onboarding"}-${experienceStep}`}
                       camera={sceneCamera}
-                      dpr={[1, 1.8]}
+                      dpr={[1, 1.5]}
+                      gl={{ antialias: true, powerPreference: "high-performance", alpha: false, stencil: false }}
                     >
                       <color attach="background" args={[typeof document !== "undefined" && document.documentElement.classList.contains("articton-light") ? "#f8f9ff" : "#06131b"]} />
-                      <ambientLight intensity={0.78} />
-                      <directionalLight position={[6, 8, 6]} intensity={1.25} />
-                      <directionalLight position={[-6, -2, -6]} intensity={0.45} />
-                      <pointLight position={[0, 1.2, 2.2]} intensity={0.75} color="#FFD41C" />
+                      <hemisphereLight args={["#ffffff", "#26364d", 1.35]} />
+                      <ambientLight intensity={1.05} />
+                      <directionalLight position={[6, 8, 8]} intensity={2.15} />
+                      <directionalLight position={[-7, 3, 4]} intensity={1.05} />
+                      <directionalLight position={[0, -2, -7]} intensity={0.7} />
+                      <pointLight position={[0, 2.5, 4]} intensity={0.9} color="#fff4cf" />
 
                       <Suspense fallback={null}>
                         <LabEnvironment />

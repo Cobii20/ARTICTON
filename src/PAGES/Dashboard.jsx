@@ -963,7 +963,7 @@ const assemblyPracticalUnlocked =
 
                   <div className="mt-5 space-y-3 border-t border-[#1a2438] pt-5">
                     <SidebarUtilityButton icon="help" label="FAQs" onClick={() => setIsFaqOpen(true)} />
-                    <SidebarUtilityButton icon="support" label="Customer Service" onClick={() => setIsSupportOpen(true)} />
+                    <SidebarUtilityButton icon="support" label="Help & Support" onClick={() => setIsSupportOpen(true)} />
                   </div>
                 </div>
               </aside>
@@ -1319,7 +1319,7 @@ function CustomerServiceModal({ isOpen, onClose, user }) {
       return;
     }
     if (!auth.currentUser) {
-      setSubmitError("Please sign in again before sending a support request.");
+      setSubmitError("Please sign in again before sending your concern.");
       return;
     }
     try {
@@ -1336,10 +1336,10 @@ function CustomerServiceModal({ isOpen, onClose, user }) {
         onClose();
       }, 1800);
     } catch (err) {
-      console.error("Error submitting support ticket:", err);
+      console.error("Error submitting student concern:", err);
       setSubmitError(
         err?.code === "functions/resource-exhausted"
-          ? "Please wait before sending another support request."
+          ? "Please wait before sending another concern."
           : "Your request could not be sent. Please try again."
       );
     } finally {
@@ -1365,8 +1365,8 @@ function CustomerServiceModal({ isOpen, onClose, user }) {
           >
             <div className="flex items-center justify-between border-b border-[#1a2438] px-6 py-5">
               <div>
-                <div className="text-lg font-bold text-white">Customer Service</div>
-                <div className="text-xs text-[#7a8ba8]">Need help? Send us your concern.</div>
+                <div className="text-lg font-bold text-white">Student Support Center</div>
+                <div className="text-xs text-[#7a8ba8]">Need help? Send your concern to the ARTICTON team.</div>
               </div>
 
               <button
@@ -1405,7 +1405,7 @@ function CustomerServiceModal({ isOpen, onClose, user }) {
 
               {submitted ? (
                 <div className="rounded-2xl border border-[#FFD41C]/25 bg-[#FFD41C]/10 px-4 py-3 text-sm font-semibold text-[#FFD41C]">
-                  Support request submitted successfully ✓
+                  Your concern was submitted successfully ✓
                 </div>
               ) : null}
 
@@ -1415,7 +1415,7 @@ function CustomerServiceModal({ isOpen, onClose, user }) {
                 </button>
 
                 <button type="button" disabled={uploading} onClick={handleSubmit} className="rounded-xl bg-[#FFD41C] px-5 py-2.5 text-sm font-bold text-[#0a0e17] transition hover:scale-[1.02]">
-                  {uploading ? "Submitting..." : "Submit Ticket"}
+                  {uploading ? "Submitting..." : "Submit Concern"}
                 </button>
               </div>
             </div>

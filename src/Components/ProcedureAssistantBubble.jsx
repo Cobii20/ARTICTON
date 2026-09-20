@@ -17,7 +17,9 @@ export default function ProcedureAssistantBubble({
 }) {
   const note = getComponentProcedureNote(mode, activeComponent || currentStep);
   const [autoRead, setAutoRead] = useState(false);
-  const [dismissed, setDismissed] = useState(false);
+  // Start as a compact launcher so the 3D workspace is unobstructed until the
+  // learner explicitly opens the assistant.
+  const [dismissed, setDismissed] = useState(true);
   const [speakingKey, setSpeakingKey] = useState(null);
   const lastAutoReadIndexRef = useRef(-1);
 

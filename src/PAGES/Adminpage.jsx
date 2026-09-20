@@ -791,7 +791,7 @@ export default function AdminPage({ adminUser, onLogout }) {
 
             <AdminNavButton
               icon={LifeBuoy}
-              label="Support Tickets"
+              label="Student Concerns"
               active={activeTab === "support"}
               onClick={() => setActiveTab("support")}
             />
@@ -834,7 +834,7 @@ export default function AdminPage({ adminUser, onLogout }) {
                 : activeTab === "analytics"
                 ? "Analytics"
                 : activeTab === "support"
-                ? "Support Tickets"
+                ? "Student Concerns"
                 : activeTab === "questions"
                 ? "Question Approvals"
                 : "Module Approvals"}

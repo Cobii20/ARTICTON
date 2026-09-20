@@ -109,7 +109,9 @@ const HOST_FIELD_PADDING_RATIO = 0.3;
 const HOST_FIELD_FEATHER_RATIO = 0.58;
 const DRAG_FOLLOW_SPEED = 16;
 const ROTATION_FOLLOW_SPEED = 7;
-const TELEMETRY_FRAME_INTERVAL = 3;
+// Keep the diagnostic overlay responsive without forcing a large React tree
+// to reconcile repeatedly while Three.js is following the pointer.
+const TELEMETRY_FRAME_INTERVAL = 10;
 const TELEMETRY_IDLE_FRAME_INTERVAL = 16;
 const CAMERA_FOCUS_DURATION_MS = 1100;
 const CASE_GROUND_CLEARANCE = 0.025;
@@ -2213,9 +2215,8 @@ function ModelViewer({
     >
       <Canvas
         camera={{ position: [35, 72, 52], fov: 42, near: 0.01, far: 1800 }}
-        dpr={[1, 1.45]}
-        shadows
-        performance={{ min: 0.55 }}
+        dpr={[0.75, 1.25]}
+        performance={{ min: 0.6, debounce: 300 }}
         className="h-full w-full"
         gl={{
           antialias: true,
@@ -2231,9 +2232,6 @@ function ModelViewer({
         <directionalLight
           position={[6, 10, 7]}
           intensity={1.72}
-          castShadow
-          shadow-mapSize-width={1024}
-          shadow-mapSize-height={1024}
         />
         <directionalLight position={[-5, 4, 2]} intensity={0.65} />
 

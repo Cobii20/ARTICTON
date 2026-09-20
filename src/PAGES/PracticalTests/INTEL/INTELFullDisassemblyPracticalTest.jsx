@@ -472,7 +472,7 @@ function PartModel({
   }, [modelCenter, targetPosition]);
 
   const publishTelemetry = useCallback(() => {
-    if (!groupRef.current || !isMovablePart || !isActive || !targetPosition) {
+    if (!onTelemetry || !groupRef.current || !isMovablePart || !isActive || !targetPosition) {
       return;
     }
 
@@ -965,6 +965,18 @@ function PartModel({
         .sub(rotatedHostOffsetRef.current);
       rotationRef.current.quaternion.copy(hostTransform.quaternion);
       installedQuaternionRef.current.copy(hostTransform.quaternion);
+    }
+
+    // Inactive parts only need to inherit the motherboard transform above.
+    // Skip the full drag/magnetic calculation for every other static model.
+    if (!isActive) {
+      onTransformChange?.({
+        position: groupRef.current.position,
+        quaternion: rotationRef.current.quaternion,
+        pivot: modelCenter,
+        phase: phaseRef.current,
+      });
+      return;
     }
 
     const centers = targetPosition ? getVisualCenters() : null;
@@ -1622,7 +1634,6 @@ function ModelViewer({
   onModelsReady,
 }) {
   const [isDraggingPart, setIsDraggingPart] = useState(false);
-  const [, setTelemetry] = useState(null);
   const [overviewRequest, setOverviewRequest] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const viewerRef = useRef(null);
@@ -1695,17 +1706,16 @@ function ModelViewer({
     >
       <Canvas
         camera={{ position: [24, 18, 110], fov: 44, near: 0.01, far: 2000 }}
-        dpr={[1, 1.5]}
-        shadows
-        performance={{ min: 0.55 }}
+        dpr={[0.75, 1]}
+        performance={{ min: 0.6, debounce: 300 }}
         className="h-full w-full"
-        gl={{ antialias: true, powerPreference: "high-performance", alpha: false, stencil: false }}
+        gl={{ antialias: false, powerPreference: "high-performance", alpha: false, stencil: false }}
         style={{ touchAction: "none" }}
       >
         <color attach="background" args={[typeof document !== "undefined" && document.documentElement.classList.contains("articton-light") ? "#f8f9ff" : "#070c14"]} />
         <hemisphereLight args={["#ffffff", "#182338", 1.15]} />
         <ambientLight intensity={0.7} />
-        <directionalLight position={[6, 10, 7]} intensity={1.75} castShadow shadow-mapSize-width={1024} shadow-mapSize-height={1024} />
+        <directionalLight position={[6, 10, 7]} intensity={1.75} />
         <directionalLight position={[-5, 4, 2]} intensity={0.68} />
 
         <ModelErrorBoundary parts={parts}>
@@ -1721,7 +1731,6 @@ function ModelViewer({
               onFumble={onFumble}
               onInteractionMessage={onInteractionMessage}
               onDragStateChange={setIsDraggingPart}
-              onTelemetry={setTelemetry}
             />
             <SceneReadyNotifier onReady={onModelsReady} />
           </Suspense>

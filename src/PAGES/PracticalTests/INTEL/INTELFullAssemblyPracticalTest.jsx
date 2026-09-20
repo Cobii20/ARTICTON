@@ -1947,7 +1947,6 @@ function ModelViewer({
   onModelsReady,
 }) {
   const [isDraggingPart, setIsDraggingPart] = useState(false);
-  const [, setTelemetry] = useState(null);
   const [overviewRequest, setOverviewRequest] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const viewerRef = useRef(null);
@@ -2021,9 +2020,8 @@ function ModelViewer({
     >
       <Canvas
         camera={{ position: [35, 72, 52], fov: 42, near: 0.01, far: 1800 }}
-        dpr={[1, 1.45]}
-        shadows
-        performance={{ min: 0.55 }}
+        dpr={[0.75, 1.25]}
+        performance={{ min: 0.6, debounce: 300 }}
         className="h-full w-full"
         gl={{ antialias: true, powerPreference: "high-performance", alpha: false, stencil: false }}
         style={{ touchAction: "none" }}
@@ -2031,7 +2029,7 @@ function ModelViewer({
         <color attach="background" args={[typeof document !== "undefined" && document.documentElement.classList.contains("articton-light") ? "#f8f9ff" : "#070c14"]} />
         <hemisphereLight args={["#ffffff", "#182338", 1.12]} />
         <ambientLight intensity={0.7} />
-        <directionalLight position={[6, 10, 7]} intensity={1.72} castShadow shadow-mapSize-width={1024} shadow-mapSize-height={1024} />
+        <directionalLight position={[6, 10, 7]} intensity={1.72} />
         <directionalLight position={[-5, 4, 2]} intensity={0.65} />
 
         <ModelErrorBoundary parts={PART_MODELS}>
@@ -2046,7 +2044,6 @@ function ModelViewer({
               onFumble={onFumble}
               onInteractionMessage={onInteractionMessage}
               onDragStateChange={setIsDraggingPart}
-              onTelemetry={setTelemetry}
             />
             <SceneReadyNotifier onReady={onModelsReady} />
           </Suspense>
