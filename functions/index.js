@@ -1,6 +1,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onDocumentWritten } = require("firebase-functions/v2/firestore");
 const admin = require("firebase-admin");
+const sharp = require("sharp");
 const { PROCEDURE_DETAILS, getProcedureText } = require("./procedureNotes");
 
 if (admin.apps.length === 0) {
@@ -9,6 +10,8 @@ if (admin.apps.length === 0) {
 
 const db = admin.firestore();
 const authAdmin = admin.auth();
+const SUPPORT_SCREENSHOT_MAX_BYTES = 4 * 1024 * 1024;
+const SUPPORT_SCREENSHOT_MAX_PIXELS = 12_000_000;
 
 function cleanProfilePhotoUrl(profile = {}) {
   const candidate = String(
@@ -280,11 +283,59 @@ exports.listStudentSummaries = onCall(callableOptions, async (request) => {
   };
 });
 
-exports.submitSupportTicket = onCall(callableOptions, async (request) => {
+async function sanitizeSupportScreenshot(attachment) {
+  if (attachment == null) return null;
+  requirePlainObject(attachment, "attachment", ["name", "type", "data"]);
+  const name = requireBoundedString(attachment.name, "attachment name", 180);
+  const declaredType = requireBoundedString(attachment.type, "attachment type", 40);
+  if (!["image/jpeg", "image/png", "image/webp"].includes(declaredType)) {
+    throw new HttpsError("invalid-argument", "Only JPEG, PNG, and WebP screenshots are supported.");
+  }
+  if (typeof attachment.data !== "string" || !/^[A-Za-z0-9+/]+={0,2}$/.test(attachment.data)) {
+    throw new HttpsError("invalid-argument", "The screenshot data is invalid.");
+  }
+  if (attachment.data.length > Math.ceil(SUPPORT_SCREENSHOT_MAX_BYTES / 3) * 4 + 4) {
+    throw new HttpsError("invalid-argument", "The screenshot must be 4 MB or smaller.");
+  }
+
+  const input = Buffer.from(attachment.data, "base64");
+  const canonicalInput = attachment.data.replace(/=+$/, "");
+  if (!input.length || input.length > SUPPORT_SCREENSHOT_MAX_BYTES ||
+      input.toString("base64").replace(/=+$/, "") !== canonicalInput) {
+    throw new HttpsError("invalid-argument", "The screenshot data is invalid or too large.");
+  }
+
+  try {
+    const image = sharp(input, {
+      failOn: "error",
+      limitInputPixels: SUPPORT_SCREENSHOT_MAX_PIXELS,
+      sequentialRead: true,
+    });
+    const metadata = await image.metadata();
+    if (!["jpeg", "png", "webp"].includes(metadata.format)) {
+      throw new Error("Unsupported decoded image format");
+    }
+    const output = await image
+      .rotate()
+      .resize({ width: 2560, height: 2560, fit: "inside", withoutEnlargement: true })
+      .webp({ quality: 85 })
+      .toBuffer();
+    if (output.length > SUPPORT_SCREENSHOT_MAX_BYTES) {
+      throw new Error("Sanitized image is too large");
+    }
+    return { buffer: output, originalName: name };
+  } catch (error) {
+    console.warn("Rejected support screenshot:", error?.message || error);
+    throw new HttpsError("invalid-argument", "The attachment is not a valid, safe screenshot.");
+  }
+}
+
+exports.submitSupportTicket = onCall({ ...callableOptions, memory: "512MiB" }, async (request) => {
   const { uid, email } = await requireAuthenticatedUser(request);
-  requirePlainObject(request.data, "request", ["subject", "message"]);
+  requirePlainObject(request.data, "request", ["subject", "message", "attachment"]);
   const subject = requireBoundedString(request.data.subject, "subject", 160);
   const message = requireBoundedString(request.data.message, "message", 5000);
+  const screenshot = await sanitizeSupportScreenshot(request.data.attachment);
 
   // One ticket per ten minutes and no more than ten per day prevents repeated
   // submissions while still leaving room for legitimate follow-up concerns.
@@ -302,18 +353,69 @@ exports.submitSupportTicket = onCall(callableOptions, async (request) => {
     String(profile.displayName || "Student").trim().slice(0, 120);
 
   const ticketRef = db.collection("supportTickets").doc();
-  await ticketRef.set({
-    uid,
-    name: name.slice(0, 120),
-    email,
-    subject,
-    message,
-    screenshotURL: "",
-    status: "open",
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-  });
+  const screenshotPath = screenshot ? `supportTickets/${uid}/${ticketRef.id}.webp` : "";
+  let uploaded = false;
+  try {
+    if (screenshot) {
+      await admin.storage().bucket().file(screenshotPath).save(screenshot.buffer, {
+        resumable: false,
+        validation: "crc32c",
+        metadata: {
+          contentType: "image/webp",
+          cacheControl: "private, max-age=0, no-store",
+          metadata: { ownerUid: uid, ticketId: ticketRef.id },
+        },
+      });
+      uploaded = true;
+    }
+    await ticketRef.set({
+      uid,
+      name: name.slice(0, 120),
+      email,
+      subject,
+      message,
+      screenshotURL: "",
+      screenshotPath,
+      screenshotOriginalName: screenshot?.originalName || "",
+      status: "open",
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  } catch (error) {
+    if (uploaded) {
+      await admin.storage().bucket().file(screenshotPath).delete({ ignoreNotFound: true }).catch(() => {});
+    }
+    throw error;
+  }
 
-  return { ticketId: ticketRef.id, submitted: true };
+  return { ticketId: ticketRef.id, submitted: true, attachmentStored: Boolean(screenshot) };
+});
+
+exports.getSupportTicketAttachment = onCall({ ...callableOptions, memory: "512MiB" }, async (request) => {
+  const { uid } = await assertAdmin(request);
+  requirePlainObject(request.data, "request", ["ticketId"]);
+  const ticketId = requireBoundedString(request.data.ticketId, "ticketId", 100, /^[A-Za-z0-9_-]+$/);
+  await enforceRateLimit(uid, "get_support_ticket_attachment", {
+    windowMs: 60_000,
+    windowMax: 60,
+    dailyMax: 1000,
+  });
+  const snapshot = await db.doc(`supportTickets/${ticketId}`).get();
+  if (!snapshot.exists) throw new HttpsError("not-found", "Support ticket not found.");
+  const ticket = snapshot.data() || {};
+  const ownerUid = String(ticket.uid || "");
+  const screenshotPath = String(ticket.screenshotPath || "");
+  if (!ownerUid || screenshotPath !== `supportTickets/${ownerUid}/${ticketId}.webp`) {
+    throw new HttpsError("not-found", "This ticket does not have a protected screenshot.");
+  }
+  const file = admin.storage().bucket().file(screenshotPath);
+  const [metadata] = await file.getMetadata();
+  const size = Number(metadata.size || 0);
+  if (metadata.contentType !== "image/webp" || !Number.isFinite(size) || size <= 0 ||
+      size > SUPPORT_SCREENSHOT_MAX_BYTES) {
+    throw new HttpsError("failed-precondition", "The stored attachment failed validation.");
+  }
+  const [buffer] = await file.download();
+  return { contentType: "image/webp", data: buffer.toString("base64") };
 });
 
 function cleanTutorMode(value) {
@@ -664,11 +766,15 @@ exports.startAssessment = onCall(callableOptions, async (request) => {
     .get();
 
   const knownAssessment = /^(module_[1-4]_(pre|post)_test|practice_exam_[12])$/.test(activityId);
-  if ((!definitionSnapshot.exists && !knownAssessment) || (definitionSnapshot.exists && definitionSnapshot.data().active !== true)) {
+  const definitionData = definitionSnapshot.data() || {};
+  const explicitlyDisabled = definitionSnapshot.exists && definitionData.active === false;
+  const unavailableCustomAssessment =
+    !knownAssessment && (!definitionSnapshot.exists || definitionData.active !== true);
+  if (explicitlyDisabled || unavailableCustomAssessment) {
     throw new HttpsError("not-found", "Assessment not found or unavailable.");
   }
   await enforceRateLimit(uid, "start_assessment", { windowMs: 60_000, windowMax: 6, dailyMax: 40 });
-  const definition = definitionSnapshot.data() || {};
+  const definition = definitionData;
 
   const bankSnapshot = await db.doc(`published_question_banks/${activityId}`).get();
   const bank = bankSnapshot.data();
@@ -990,6 +1096,177 @@ const GUIDED_MODULES = Object.freeze({
   module2INTEL: { module: 2, platform: "intel", achievementId: "module-2-intel-disassembly-complete" },
   module3AMD: { module: 3, platform: "amd", achievementId: "module-3-amd-assembly-complete" },
   module3INTEL: { module: 3, platform: "intel", achievementId: "module-3-intel-assembly-complete" },
+});
+
+const GUIDED_PROGRESS_STEPS = Object.freeze({
+  module2AMD: ["psu", "hdd", "ram", "gpu", "motherboard", "ssd", "cpu", "final"],
+  module2INTEL: ["psu", "hdd", "ram", "gpu", "motherboard", "ssd", "cpu", "final"],
+  module3AMD: ["cpu", "ramFirst", "ramSecond", "ssd", "psu", "motherboard", "hdd", "gpu", "final"],
+  module3INTEL: ["cpu", "ramFirst", "ramSecond", "ssd", "psu", "motherboard", "hdd", "gpu", "final"],
+});
+
+exports.saveGuidedModuleProgress = onCall(callableOptions, async (request) => {
+  const { uid } = await requireAuthenticatedUser(request);
+  requirePlainObject(request.data, "request", ["moduleId", "currentStep", "completedSteps", "showIntro"]);
+  const moduleId = requireBoundedString(request.data.moduleId, "moduleId", 30, /^[A-Za-z0-9]+$/);
+  const definition = GUIDED_MODULES[moduleId];
+  const allowedSteps = GUIDED_PROGRESS_STEPS[moduleId];
+  if (!definition || !allowedSteps) throw new HttpsError("invalid-argument", "Unknown guided module.");
+  const currentStep = Number(request.data.currentStep);
+  if (!Number.isInteger(currentStep) || currentStep < 0 || currentStep >= allowedSteps.length) {
+    throw new HttpsError("invalid-argument", "The current guided step is invalid.");
+  }
+  if (typeof request.data.showIntro !== "boolean") {
+    throw new HttpsError("invalid-argument", "showIntro must be a boolean.");
+  }
+  requirePlainObject(request.data.completedSteps, "completedSteps", allowedSteps);
+  const completedSteps = {};
+  for (const key of allowedSteps) {
+    if (request.data.completedSteps[key] === true) completedSteps[key] = true;
+    else if (key in request.data.completedSteps && request.data.completedSteps[key] !== false) {
+      throw new HttpsError("invalid-argument", `completedSteps.${key} must be a boolean.`);
+    }
+  }
+  await enforceRateLimit(uid, "save_guided_module_progress", {
+    windowMs: 60_000, windowMax: 40, dailyMax: 1500,
+  });
+
+  const userRef = db.doc(`users/${uid}`);
+  let response;
+  await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(userRef);
+    if (!snapshot.exists) throw new HttpsError("not-found", "User profile was not found.");
+    const profile = snapshot.data() || {};
+    const previous = profile.moduleProgress?.[moduleId] || {};
+    const mergedSteps = { ...(previous.completedSteps || {}), ...completedSteps };
+    const completedCount = allowedSteps.filter((key) => mergedSteps[key] === true).length;
+    const percent = Math.round((completedCount / allowedSteps.length) * 100);
+    const platformProgress = {
+      ...previous,
+      module: definition.module,
+      platform: definition.platform,
+      currentStep: Math.max(Number(previous.currentStep || 0), currentStep),
+      completedSteps: mergedSteps,
+      percent,
+      completed: completedCount === allowedSteps.length,
+      showIntro: request.data.showIntro,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    const aggregateKey = `module${definition.module}`;
+    const otherId = `${aggregateKey}${definition.platform === "amd" ? "INTEL" : "AMD"}`;
+    const other = profile.moduleProgress?.[otherId] || {};
+    const allStepKeys = [...new Set([...allowedSteps, ...Object.keys(other.completedSteps || {})])];
+    const aggregateSteps = Object.fromEntries(allStepKeys
+      .filter((key) => mergedSteps[key] === true || other.completedSteps?.[key] === true)
+      .map((key) => [key, true]));
+    const aggregate = {
+      ...(profile.moduleProgress?.[aggregateKey] || {}),
+      currentStep: Math.max(Number(profile.moduleProgress?.[aggregateKey]?.currentStep || 0), currentStep),
+      completedSteps: aggregateSteps,
+      percent: Math.round((percent + Number(other.percent || 0)) / 2),
+      completed: platformProgress.completed === true && other.completed === true,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+    transaction.update(userRef, {
+      [`moduleProgress.${moduleId}`]: platformProgress,
+      [`moduleProgress.${aggregateKey}`]: aggregate,
+    });
+    response = {
+      moduleId,
+      currentStep: platformProgress.currentStep,
+      completedSteps: mergedSteps,
+      percent,
+      completed: platformProgress.completed,
+    };
+  });
+  return response;
+});
+
+const MODULE_ONE_PARTS = Object.freeze([
+  "cpu", "motherboard", "ram", "ssd", "hdd", "psu", "gpu", "case",
+]);
+
+exports.saveModuleOneProgress = onCall(callableOptions, async (request) => {
+  const { uid } = await requireAuthenticatedUser(request);
+  requirePlainObject(request.data, "request", [
+    "platform", "currentPage", "introDone", "lastVisitedModuleKey", "completedParts",
+  ]);
+  const platform = requireBoundedString(request.data.platform, "platform", 5, /^(amd|intel)$/);
+  const currentPage = Number(request.data.currentPage);
+  if (!Number.isInteger(currentPage) || currentPage < 1 || currentPage > MODULE_ONE_PARTS.length) {
+    throw new HttpsError("invalid-argument", "currentPage must be between 1 and 8.");
+  }
+  if (typeof request.data.introDone !== "boolean") {
+    throw new HttpsError("invalid-argument", "introDone must be a boolean.");
+  }
+  const lastVisitedModuleKey = requireBoundedString(
+    request.data.lastVisitedModuleKey, "lastVisitedModuleKey", 20, /^[a-z]+$/
+  );
+  if (!MODULE_ONE_PARTS.includes(lastVisitedModuleKey)) {
+    throw new HttpsError("invalid-argument", "Unknown Module 1 component.");
+  }
+  requirePlainObject(request.data.completedParts, "completedParts", MODULE_ONE_PARTS);
+  const completedParts = {};
+  for (const key of MODULE_ONE_PARTS) {
+    if (key in request.data.completedParts) {
+      if (typeof request.data.completedParts[key] !== "boolean") {
+        throw new HttpsError("invalid-argument", `completedParts.${key} must be a boolean.`);
+      }
+      completedParts[key] = request.data.completedParts[key];
+    }
+  }
+  await enforceRateLimit(uid, "save_module_one_progress", {
+    windowMs: 60_000, windowMax: 30, dailyMax: 1000,
+  });
+
+  const userRef = db.doc(`users/${uid}`);
+  let response;
+  await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(userRef);
+    if (!snapshot.exists) throw new HttpsError("not-found", "User profile was not found.");
+    const profile = snapshot.data() || {};
+    const previousModule = profile.moduleProgress?.module1 || {};
+    const previousPlatform = previousModule.platformProgress?.[platform] || {};
+    const mergedParts = { ...(previousPlatform.completedParts || {}), ...completedParts };
+    const completedCount = MODULE_ONE_PARTS.filter((key) => mergedParts[key] === true).length;
+    const percent = Math.round((completedCount / MODULE_ONE_PARTS.length) * 100);
+    const platformProgress = {
+      ...(previousModule.platformProgress || {}),
+      [platform]: {
+        ...previousPlatform,
+        currentPage,
+        introDone: request.data.introDone,
+        lastVisitedModuleKey,
+        completedParts: mergedParts,
+        percent,
+        completed: completedCount === MODULE_ONE_PARTS.length,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+    };
+    const nextModule = {
+      ...previousModule,
+      selectedPlatform: platform,
+      currentPage,
+      completedParts: mergedParts,
+      percent,
+      completed: completedCount === MODULE_ONE_PARTS.length,
+      platformProgress,
+      overallPercent: Math.round(((platformProgress.amd?.percent || 0) + (platformProgress.intel?.percent || 0)) / 2),
+      overallCompleted: platformProgress.amd?.completed === true && platformProgress.intel?.completed === true,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+    transaction.update(userRef, { "moduleProgress.module1": nextModule });
+    response = {
+      ...nextModule,
+      platformProgress: {
+        ...platformProgress,
+        [platform]: { ...platformProgress[platform], updatedAt: null },
+      },
+      updatedAt: null,
+    };
+  });
+  return response;
 });
 
 exports.completeGuidedModule = onCall(callableOptions, async (request) => {

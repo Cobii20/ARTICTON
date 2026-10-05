@@ -1,5 +1,6 @@
 ﻿import { recordModuleVisit } from "../../utils/moduleVisits";
 import React, { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { persistModuleOneProgress } from "../../utils/moduleOneProgress";
 import { Canvas } from "@react-three/fiber";
 import { Bounds, Html, OrbitControls, useGLTF } from "@react-three/drei";
 import { motion, AnimatePresence } from "framer-motion";
@@ -1216,6 +1217,7 @@ export default function Module1Page({ onBack, onLogout, resumeVisit }) {
   const [afkAutoRotate, setAfkAutoRotate] = useState(false);
   const afkTimerRef = useRef(null);
   const controlsRef = useRef();
+  const didRestoreProgressRef = useRef(false);
 
   const [settings, setSettings] = useState(getUserSettings);
 
@@ -1445,6 +1447,26 @@ export default function Module1Page({ onBack, onLogout, resumeVisit }) {
         savedAt: new Date().toISOString(),
       })
     );
+
+    try {
+      const savedProgress = await persistModuleOneProgress({
+        platform: currentPlatform,
+        currentPage: page,
+        introDone,
+        lastVisitedModuleKey: moduleKey,
+        completedParts: mergedParts,
+      });
+      setProfile((previous) => previous ? {
+        ...previous,
+        moduleProgress: {
+          ...(previous.moduleProgress || {}),
+          module1: savedProgress,
+        },
+      } : previous);
+      window.dispatchEvent(new Event("articton-progress-updated"));
+    } catch (error) {
+      console.error("Unable to save Module 1 progress:", error);
+    }
   };
 
   const goNextModule = async () => {
@@ -1551,7 +1573,8 @@ export default function Module1Page({ onBack, onLogout, resumeVisit }) {
   };
 
   useEffect(() => {
-    if (!profile) return;
+    if (!profile || didRestoreProgressRef.current) return;
+    didRestoreProgressRef.current = true;
 
     const resume = resumeVisit?.snapshot;
     if (resume && ["", "amd", "intel"].includes(resume.selectedPlatform) &&
@@ -1666,22 +1689,6 @@ export default function Module1Page({ onBack, onLogout, resumeVisit }) {
       setActiveId(null);
       setAfkAutoRotate(true);
     }, 15000);
-  };
-
-  const handleSelectModule = async (index) => {
-    const key = modules[index].key;
-
-    setCertificateWarning("");
-    setActiveId(null);
-    setLastCoords(null);
-    setModuleIndex(index);
-    setShowIntro(true);
-
-    await saveModule1Progress({
-      page: index + 1,
-      introDone: false,
-      moduleKey: key,
-    });
   };
 
   if (showCertificate) {
@@ -1947,7 +1954,6 @@ export default function Module1Page({ onBack, onLogout, resumeVisit }) {
                         modules={modules}
                         currentKey={current.key}
                         completedParts={completedParts}
-                        onSelect={handleSelectModule}
                         onViewCertificate={handleViewCertificate}
                         moduleFinished={moduleFinished}
                         certificateWarning={certificateWarning}
@@ -1982,34 +1988,32 @@ function PartsDock({
   modules,
   currentKey,
   completedParts,
-  onSelect,
   onViewCertificate,
   moduleFinished,
   certificateWarning,
 }) {
   return (
-    <div className="pointer-events-none absolute inset-x-3 bottom-3 z-[120] flex flex-col items-center gap-2 md:inset-x-6 md:bottom-5">
+    <div className="articton-module1-dock pointer-events-auto absolute bottom-3 left-1/2 z-[120] flex max-w-[calc(100%-1.5rem)] -translate-x-1/2 flex-col items-center gap-1 rounded-[28px] border border-[#FFD41C]/24 bg-[#06131b]/72 p-2 shadow-[0_0_35px_rgba(255,212,28,0.13),0_18px_70px_rgba(0,0,0,0.45)] backdrop-blur-xl md:bottom-5">
       {certificateWarning ? (
         <div className="pointer-events-auto max-w-[min(720px,calc(100vw-48px))] rounded-full border border-red-300/25 bg-red-500/12 px-4 py-2 text-center text-[11px] font-semibold text-red-100 shadow-[0_18px_50px_rgba(0,0,0,0.35)] backdrop-blur-xl">
           {certificateWarning}
         </div>
       ) : null}
 
-      <div className="articton-module1-bottom-nav pointer-events-auto flex max-w-full items-center gap-2 overflow-x-auto rounded-full border border-[#FFD41C]/24 bg-[#06131b]/72 p-2 shadow-[0_0_35px_rgba(255,212,28,0.13),0_18px_70px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+      <div className="articton-module1-bottom-nav pointer-events-none flex max-w-full items-center gap-2 overflow-x-auto px-1 py-1">
         {modules.map((m, index) => {
           const done = !!completedParts[m.key];
           const active = currentKey === m.key;
 
           return (
-            <button
+            <div
               key={m.key}
-              type="button"
-              onClick={() => onSelect(index)}
+              aria-current={active ? "step" : undefined}
               className={[
-                "articton-module1-nav-button flex h-11 items-center gap-2 whitespace-nowrap rounded-full border px-3 text-[12px] font-bold transition",
+                "articton-module1-nav-button flex h-11 cursor-default items-center gap-2 whitespace-nowrap rounded-full border px-3 text-[12px] font-bold",
                 active
                   ? "is-active border-[#FFD41C]/45 bg-[#FFD41C]/16 text-white shadow-[0_0_22px_rgba(255,212,28,0.13)]"
-                  : "border-white/10 bg-white/[0.035] text-[#b7c6dd] hover:bg-white/[0.08]",
+                  : "border-white/10 bg-white/[0.035] text-[#b7c6dd]",
               ].join(" ")}
             >
               <span
@@ -2021,20 +2025,19 @@ function PartsDock({
                 {done ? "OK" : index + 1}
               </span>
               <span className="hidden sm:inline">{m.name === "Motherboard" ? "MB" : m.name}</span>
-            </button>
+            </div>
           );
         })}
-
-        {moduleFinished ? (
-          <button
-            type="button"
-            onClick={onViewCertificate}
-            className="h-11 whitespace-nowrap rounded-full bg-[#FFD41C] px-4 text-[12px] font-black text-[#06131b] shadow-[0_0_28px_rgba(255,212,28,0.22)] transition hover:scale-[1.02]"
-          >
-            Certificate
-          </button>
-        ) : null}
       </div>
+
+      <button
+        type="button"
+        onClick={onViewCertificate}
+        disabled={!moduleFinished}
+        className="articton-module1-certificate-button pointer-events-auto whitespace-nowrap rounded-full border border-[#FFD41C]/24 bg-[#FFD41C]/10 px-5 py-2 text-[12px] font-black text-[#FFD41C] transition enabled:hover:bg-[#FFD41C] enabled:hover:text-[#06131b] disabled:cursor-not-allowed disabled:opacity-55"
+      >
+        {moduleFinished ? "View Certificate" : "Certificate · Complete all parts"}
+      </button>
     </div>
   );
 }
@@ -2081,7 +2084,7 @@ function SceneControls({
           type="button"
           onClick={onPrev}
           aria-label="Previous module"
-          className="absolute left-4 top-1/2 z-[115] flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-[#FFD41C]/25 bg-[#06131b]/74 text-lg font-black text-[#dbe6f5] shadow-[0_18px_60px_rgba(0,0,0,0.36)] backdrop-blur-xl transition hover:bg-white/[0.08] md:left-6"
+          className="absolute bottom-6 left-4 z-[125] flex h-11 w-11 items-center justify-center rounded-full border border-[#FFD41C]/25 bg-[#06131b]/74 text-lg font-black text-[#dbe6f5] shadow-[0_18px_60px_rgba(0,0,0,0.36)] backdrop-blur-xl transition hover:bg-white/[0.08] md:bottom-8 md:left-6"
         >
           &lt;
         </button>
@@ -2092,7 +2095,7 @@ function SceneControls({
           type="button"
           onClick={onNext}
           aria-label="Next module"
-          className="absolute right-4 top-1/2 z-[115] flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-[#FFD41C]/25 bg-[#06131b]/74 text-lg font-black text-[#dbe6f5] shadow-[0_18px_60px_rgba(0,0,0,0.36)] backdrop-blur-xl transition hover:bg-white/[0.08] md:right-6"
+          className="absolute bottom-6 right-4 z-[125] flex h-11 w-11 items-center justify-center rounded-full border border-[#FFD41C]/25 bg-[#06131b]/74 text-lg font-black text-[#dbe6f5] shadow-[0_18px_60px_rgba(0,0,0,0.36)] backdrop-blur-xl transition hover:bg-white/[0.08] md:bottom-8 md:right-6"
         >
           &gt;
         </button>

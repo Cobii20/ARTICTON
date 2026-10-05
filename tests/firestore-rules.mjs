@@ -33,6 +33,7 @@ test('signup creates only an owned student profile',async()=>{
  await assertSucceeds(setDoc(doc(fresh,'users/new'),{
   uid:'new',email:'new@example.com',role:'student',firstName:'New',lastName:'Student',
   middleName:'',gender:'',birthday:'',program:'',contactNumber:'',
+  moduleProgress:{},quizProgress:{},practicalProgress:{},practicalTests:{},mobileModuleScores:{},mobilePracticeScores:{},
   updatedAt:serverTimestamp(),createdAt:serverTimestamp()
  }));
 });

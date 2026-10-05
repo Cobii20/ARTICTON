@@ -102,6 +102,8 @@ service cloud.firestore {
           "subject",
           "message",
           "screenshotURL",
+          "screenshotPath",
+          "screenshotOriginalName",
           "status",
           "createdAt"
         ])
@@ -114,6 +116,10 @@ service cloud.firestore {
         && request.resource.data.message.size() > 0 && request.resource.data.message.size() <= 5000
         && request.resource.data.screenshotURL is string
         && request.resource.data.screenshotURL.size() <= 1000
+        && request.resource.data.screenshotPath is string
+        && request.resource.data.screenshotPath.size() <= 500
+        && request.resource.data.screenshotOriginalName is string
+        && request.resource.data.screenshotOriginalName.size() <= 180
         && request.resource.data.status == "open"
         && request.resource.data.createdAt == request.time;
     }
@@ -299,7 +305,7 @@ service cloud.firestore {
     match /users/{uid} {
       allow create: if signedIn()
         && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(["uid", "email", "role", "firstName", "lastName", "middleName", "gender", "birthday", "program", "contactNumber", "updatedAt", "createdAt"])
+        && request.resource.data.keys().hasOnly(["uid", "email", "role", "firstName", "lastName", "middleName", "gender", "birthday", "program", "contactNumber", "moduleProgress", "quizProgress", "practicalProgress", "practicalTests", "mobileModuleScores", "mobilePracticeScores", "updatedAt", "createdAt"])
         && request.resource.data.uid == uid
         && request.resource.data.email == request.auth.token.email
         && request.resource.data.role == "student"
@@ -310,6 +316,12 @@ service cloud.firestore {
         && request.resource.data.get("birthday", "") is string && request.resource.data.get("birthday", "").size() <= 20
         && request.resource.data.get("program", "") is string && request.resource.data.get("program", "").size() <= 100
         && request.resource.data.get("contactNumber", "") is string && request.resource.data.get("contactNumber", "").size() <= 30
+        && request.resource.data.get("moduleProgress", {}) == {}
+        && request.resource.data.get("quizProgress", {}) == {}
+        && request.resource.data.get("practicalProgress", {}) == {}
+        && request.resource.data.get("practicalTests", {}) == {}
+        && request.resource.data.get("mobileModuleScores", {}) == {}
+        && request.resource.data.get("mobilePracticeScores", {}) == {}
         && request.resource.data.updatedAt == request.time && request.resource.data.createdAt == request.time;
 
       allow read: if isAdmin() || isOwnUser(uid);

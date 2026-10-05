@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { collection, doc, onSnapshot, updateDoc } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
 import { ExternalLink, Inbox, Search } from "lucide-react";
-import { db } from "../firebase";
+import { db, functions } from "../firebase";
 
 const statusStyles = {
   open: "border-amber-400/25 bg-amber-400/10 text-amber-200",
@@ -17,6 +18,42 @@ function formatDate(value) {
 function statusLabel(status) {
   if (status === "in_progress") return "In progress";
   return status === "resolved" ? "Resolved" : "Open";
+}
+
+function TicketAttachment({ ticket }) {
+  const [url, setUrl] = useState("");
+  const [loadError, setLoadError] = useState("");
+  useEffect(() => {
+    if (!ticket.screenshotPath) return undefined;
+    let active = true;
+    let objectUrl = "";
+    const getAttachment = httpsCallable(functions, "getSupportTicketAttachment");
+    getAttachment({ ticketId: ticket.id }).then((result) => {
+      if (!active) return;
+      const binary = atob(result.data.data);
+      const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+      const blob = new Blob([bytes], { type: result.data.contentType || "image/webp" });
+      objectUrl = URL.createObjectURL(blob);
+      setUrl(objectUrl);
+    }).catch((error) => {
+      console.error("Unable to load support screenshot:", error);
+      if (active) setLoadError("Attachment unavailable");
+    });
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [ticket.id, ticket.screenshotPath]);
+
+  if (!ticket.screenshotPath) {
+    return ticket.screenshotURL ? <a href={ticket.screenshotURL} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-2 rounded-xl border border-[#FFD41C]/30 bg-[#FFD41C]/10 px-4 py-2 text-sm font-semibold text-[#FFD41C]">View attached screenshot <ExternalLink className="h-4 w-4" /></a> : null;
+  }
+  if (loadError) return <p className="mt-4 text-sm text-red-300">{loadError}</p>;
+  if (!url) return <p className="mt-4 text-sm text-[#9fb0c9]">Loading attachment...</p>;
+  return <a href={url} target="_blank" rel="noreferrer" className="mt-4 block max-w-xl overflow-hidden rounded-2xl border border-[#FFD41C]/25 bg-black/20">
+    <img src={url} alt={`Screenshot attached to ${ticket.subject || "support ticket"}`} className="max-h-80 w-full object-contain" />
+    <span className="flex items-center gap-2 px-4 py-3 text-sm font-semibold text-[#FFD41C]">Open full screenshot <ExternalLink className="h-4 w-4" /></span>
+  </a>;
 }
 
 export default function AdminSupportTickets() {
@@ -118,7 +155,7 @@ export default function AdminSupportTickets() {
           </select>
         </div>
         <p className="mt-5 whitespace-pre-wrap break-words rounded-2xl border border-[#1a2438] bg-white/[0.025] p-4 text-sm leading-7 text-[#dbe6f5]">{ticket.message || "No message provided."}</p>
-        {ticket.screenshotURL && <a href={ticket.screenshotURL} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-2 rounded-xl border border-[#FFD41C]/30 bg-[#FFD41C]/10 px-4 py-2 text-sm font-semibold text-[#FFD41C]">View attached screenshot <ExternalLink className="h-4 w-4" /></a>}
+        <TicketAttachment ticket={ticket} />
       </article>;
     })}</div>}
   </section>;

@@ -20,6 +20,7 @@ import { httpsCallable } from "firebase/functions";
 import { doc, getDoc } from "firebase/firestore";
 import { AchievementToast, resolveAchievement } from "../../../utils/achievements.jsx";
 import { completeGuidedModule } from "../../../utils/authoritativeModules.js";
+import { saveGuidedModuleProgress } from "../../../utils/guidedModuleProgress.js";
 import { formatTutorReply } from "../../../utils/tutorReply.js";
 import { getUserSettings } from "../../../utils/userSettings";
 import { PDF_BASED_ASSEMBLY_GUIDES } from "../../../utils/pdfBasedInstructionGuides";
@@ -2870,6 +2871,15 @@ export default function Module3AssemblyAMD({
       snapshot: { step, completedParts, finalRoundCompletedParts, showIntro },
     });
   }, [firebaseUser?.uid, step, completedParts, finalRoundCompletedParts, showIntro, currentStep.name, effectiveCompletedSteps]);
+
+  useEffect(() => {
+    if (!firebaseUser) return undefined;
+    const timer = window.setTimeout(() => {
+      saveGuidedModuleProgress({ moduleId: "module3AMD", currentStep: step, completedSteps: effectiveCompletedSteps, showIntro })
+        .catch((error) => console.error("Error saving Module 3 (AMD) progress:", error));
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [firebaseUser, step, effectiveCompletedSteps, showIntro]);
 
   const currentStepCompleted = isFinalRound
     ? finalRoundComplete

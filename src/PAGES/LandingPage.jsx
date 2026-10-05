@@ -401,6 +401,12 @@ function SignupPage({ onBack, onSwitchToLogin, onAfterSignup }) {
         birthday,
         program,
         contactNumber: contactNumber.trim(),
+        moduleProgress: {},
+        quizProgress: {},
+        practicalProgress: {},
+        practicalTests: {},
+        mobileModuleScores: {},
+        mobilePracticeScores: {},
         updatedAt: serverTimestamp(),
         createdAt: serverTimestamp(),
       });

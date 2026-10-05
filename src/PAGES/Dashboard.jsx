@@ -280,7 +280,7 @@ const openModule = (id, platform)=>{
     const module2AmdCompletedCount = Object.values(module2AMDProgress?.completedSteps || {}).filter(Boolean).length;
     const module2IntelCompletedCount = Object.values(module2INTELProgress?.completedSteps || {}).filter(Boolean).length;
     const module2PlatformCompletedCount = module2AmdCompletedCount + module2IntelCompletedCount;
-    const module2TotalSteps = 7;
+    const module2TotalSteps = 8;
 
     const module3Progress = profile?.moduleProgress?.module3;
     const module3AMDProgress = profile?.moduleProgress?.module3AMD;
@@ -290,7 +290,7 @@ const openModule = (id, platform)=>{
     const module3AmdCompletedCount = Object.values(module3AMDProgress?.completedSteps || {}).filter(Boolean).length;
     const module3IntelCompletedCount = Object.values(module3INTELProgress?.completedSteps || {}).filter(Boolean).length;
     const module3PlatformCompletedCount = module3AmdCompletedCount + module3IntelCompletedCount;
-    const module3TotalSteps = 7;
+    const module3TotalSteps = 9;
 
     const module4Progress = profile?.moduleProgress?.module4;
     const module4CompletedCount = Object.values(module4Progress?.completedSteps || {}).filter(Boolean).length;
@@ -1310,6 +1310,48 @@ function CustomerServiceModal({ isOpen, onClose, user }) {
   const [submitted, setSubmitted] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [attachment, setAttachment] = useState(null);
+  const [attachmentPreview, setAttachmentPreview] = useState("");
+  const attachmentInputRef = useRef(null);
+
+  useEffect(() => () => {
+    if (attachmentPreview) URL.revokeObjectURL(attachmentPreview);
+  }, [attachmentPreview]);
+
+  const selectAttachment = (event) => {
+    const file = event.target.files?.[0] || null;
+    setSubmitError("");
+    if (!file) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setSubmitError("Choose a JPEG, PNG, or WebP screenshot.");
+      event.target.value = "";
+      return;
+    }
+    if (file.size > 4 * 1024 * 1024) {
+      setSubmitError("The screenshot must be 4 MB or smaller.");
+      event.target.value = "";
+      return;
+    }
+    setAttachment(file);
+    setAttachmentPreview(URL.createObjectURL(file));
+  };
+
+  const removeAttachment = () => {
+    setAttachment(null);
+    setAttachmentPreview("");
+    if (attachmentInputRef.current) attachmentInputRef.current.value = "";
+  };
+
+  const encodeAttachment = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Unable to read the screenshot."));
+    reader.onload = () => {
+      const data = String(reader.result || "").split(",")[1];
+      if (!data) reject(new Error("Unable to read the screenshot."));
+      else resolve({ name: file.name, type: file.type, data });
+    };
+    reader.readAsDataURL(file);
+  });
 
   const handleSubmit = async () => {
     if (uploading) return;
@@ -1325,7 +1367,12 @@ function CustomerServiceModal({ isOpen, onClose, user }) {
     try {
       setUploading(true);
       const submitSupportTicket = httpsCallable(functions, "submitSupportTicket");
-      await submitSupportTicket({ subject: subject.trim(), message: message.trim() });
+      const encodedAttachment = attachment ? await encodeAttachment(attachment) : undefined;
+      await submitSupportTicket({
+        subject: subject.trim(),
+        message: message.trim(),
+        ...(encodedAttachment ? { attachment: encodedAttachment } : {}),
+      });
 
       setSubmitted(true);
 
@@ -1333,6 +1380,7 @@ function CustomerServiceModal({ isOpen, onClose, user }) {
         setSubmitted(false);
         setSubject("");
         setMessage("");
+        removeAttachment();
         onClose();
       }, 1800);
     } catch (err) {
@@ -1340,7 +1388,9 @@ function CustomerServiceModal({ isOpen, onClose, user }) {
       setSubmitError(
         err?.code === "functions/resource-exhausted"
           ? "Please wait before sending another concern."
-          : "Your request could not be sent. Please try again."
+          : err?.code === "functions/invalid-argument"
+            ? String(err.message || "The screenshot is invalid.").replace(/^.*?:\s*/, "")
+            : "Your request could not be sent. Please try again."
       );
     } finally {
       setUploading(false);
@@ -1397,8 +1447,32 @@ function CustomerServiceModal({ isOpen, onClose, user }) {
                 />
               </div>
 
-              <div className="rounded-2xl border border-[#1a2438] bg-white/[0.03] px-4 py-3 text-sm text-[#9fb0c9]">
-                Screenshot attachments are disabled until server-side file validation is available.
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-[0.2em] text-[#7a8ba8]">Screenshot <span className="normal-case tracking-normal text-[#66758f]">(optional)</span></label>
+                <input id="support-screenshot" ref={attachmentInputRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={selectAttachment} className="sr-only" />
+                {!attachmentPreview && <label htmlFor="support-screenshot" className="group mt-2 flex cursor-pointer items-center gap-4 rounded-2xl border border-dashed border-[#34415a] bg-white/[0.025] p-4 transition hover:border-[#FFD41C]/60 hover:bg-[#FFD41C]/[0.04] focus-within:border-[#FFD41C]">
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#FFD41C]/25 bg-[#FFD41C]/10 text-[#FFD41C] transition group-hover:scale-105">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 fill-none stroke-current" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="4" width="18" height="16" rx="3" />
+                      <circle cx="8.5" cy="9" r="1.5" />
+                      <path d="m5 17 4.5-4.5 3 3 2-2L19 18" />
+                    </svg>
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold text-white">Add a screenshot</span>
+                    <span className="mt-0.5 block text-xs text-[#7a8ba8]">PNG, JPG, or WebP · maximum 4 MB</span>
+                  </span>
+                  <span className="shrink-0 rounded-xl border border-[#FFD41C]/35 bg-[#FFD41C] px-4 py-2 text-xs font-bold text-[#0a0e17] shadow-[0_8px_24px_rgba(255,212,28,0.12)] transition group-hover:-translate-y-0.5">Browse</span>
+                </label>}
+                {attachmentPreview && <div className="mt-3 flex items-center gap-3">
+                  <img src={attachmentPreview} alt="Selected screenshot preview" className="h-20 w-28 rounded-xl border border-[#34415a] bg-black/20 object-cover" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm text-white">{attachment.name}</p>
+                    <p className="mt-1 text-xs text-[#7a8ba8]">{(attachment.size / 1024 / 1024).toFixed(2)} MB · ready to attach</p>
+                  </div>
+                  <button type="button" onClick={removeAttachment} className="rounded-xl border border-red-400/20 bg-red-500/[0.06] px-3 py-2 text-xs font-semibold text-red-300 transition hover:bg-red-500/10">Remove</button>
+                </div>}
+                <p className="mt-2 text-[11px] text-[#66758f]">For your privacy, metadata is removed before the image is saved.</p>
               </div>
 
               {submitError ? <p role="alert" className="text-sm text-red-400">{submitError}</p> : null}
@@ -1513,9 +1587,6 @@ function PracticalScoresCard({ tests = [], onViewAll }) {
             Practical Exam Scores
           </div>
 
-          <div className="mt-1 text-sm text-[#7a8ba8]">
-            Your latest results from Firebase Firestore
-          </div>
         </div>
 
         {onViewAll ? (

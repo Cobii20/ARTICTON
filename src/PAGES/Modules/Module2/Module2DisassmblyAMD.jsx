@@ -22,6 +22,7 @@ import { httpsCallable } from "firebase/functions";
 import { doc, getDoc } from "firebase/firestore";
 import { AchievementToast, resolveAchievement } from "../../../utils/achievements.jsx";
 import { completeGuidedModule } from "../../../utils/authoritativeModules.js";
+import { saveGuidedModuleProgress } from "../../../utils/guidedModuleProgress.js";
 import { formatTutorReply } from "../../../utils/tutorReply.js";
 import { getUserSettings } from "../../../utils/userSettings";
 import { PDF_BASED_DISASSEMBLY_GUIDES } from "../../../utils/pdfBasedInstructionGuides";
@@ -49,16 +50,16 @@ import {
 const steps = DISASSEMBLY_STEPS;
 
 const PART_MODELS = [
-  { key: "table", path: "/models/AMDtable.glb" },
-  { key: "case", path: "/models/NEWcaseAMD.glb" },
-  { key: "motherboard", path: "/models/NEWmotherboardAMD.glb" },
-  { key: "cpu", path: "/models/NEWcpuAMD.glb" },
-  { key: "ram1", path: "/models/NEWramAMD.glb" },
-  { key: "ram2", path: "/models/NEWram2AMD.glb" },
-  { key: "ssd", path: "/models/NEWssdAMD.glb" },
-  { key: "hdd", path: "/models/NEWhddAMD.glb" },
-  { key: "psu", path: "/models/NEWpsuAMD.glb" },
-  { key: "gpu", path: "/models/NEWgpuAMD.glb" },
+  { key: "table", path: "/models/disassembly/AMDtable.glb" },
+  { key: "case", path: "/models/disassembly/NEWcaseAMD.glb" },
+  { key: "motherboard", path: "/models/disassembly/NEWmotherboardAMD.glb" },
+  { key: "cpu", path: "/models/disassembly/NEWcpuAMD.glb" },
+  { key: "ram1", path: "/models/disassembly/NEWramAMD.glb" },
+  { key: "ram2", path: "/models/disassembly/NEWram2AMD.glb" },
+  { key: "ssd", path: "/models/disassembly/NEWssdAMD.glb" },
+  { key: "hdd", path: "/models/disassembly/NEWhddAMD.glb" },
+  { key: "psu", path: "/models/disassembly/NEWpsuAMD.glb" },
+  { key: "gpu", path: "/models/disassembly/NEWgpuAMD.glb" },
 ];
 
 const GUIDED_STEPS = steps.filter((step) => step.key !== "final");
@@ -1475,28 +1476,8 @@ function SourcePartGuide({ part }) {
   const pulseRef = useRef(null);
 
   const guideData = useMemo(() => {
-    const sourceScene = scene.clone(true);
-    const materials = [];
-
-    sourceScene.traverse((object) => {
-      if (!object.isMesh) return;
-      object.raycast = () => null;
-      object.renderOrder = 1200;
-      const material = new THREE.MeshBasicMaterial({
-        color: "#ffcf5a",
-        transparent: true,
-        opacity: 0.72,
-        wireframe: true,
-        depthTest: false,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-      });
-      object.material = material;
-      materials.push(material);
-    });
-
-    sourceScene.updateMatrixWorld(true);
-    const bounds = new THREE.Box3().setFromObject(sourceScene);
+    scene.updateMatrixWorld(true);
+    const bounds = new THREE.Box3().setFromObject(scene);
     const center = bounds.getCenter(new THREE.Vector3());
     const size = bounds.getSize(new THREE.Vector3());
     const radius = THREE.MathUtils.clamp(
@@ -1510,18 +1491,11 @@ function SourcePartGuide({ part }) {
       center.z + Math.max(size.z * 0.32, 0.45)
     );
 
-    return { sourceScene, materials, center, size, radius, callout };
+    return { center, size, radius, callout };
   }, [scene]);
-
-  useEffect(() => {
-    return () => guideData.materials.forEach((material) => material.dispose());
-  }, [guideData]);
 
   useFrame(({ clock }) => {
     const pulse = (Math.sin(clock.elapsedTime * 5) + 1) / 2;
-    guideData.materials.forEach((material) => {
-      material.opacity = 0.42 + pulse * 0.48;
-    });
     if (pulseRef.current) {
       pulseRef.current.scale.setScalar(0.9 + pulse * 0.22);
     }
@@ -1529,14 +1503,24 @@ function SourcePartGuide({ part }) {
 
   return (
     <group>
-      <primitive object={guideData.sourceScene} dispose={null} />
+      <mesh position={guideData.center} renderOrder={1200} raycast={() => null}>
+        <boxGeometry args={guideData.size.toArray()} />
+        <meshBasicMaterial
+          color="#ffcf5a"
+          transparent
+          opacity={0.64}
+          wireframe
+          depthTest={false}
+          depthWrite={false}
+        />
+      </mesh>
 
       <mesh
         ref={pulseRef}
         position={guideData.center}
         renderOrder={1201}
       >
-        <sphereGeometry args={[guideData.radius, 24, 16]} />
+        <sphereGeometry args={[guideData.radius, 16, 10]} />
         <meshBasicMaterial
           color="#ffcf5a"
           transparent
@@ -1554,50 +1538,14 @@ function PlacementTargetGuide({ part }) {
   const target = PLACEMENT_TARGETS[part.key];
   const { scene } = useGLTF(encodeURI(part.path));
   const pulseRef = useRef(null);
+  const fillRef = useRef(null);
+  const wireRef = useRef(null);
   const ringRef = useRef(null);
   const innerRingRef = useRef(null);
 
   const guideData = useMemo(() => {
-    const fillScene = scene.clone(true);
-    const wireScene = scene.clone(true);
-    const fillMaterials = [];
-    const wireMaterials = [];
-
-    fillScene.traverse((object) => {
-      if (!object.isMesh) return;
-      object.raycast = () => null;
-      object.renderOrder = 1080;
-      const material = new THREE.MeshBasicMaterial({
-        color: "#00ffb4",
-        transparent: true,
-        opacity: 0.11,
-        depthTest: false,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-      });
-      object.material = material;
-      fillMaterials.push(material);
-    });
-
-    wireScene.traverse((object) => {
-      if (!object.isMesh) return;
-      object.raycast = () => null;
-      object.renderOrder = 1081;
-      const material = new THREE.MeshBasicMaterial({
-        color: "#73ffd4",
-        transparent: true,
-        opacity: 0.76,
-        wireframe: true,
-        depthTest: false,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-      });
-      object.material = material;
-      wireMaterials.push(material);
-    });
-
-    fillScene.updateMatrixWorld(true);
-    const bounds = new THREE.Box3().setFromObject(fillScene);
+    scene.updateMatrixWorld(true);
+    const bounds = new THREE.Box3().setFromObject(scene);
     const center = bounds.getCenter(new THREE.Vector3());
     const size = bounds.getSize(new THREE.Vector3());
     const targetQuaternion = target.preserveInstalledRotation
@@ -1610,10 +1558,6 @@ function PlacementTargetGuide({ part }) {
     );
 
     return {
-      fillScene,
-      wireScene,
-      fillMaterials,
-      wireMaterials,
       center,
       size,
       targetQuaternion,
@@ -1621,26 +1565,18 @@ function PlacementTargetGuide({ part }) {
     };
   }, [scene, target.preserveInstalledRotation]);
 
-  useEffect(() => {
-    return () => {
-      [...guideData.fillMaterials, ...guideData.wireMaterials].forEach(
-        (material) => material.dispose()
-      );
-    };
-  }, [guideData]);
-
   useFrame(({ clock }) => {
     const pulse = (Math.sin(clock.elapsedTime * 3.4) + 1) / 2;
 
     if (pulseRef.current) {
       pulseRef.current.scale.setScalar(0.985 + pulse * 0.03);
     }
-    guideData.fillMaterials.forEach((material) => {
-      material.opacity = 0.07 + pulse * 0.11;
-    });
-    guideData.wireMaterials.forEach((material) => {
-      material.opacity = 0.5 + pulse * 0.34;
-    });
+    if (fillRef.current?.material) {
+      fillRef.current.material.opacity = 0.07 + pulse * 0.11;
+    }
+    if (wireRef.current?.material) {
+      wireRef.current.material.opacity = 0.5 + pulse * 0.34;
+    }
 
     if (ringRef.current?.material) {
       ringRef.current.material.opacity = 0.28 + pulse * 0.48;
@@ -1664,10 +1600,27 @@ function PlacementTargetGuide({ part }) {
       <group ref={pulseRef}>
         <group position={guideData.center.toArray()}>
           <group quaternion={guideData.targetQuaternion}>
-            <group position={guideData.center.clone().multiplyScalar(-1).toArray()}>
-              <primitive object={guideData.fillScene} dispose={null} />
-              <primitive object={guideData.wireScene} dispose={null} />
-            </group>
+            <mesh ref={fillRef} renderOrder={1080} raycast={() => null}>
+              <boxGeometry args={guideData.size.toArray()} />
+              <meshBasicMaterial
+                color="#00ffb4"
+                transparent
+                opacity={0.11}
+                depthTest={false}
+                depthWrite={false}
+              />
+            </mesh>
+            <mesh ref={wireRef} renderOrder={1081} raycast={() => null}>
+              <boxGeometry args={guideData.size.toArray()} />
+              <meshBasicMaterial
+                color="#73ffd4"
+                transparent
+                opacity={0.76}
+                wireframe
+                depthTest={false}
+                depthWrite={false}
+              />
+            </mesh>
           </group>
         </group>
       </group>
@@ -1678,7 +1631,7 @@ function PlacementTargetGuide({ part }) {
         rotation={[-Math.PI / 2, 0, 0]}
         renderOrder={1078}
       >
-        <ringGeometry args={[ringRadius * 0.78, ringRadius, 64]} />
+        <ringGeometry args={[ringRadius * 0.78, ringRadius, 32]} />
         <meshBasicMaterial
           color="#00ffb4"
           transparent
@@ -1695,7 +1648,7 @@ function PlacementTargetGuide({ part }) {
         rotation={[-Math.PI / 2, 0, 0]}
         renderOrder={1079}
       >
-        <ringGeometry args={[ringRadius * 0.34, ringRadius * 0.44, 64]} />
+        <ringGeometry args={[ringRadius * 0.34, ringRadius * 0.44, 32]} />
         <meshBasicMaterial
           color="#ffffff"
           transparent
@@ -2774,6 +2727,15 @@ export default function Module2DisassemblyAMD({ onFinish, onBack, onLogout, onSw
       snapshot: { step, completedParts, finalRoundCompletedParts, showIntro },
     });
   }, [firebaseUser?.uid, step, completedParts, finalRoundCompletedParts, showIntro, currentStep.name, effectiveCompletedSteps]);
+
+  useEffect(() => {
+    if (!firebaseUser) return undefined;
+    const timer = window.setTimeout(() => {
+      saveGuidedModuleProgress({ moduleId: "module2AMD", currentStep: step, completedSteps: effectiveCompletedSteps, showIntro })
+        .catch((error) => console.error("Error saving Module 2 (AMD) progress:", error));
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [firebaseUser, step, effectiveCompletedSteps, showIntro]);
 
   const currentStepCompleted = currentStep?.key === "final"
     ? finalRoundComplete
